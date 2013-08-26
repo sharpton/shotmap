@@ -96,6 +96,17 @@ sub opts{
     return $self->{"opts"};
 }
 
+
+sub project_path{
+    my $self = shift;
+    my $path = shift;
+    if( defined( $path ) ){
+	$self->{"projectpath"} = $path;
+    }
+    return $self->{"projectpath"};
+}
+sub get_project_path{ my $self = shift; return $self->project_path };
+
 sub get_sample_ids {
     my ($self) = @_;
     my @sample_ids = ();
@@ -107,22 +118,6 @@ sub get_sample_ids {
     return \@sample_ids; # <-- array reference!
 }
 
-=head2 set_dbi_connection
-
- Title   : set_dbi_connection
- Usage   : $analysis->set_dbi_conection( "DBI:mysql:IMG" );
- Function: Create a connection with mysql (or other) database
- Example : my $connection = analysis->set_dbi_connection( "DBI:mysql:IMG" );
- Returns : A DBI connection string (scalar, optional)
- Args    : A DBI connection string (scalar)
-
-=cut
-
-
-sub get_db_name()        { my $self = shift; return $self->{"db_name"}; }
-sub get_db_hostname()    { my $self = shift; return $self->{"db_hostname"}; }
-sub get_dbi_connection() { my $self = shift; return $self->{"dbi"}; }
-
 sub set_bulk_insert_count{
     my ($self, $count) = @_;
     $self->{"bulk_insert_count"} = $count;
@@ -133,14 +128,6 @@ sub set_bulk_insert_count{
  Usage   : $analysis->set_project_path( "~/data/metaprojects/project1/" );
  Function: Point to the raw project data directory (not the ffdb version)
 =cut 
-
-sub set_project_path{
-    my $self = shift;
-    my $path = shift;
-    $self->{"projectpath"} = $path;
-}
-sub get_project_path{ my $self = shift;    return $self->{"projectpath"}; }
-
 
 
 =head2 get_sample_path
@@ -156,103 +143,12 @@ sub get_project_path{ my $self = shift;    return $self->{"projectpath"}; }
 
 sub get_sample_path($) { # note the mandatory (numeric?) argument!
     my ($self, $sample_id) = @_;
-    (defined($self->get_ffdb())) or die "ffdb was not defined! This can't be called until AFTER you call set_ffdb.";
+    (defined($self->ffdb())) or die "ffdb was not defined! This can't be called until AFTER you call set_ffdb.";
     (defined($sample_id)) or die "get_sample_path has ONE MANDATORY argument! It can NOT be called with an undefined input sample_id! In this case, Sample id was not defined!";
-    (defined($self->get_project_id())) or die "Project ID was not defined!";
+    (defined($self->project_id())) or die "Project ID was not defined!";
     (defined($self->db_name())) or die "Database name was not defined!";
-    return(File::Spec->catfile($self->get_ffdb(), "projects", $self->db_name(), $self->get_project_id(), "$sample_id")); # concatenates items into a filesystem path
+    return(File::Spec->catfile($self->ffdb(), "projects", $self->db_name(), $self->project_id(), "$sample_id")); # concatenates items into a filesystem path
 }
-
-=head2 set_username 
-
- Title   : set_username
- Usage   : $analysis->set_username( $username );
- Function: Set the MySQL username
- Example : my $username = $analysis->set_username( "joebob" );
- Args    : A username (string)
-
-=cut 
-
-sub set_username { # note: this is the MYSQL username!
-    my ($self, $user) = @_; $self->{"user"} = $user;
-}
-sub get_username() { my $self = shift; return $self->{"user"}; }
-
-=head2 set_password
-
- Title   : set_password
- Usage   : $analysis->set_password( $password );
- Function: Set the MySQL password
- Example : my $username = $analysis->set_password( "123456abcde" );
- Args    : A password (string)
-
-=cut 
-
-#NOTE: This is pretty dubious! Need to add encryption/decryption function before official release
-
-sub set_password{
-    my $self = shift;
-    my $path = shift;
-    warn "In MRC.pm (function: set_password()): Note: we are setting the password in plain text here. This should ideally be eventually changed to involve encryption or something.";
-    $self->{"pass"} = $path;
-}
-sub get_password { my $self = shift; return $self->{"pass"}; }
-
-
-sub get_password_from_file{
-    my ( $self, $passfile ) = @_;
-    open( FILE, $passfile ) || die "Can't open $passfile for read:$!\n";
-    my $pass;
-    while(<FILE>){
-	chomp $_;
-	if( $_ =~ m/^dbpass\=(.*)$/ ){
-	    $pass = $1;
-	}
-    }
-    close FILE;
-    return $pass;
-}
-
-
-
-=head2 build_schema
-
- Title   : build_schema
- Usage   : $analysis->build_schema();
- Function: Construct the DBIx schema for the DB that MRC interfaces with. Store it in the MRC object
- Example : my $schema = $analysis->build_schema();
- Returns : A DBIx schema
- Args    : None, but requires that set_username, set_password and set_dbi_connection have been called first
-
-=cut
-
-
-=head2 get_schema
-
- Title   : get_schema
- Usage   : $analysis->get_schema();
- Function: Obtain the DBIx schema for the database MRC interfaces with
- Example : my $schema = $analysis->get_schema( );
- Returns : A DBIx schema object
- Args    : None
-
-=cut 
-
-
-
-=head2 set_project_id
-
- Title   : set_project_id
- Usage   : $analysis->set_project_id( $project_id );
- Function: Store the project's database identifier (project_id) in the MRC object
- Example : my $project_id = MRC::DB::insert_project();
-           $analysis->set_project_id( $project_id );
- Returns : The project_id (scalar)
- Args    : The project_id (scalar)
-
-=cut 
-
-#NOTE: Check that the MRC::DB::insert_project() function is named/called correctly above
 
 sub project_id{
     my ($self, $pid) = @_;
@@ -395,7 +291,7 @@ sub remote_exe_path{
 }
 
 sub remote_ffdb{
-    my( $self, $value ) = shift;
+    my( $self, $value ) = @_;
     if( defined( $value ) ){
 	$self->{"rffdb"} = $value;
     }
@@ -404,56 +300,23 @@ sub remote_ffdb{
 
 sub remote_project_path{
    my ($self) = @_;
-   (defined($self->get_remote_ffdb())) or warn "get_remote_project_path: Remote ffdb path was NOT defined at this point, but we requested it anyway!\n";
-   (defined($self->get_project_id())) or warn "get_remote_project_path: Project ID was NOT defined at this point, but we requested it anyway!.\n";
+   (defined($self->remote_ffdb())) or warn "get_remote_project_path: Remote ffdb path was NOT defined at this point, but we requested it anyway!\n";
+   (defined($self->project_id())) or warn "get_remote_project_path: Project ID was NOT defined at this point, but we requested it anyway!.\n";
    (defined($self->db_name())) or warn "get_remote_project_path: Database name was NOT defined at this point, but we requested it anyway!.\n";
-   my $path = $self->get_remote_ffdb() . "/projects/" . $self->db_name . "/" . $self->get_project_id() . "/";
+   my $path = $self->remote_ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/";
    return $path;
 }
 
 sub remote_sample_path{
     my ( $self, $sample_id ) = @_;    
-    my $path = $self->get_remote_ffdb() . "/projects/" . $self->db_name() . "/" . $self->get_project_id() . "/" . $sample_id . "/";
+    my $path = $self->remote_ffdb() . "/projects/" . $self->db_name() . "/" . $self->project_id() . "/" . $sample_id . "/";
     return $path;
 }
 
-=head2 get_remote_connection
-
- Title   : get_remote_connection
- Function: Get the connection string to the remote host (i.e., username@hostname). Must have set remote_username and
-           remote_server before running this command
- Returns : A connection string(string) 
-=cut 
 sub remote_connection{
     my ($self) = @_;
-    return($self->get_remote_username() . "@" . $self->get_remote_server());
+    return($self->remote_user() . "@" . $self->remote_host());
 }
-
-
-
-=head is_strict_clustering
-
- Title   : is_strict_clustering
- Usage   : $analysis->is_strict_clustering( 1 );
- Function: If the project uses strict clustering, set this switch. Future implementation may alternatively enable
-           fuzzy clustering. Maybe.
- Example : my $is_strict = $analysis->is_strict_clustering( 1 );
- Returns : A binary of whether the project uses strict clusterting (binary)
- Args    : A binary of whether the project uses strict clusterting (binary)
-
-=cut 
-
-
-=head set_evalue_threshold
-
- Title   : set_evalue_threshold
- Usage   : $analysis->set_evalue_threshold( 0.001 );
- Function: What evalue threshold should be used to assess classification of reads into families?
- Example : my $e_value = $analysis->set_evalue_threshold( 0.001 );
- Returns : An evalue (float)
- Args    : An evalue (float)
-
-=cut 
 
 sub class_evalue{
     my ( $self, $value ) = @_;
@@ -678,9 +541,9 @@ sub build_schema{
     my $self   = shift;
     if( !defined( $self->{"schema_name"} ) ){
 	warn( "You did not specify a schema name, so I'm defaulting to ShotDB\n" ); 
-	$self->set_schema_name( "ShotDB" );
+	$self->set_schema_name( "ShotDB::Schema" );
     }
-    my $schema = $self->{"schema_name"}->connect( $self->{"dbi"}, $self->{"user"}, $self->{"pass"},
+    my $schema = $self->{"schema_name"}->connect( $self->dbi_connection, $self->db_user, $self->db_pass,
 						  #since we have terms in DB that are reserved words in mysql (e.g., order)
 						  #we need to put quotes around those field ids when calling SQL
 						  {
@@ -748,7 +611,7 @@ sub schema_name{
 	if ($name =~ m/::Schema$/) { ## <-- does the new schema end in the literal text '::Schema'?
 	    $self->{"schema_name"} = $name; # Should end in ::Schema . "::Schema";
 	} else {
-	    warn("Note: you passed the schema name in as \"$name\", but names should always end in the literal text \"::Schema\". So we have actually modified the input argument, now the schema name is being set to: " . $name . ":::Schema\" ");
+	    warn("Note: you passed the schema name in as \"$name\", but names should always end in the literal text \"::Schema\". So we have actually modified the input argument, now the schema name is being set to: " . $name . "::Schema\" ");
 	    $self->{"schema_name"} = $name . "::Schema"; # Append "::Schema" to the name.
 	}
     }
@@ -796,7 +659,7 @@ sub dbi_connection {
     if( defined( $dbipath ) ){
 	$self->{"dbi"} = $dbipath;
     }
-    return $dbipath;
+    return $self->{"dbi"};
 }
 
 sub remote_master_dir{
@@ -805,6 +668,22 @@ sub remote_master_dir{
 	$self->{"rdir"} = $value;
     }
     return $self->{"rdir"};
+}
+
+sub dryrun{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"dryrun"} = $value;
+    }
+    return $self->{"dryrun"};
+}
+
+sub read_split_size{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"seq-split-size"} = $value;
+    }
+    return $self->{"seq-split-size"};
 }
 
 #######
@@ -825,7 +704,7 @@ sub remote_master_dir{
 sub build_remote_ffdb {
     my ($self, $verbose) = @_;
     my $rffdb      = $self->{"rffdb"};
-    my $connection = $self->get_remote_connection();
+    my $connection = $self->remote_connection();
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/projects", $verbose);
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/HMMdbs"  , $verbose);   
@@ -836,7 +715,7 @@ sub build_remote_script_dir {
     my ($self, $verbose) = @_;
     my $rscripts      = $self->{"remote_script_dir"};
     ( defined($rscripts) ) || die "The remote scripts directory was not defined, so we cannot create it!\n";
-    my $connection = $self->get_remote_connection();
+    my $connection = $self->remote_connection();
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rscripts"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
 }
 

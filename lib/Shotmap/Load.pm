@@ -15,6 +15,7 @@ package Shotmap::Load;
 use Shotmap;
 use Getopt::Long qw(GetOptionsFromString GetOptionsFromArray);
 use File::Basename;
+use Data::Dumper;
 
 sub check_vars{
     my $self = shift;
@@ -301,11 +302,30 @@ sub get_options{
     $self->opts( \%options );    
 }
 
+sub get_password_from_file{
+    my ( $self, $passfile ) = @_;
+    open( FILE, $passfile ) || die "Can't open $passfile for read:$!\n";
+    my $pass;
+    while(<FILE>){
+	chomp $_;
+	if( $_ =~ m/^dbpass\=(.*)$/ ){
+	    $pass = $1;
+	}
+    }
+    close FILE;
+    return $pass;
+}
 
 sub set_params{
     my ( $self ) = @_;
-    
+
+    # Some run time parameters
+    $self->dryrun( $self->opts->{"dryrun"} );
+    $self->project_id( $self->opts->{"pid"} );
+    $self->project_dir( $self->opts->{"projdir"} );
+
     # Set orf calling parameters
+    $self->read_split_size( $self->opts->{"seq-split-size"} );
     my $trans_method = $self->opts->{"trans-method"};
     if( $self->opts->{"split-orfs"} ){
 	$trans_method = $trans_method . "_split";
@@ -380,7 +400,7 @@ sub set_params{
 	$self->remote_exe_path( $self->opts->{"rpath"} );
 	$self->remote_master_dir( $self->opts->{"rdir"} );
 	$self->remote_scripts( $self->remote_master_dir . "/scripts" ); 
-	$self->remote_ffdb( $self->remote_master_dir . "/MRC_ffdb" ); 
+	$self->remote_ffdb(    $self->remote_master_dir . "/MRC_ffdb" ); 
 	$self->Shotmap::Notify::warn_ssh_keys();
 	#if we aren't staging, does the database exist on the remote server?
 	if( !$self->stage ){
@@ -411,15 +431,14 @@ sub set_params{
     
     # Set Relational (MySQL) database values
     $self->db_name( $self->opts->{"dbname"} );
-    $self->db_host( $self->opts->{"dhbost"} );
+    $self->db_host( $self->opts->{"dbhost"} );
     $self->db_user( $self->opts->{"dbuser"} );
     my $DBIstring = "DBI:mysql:" . $self->db_name . ":" . $self->db_host;
-    $self->dbi_connection($DBIstring); 
+    $self->dbi_connection($DBIstring);
     if( defined( $self->opts->{"dbpass"} ) ){
 	$self->db_pass( $self->opts->{"dbpass"} ); 
-    }
-    elsif( defined( $self->opts->{"conf-file"}) ){
-	my $pass = $self->get_password_from_file( $self->opts->{"conf-file"} );
+    } elsif( defined( $self->opts->{"conf-file"}) ){
+	my $pass = $self->Shotmap::Load::get_password_from_file( $self->opts->{"conf-file"} );
 	$self->db_pass( $pass );
     }
     $self->schema_name( $self->opts->{"dbschema"} );

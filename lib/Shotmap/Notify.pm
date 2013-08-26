@@ -40,14 +40,14 @@ sub safeColor($;$) { # one required and one optional argument
     return (($USE_COLORS_CONSTANT) ? Term::ANSIColor::colored($str, $color) : $str);
 }
 
-sub dryNotify() { # one optional argument
+sub dryNotify { # one optional argument
     my ($self, $msg) = @_;
     $msg = (defined($msg)) ? $msg : "This was only a dry run, so we skipped executing a command.";
     chomp($msg);
     print STDERR safeColor("[DRY RUN]: $msg\n", "black on_magenta");
 }
 
-sub notifyAboutScp($$) {
+sub notifyAboutScp {
     my ($self, $msg) = @_;
     chomp($msg);
     my $parentFunction = defined((caller(2))[3]) ? (caller(2))[3] : '';
@@ -55,7 +55,7 @@ sub notifyAboutScp($$) {
     # no point in printing the line number for an SCP command, as they all are executed from Run.pm anyway
 }
 
-sub notifyAboutRemoteCmd($$) {
+sub notifyAboutRemoteCmd{
     my ($self, $msg) = @_;
     chomp($msg);
     my $parentFunction = defined((caller(2))[3]) ? (caller(2))[3] : '';
@@ -64,13 +64,13 @@ sub notifyAboutRemoteCmd($$) {
     # no point in printing the line number for a remote command, as they all are executed from Run.pm anyway
 }
 
-sub notify($$) {
+sub notify {
     my ($self, $msg) = @_;
     chomp($msg);
     print STDERR (safeColor("[NOTE]: $msg\n", "cyan on_black"));
 }
 
-sub dieWithUsageError($$) {
+sub dieWithUsageError {
     my ($self, $msg) = @_;
     chomp($msg);
     print("[TERMINATED DUE TO USAGE ERROR]: " . $msg . "\n");
@@ -78,11 +78,31 @@ sub dieWithUsageError($$) {
     die(MRC::safeColor("[TERMINATED DUE TO USAGE ERROR]: " . $msg . " ", "yellow on_red"));
 }
 
-sub exec_and_die_on_nonzero($$) {
+sub exec_and_die_on_nonzero {
     my ($self, $cmd) = @_;
     my $results = IPC::System::Simple::capture($cmd);
     (0 == $EXITVAL) or die "Error:  non-zero exit value: $results";
     return($results);
+}
+
+sub pipeline_params{
+    my ( $self ) = @_;
+
+    $self->Shotmap::Notify::notify("Starting a classification run using the following settings:\n");
+    ($self->remote)                      && $self->Shotmap::Notify::notify("   * Use the remote server <" . $self->remote_host . ">\n");
+    if( defined( $self->db_host ) ){        $self->Shotmap::Notify::notify("   * Database host: <"        . $self->db_host     . ">\n") };
+    if( defined( $self->db_name  ) ){       $self->Shotmap::Notify::notify("   * Database name: <"        . $self->db_name     . ">\n") };
+    ($self->use_search_alg("last"))      && $self->Shotmap::Notify::notify("   * Algorithm: last\n");
+    ($self->use_search_alg("blast"))     && $self->Shotmap::Notify::notify("   * Algorithm: blast\n");
+    ($self->use_search_alg("hmmscan"))   && $self->Shotmap::Notify::notify("   * Algorithm: hmmscan\n");
+    ($self->use_search_alg("hmmsearch")) && $self->Shotmap::Notify::notify("   * Algorithm: hmmsearch\n");
+    ($self->use_search_alg("rapsearch")) && $self->Shotmap::Notify::notify("   * Algorithm: rapsearch\n");
+    ($self->stage)                       && $self->Shotmap::Notify::notify("   * Staging: Will copy the search databaase to " . $self->remote_host    . "\n");
+    if( defined( $self->class_evalue )   ){ $self->Shotmap::Notify::notify("   * Evalue threshold: "          . $self->class_evalue   . "\n") };
+    if( defined( $self->class_coverage ) ){ $self->Shotmap::Notify::notify("   * Coverage threshold: "        . $self->class_coverage . "\n") };
+    if( defined( $self->class_score )    ){ $self->Shotmap::Notify::notify("   * Score threshold: "           . $self->class_score    . "\n") };
+
+    return $self;
 }
 
 sub printBanner($$) {
