@@ -13,8 +13,147 @@ use warnings;
 package Shotmap::Results;
 
 use Shotmap;
-use Getopt::Long qw(GetOptionsFromString GetOptionsFromArray);
-use File::Basename;
+
+sub calculate_diversity{
+
+}
+
+sub classify_reads{
+    my( $self ) = @_;
+
+    my $is_remote      = $self->remote;
+    my $waitime        = $self->wait;
+    my $use_blast      = $self->use_search_alg("blast");
+    my $use_last       = $self->use_search_alg("last");
+    my $use_rapsearch  = $self->use_search_alg("rapsearch");
+    my $use_hmmsearch  = $self->use_search_alg("hmmsearch");
+    my $use_hmmscan    = $self->use_search_alg("hmmscan");
+    my $hmmdb_name     = $self->search_db_name("hmm");
+    my $blastdb_name   = $self->search_db_name("blast");
+    my $db_name        = $self->db_name;
+
+    $self->Shotmap::Notify::printBanner("CLASSIFYING READS");
+    foreach my $sample_id( @{ $self->get_sample_ids() } ){
+	next unless( $self->Shotmap::Run::check_sample_rarefaction_depth( $sample_id ) ); #NEW FUNCTION
+	my @algosToRun = ();
+	if ($use_hmmscan)   { push(@algosToRun, "hmmscan"); }
+	if ($use_hmmsearch) { push(@algosToRun, "hmmsearch"); }
+	if ($use_blast)     { push(@algosToRun, "blast"); }
+	if ($use_last)      { push(@algosToRun, "last"); }
+	if ($use_rapsearch) { push(@algosToRun, "rapsearch"); }
+	foreach my $algo (@algosToRun) {
+	    my ( $class_id, $db_name );
+	    if( $algo eq "hmmsearch" || $algo eq "hmmscan" ){
+		$db_name = $hmmdb_name;
+	    }
+	    if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
+		$db_name = $blastdb_name;
+	    }
+	    $class_id = $self->Shotmap::DB::get_classification_id(
+		$self->class_evalue(), $self->class_coverage(), $self->class_score(), $db_name, $algo, $self->top_hit_type(),
+		)->classification_id();
+	    print "Calculating diversity using classification_id ${class_id}\n";
+	    if( defined( $self->postrarefy_samples ) ){
+		print "Rarefying to " . $self->postrarefy_samples . " reads per sample\n";
+	    }
+	    print "Building classification map...\n";  
+	    $self->Shotmap::Run::build_classification_maps_by_sample($sample_id, $class_id ); 
+	    $self->Shotmap::Run::calculate_abundances( $sample_id, $class_id, $self->abundance_type, $self->normalization_type );
+	}
+    }
+    return $self;
+}
+
+sub grab_results{
+    my( $self ) = @_;
+    if ($self->remote){
+	$self->Shotmap::Notify::printBanner("GETTING REMOTE RESULTS");
+	foreach my $sample_id(@{ $self->get_sample_ids() }){
+	    ($self->use_search_alg("hmmscan"))   && $self->Shotmap::Run::get_remote_search_results($sample_id, "hmmscan");
+	    ($self->use_search_alg("blast"))     && $self->Shotmap::Run::get_remote_search_results($sample_id, "blast");
+	    ($self->use_search_alg("hmmsearch")) && $self->Shotmap::Run::get_remote_search_results($sample_id, "hmmsearch");
+	    ($self->use_search_alg("last"))      && $self->Shotmap::Run::get_remote_search_results($sample_id, "last");
+	    ($self->use_search_alg("rapsearch")) && $self->Shotmap::Run::get_remote_search_results($sample_id, "rapsearch");
+	    print "Progress report: finished ${sample_id} on " . `date` . "";
+	}
+    }
+    return $self;
+}
+
+sub load_results{
+    my( $self ) = @_;
+    if ($self->remote){
+	$self->Shotmap::Notify::printBanner("LOADING REMOTE SEARCH RESULTS");
+	foreach my $sample_id(@{ $self->get_sample_ids() }){
+	    print "Classifying reads for sample $sample_id\n";
+	    my $path_to_split_orfs = File::Spec->catdir($self->get_sample_path($sample_id), "orfs");     
+	    my @algosToRun = ();
+	    if ($self->use_search_alg("hmmscan"))   { push(@algosToRun, "hmmscan"); }
+	    if ($self->use_search_alg("hmmsearch")) { push(@algosToRun, "hmmsearch"); }
+	    if ($self->use_search_alg("blast"))     { push(@algosToRun, "blast"); }
+	    if ($self->use_search_alg("last"))      { push(@algosToRun, "last"); }
+	    if ($self->use_search_alg("rapsearch")) { push(@algosToRun, "rapsearch"); }
+	    foreach my $orf_split_file_name(@{ $self->Shotmap::DB::get_split_sequence_paths($path_to_split_orfs, 0) }) { # maybe could be glob("$path_to_split_orfs/*")
+		foreach my $algo (@algosToRun) {
+		    my ( $class_id, $db_name );
+		    if( $algo eq "hmmsearch" || $algo eq "hmmscan" ){
+			$db_name = $self->search_db_name( "hmm" );
+		    }
+		    if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
+			$db_name = $self->search_db_name( "blast" );
+		    }
+		    $class_id = $self->Shotmap::DB::get_classification_id(
+			$self->parse_evalue, $self->parse_coverage, $self->parse_score, $self->db_name, $algo, $self->top_hit_type,
+			)->classification_id();
+		    print "Classification_id for this run using $algo is $class_id\n";    
+		    #ONLY TAKES BULK-LOAD LIKE FILES NOW. OPTIONALLY DELETE PARSED RESULTS WHEN COMPLETED.
+		    # NOTE THAT WE ONLY INSERT ALT_IDS INTO THIS TABLE! NEED TO USE SAMPLE_ID, ALT_ID FROM (metareads || orfs) TO UNIQUELY EXTRACT ORF/READ ID		
+		    #$self->Shotmap::Run::classify_reads_old($sample_id, $orf_split_file_name, $class_id, $algo, $top_hit_type);
+		    $self->Shotmap::Run::parse_and_load_search_results_bulk( $sample_id, $orf_split_file_name, $class_id, $algo ); #top_hit_type and strict clustering gets used in diversity calcs now
+		}
+	    }
+	}
+    } else{
+	$self->Shotmap::Notify::printBanner("RUNNING LOCALLY ----- This is 'deprecated' apparently and maybe hasn't been tested recently?");
+	#this block is deprecated...
+	foreach my $sample_id(@{ $self->get_sample_ids() }){
+	    
+	}
+    }
+    return $self;
+}
+
+sub parse_results{
+    my( $self ) = @_;
+    my $waittime     = $self->wait;
+    my $verbose      = $self->verbose;
+    my $force_search = $self->force_search;
+
+    if( $self->remote ){
+	$self->Shotmap::Notify::printBanner("PARSING REMOTE SEARCH RESULTS");
+	my( $hmm_splits, $blast_splits );
+	if( $self->use_search_alg("hmmscan") || $self->use_search_alg("hmmsearch") ){
+	    $hmm_splits   = $self->Shotmap::DB::get_number_db_splits("hmm");
+	}
+	if( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ){
+	    $blast_splits = $self->Shotmap::DB::get_number_db_splits("blast");
+	}
+	foreach my $sample_id(@{ $self->get_sample_ids() }) { #wite this method
+	    ($self->use_search_alg("hmmscan"))   && $self->Shotmap::Run::parse_results_remote($sample_id, "hmmscan",   $hmm_splits,   $waittime, $verbose, $force_search);
+	    ($self->use_search_alg("hmmsearch")) && $self->Shotmap::Run::parse_results_remote($sample_id, "hmmsearch", $hmm_splits,   $waittime, $verbose, $force_search);
+	    ($self->use_search_alg("blast"))     && $self->Shotmap::Run::parse_results_remote($sample_id, "blast",     $blast_splits, $waittime, $verbose, $force_search);
+	    ($self->use_search_alg("last"))      && $self->Shotmap::Run::parse_results_remote($sample_id, "last",      $blast_splits, $waittime, $verbose, $force_search);
+	    ($self->use_search_alg("rapsearch")) && $self->Shotmap::Run::parse_results_remote($sample_id, "rapsearch", $blast_splits, $waittime, $verbose, $force_search);
+	    print "Progress report: finished ${sample_id} on " . `date` . "";
+	}  
+    } else {
+	$self->Shotmap::Notify::printBanner("PARSING LOCAL SEARCH RESULTS"); #NOT CODED YET
+	foreach my $sample_id(@{ $self->get_sample_ids() }){
+
+	}
+    }
+    return $self;
+}
 
 
 1;

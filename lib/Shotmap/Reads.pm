@@ -55,20 +55,20 @@ sub load_project{
 	    $self->Shotmap::Notify::dryNotify("Skipping the REMOTE loading of the project.");
 	}
 	#hmmscan
-	$self->set_remote_hmmscan_script(      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
+	$self->remote_script_path( "hmmscan",      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
 	#hmmsearch
-	$self->set_remote_hmmsearch_script(    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
+	$self->remote_script_path( "hmmsearch",    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
 	#blast
-	$self->set_remote_blast_script(        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
-	$self->set_remote_formatdb_script(     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
+	$self->remote_script_path( "blast",        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
+	$self->remote_script_path( "formatdb",     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
 	#last
-	$self->set_remote_last_script(         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
-	$self->set_remote_lastdb_script(       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
+	$self->remote_script_path( "last",         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
+	$self->remote_script_path( "lastdb",       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
 	#rapsearch
-	$self->set_remote_rapsearch_script(    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
-	$self->set_remote_prerapsearch_script( File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
+	$self->remote_script_path( "rapsearch",    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
+	$self->remote_script_path( "prerapsearch", File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
 	
-	$self->set_remote_project_log_dir(     File::Spec->catdir( $self->remote_project_path(), "logs"));
+	$self->remote_project_log_dir( File::Spec->catdir( $self->remote_project_path(), "logs") );
     }
 }
 

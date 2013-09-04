@@ -323,9 +323,13 @@ sub set_params{
     $self->dryrun( $self->opts->{"dryrun"} );
     $self->project_id( $self->opts->{"pid"} );
     $self->project_dir( $self->opts->{"projdir"} );
+    $self->wait( $self->opts->{"wait"} );
+    $self->scratch( $self->opts->{"scratch"} );
+
+    # Set read parameters
+    $self->read_split_size( $self->opts->{"seq-split-size"} );
 
     # Set orf calling parameters
-    $self->read_split_size( $self->opts->{"seq-split-size"} );
     my $trans_method = $self->opts->{"trans-method"};
     if( $self->opts->{"split-orfs"} ){
 	$trans_method = $trans_method . "_split";
@@ -335,19 +339,20 @@ sub set_params{
     $self->orf_filter_length( $self->opts->{"min-orf-len"} );
 
     # Set information about the algorithms being used
-    $self->use_search_alg( "blast",     $self->opts->{"useblast"}     );
-    $self->use_search_alg( "last",      $self->opts->{"uselast"}      );
-    $self->use_search_alg( "rapsearch", $self->opts->{"userapsearch"} );
-    $self->use_search_alg( "hmmsearch", $self->opts->{"usehmmsearch"} );
-    $self->use_search_alg( "hmmscan",   $self->opts->{"usehmmscan"}   );
+    $self->use_search_alg( "blast",     $self->opts->{"use_blast"}     );
+    $self->use_search_alg( "last",      $self->opts->{"use_last"}      );
+    $self->use_search_alg( "rapsearch", $self->opts->{"use_rapsearch"} );
+    $self->use_search_alg( "hmmsearch", $self->opts->{"use_hmmsearch"} );
+    $self->use_search_alg( "hmmscan",   $self->opts->{"use_hmmscan"}   );
 
     # Set local repository data
-    $self->local_script_dir( $ENV{'MRC_LOCAL'} . "/scripts" ); #point to location of the MRC scripts. Auto-detected from MRC_LOCAL variable.
+    $self->local_scripts_dir( $ENV{'MRC_LOCAL'} . "/scripts" ); #point to location of the MRC scripts. Auto-detected from MRC_LOCAL variable.
     $self->ffdb( $self->opts->{"ffdb"} ); 
     $self->ref_ffdb( $self->opts->{"refdb"} ); 
     $self->family_subset( $self->opts->{"family-subset"} ); #constrain analysis to a set of families of interest
 
     # Set the search database properties and names
+    $self->force_build_search_db( $self->opts->{"forcedb"} );
     $self->build_search_db( "blast", $self->opts->{"bdb"} );
     $self->build_search_db( "hmm",   $self->opts->{"hdb"} );    
     $self->search_db_split_size( "blast", $self->opts->{"blastsplit"} );
@@ -364,14 +369,16 @@ sub set_params{
 	($self->nr()?'nr_':'') . $self->search_db_split_size( "blast");
     $self->search_db_name( "blast", $blastdb_name );
     if( ( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ) && 
-	( ( !$$self->build_search_db("blast") ) && ( ! -d $self->ffdb . "/BLASTdbs/" . $blastdb_name ) ) ){
+	( ( !$self->build_search_db("blast") ) && ( ! -d $self->ffdb . "/BLASTdbs/" . $blastdb_name ) ) ){
 	$self->Shotmap::Notify::dieWithUsageError(
 	    "You are apparently trying to conduct a pairwise sequence search, " .
 	    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
 	    "<${blastdb_name}>. As a result, you must use the --bdb option to build a new blast database"
 	    );
     }
+    $self->search_db_name_suffix( $self->{"opts"}->{"db_suffix"} );
     my $hmmdb_name = "${db_prefix_basename}_" . $self->search_db_split_size( "hmm" );
+    $self->search_db_name( "hmm", $hmmdb_name );
     if( ( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan")  ) && 
 	( !$self->build_search_db("hmm") ) && 
 	( ! -d $self->ffdb() . "/HMMdbs/" . $hmmdb_name ) ){
@@ -399,14 +406,14 @@ sub set_params{
 	print( $self->remote_host . "\n" );
 	$self->remote_exe_path( $self->opts->{"rpath"} );
 	$self->remote_master_dir( $self->opts->{"rdir"} );
-	$self->remote_scripts( $self->remote_master_dir . "/scripts" ); 
+	$self->remote_scripts_dir( $self->remote_master_dir . "/scripts" ); 
 	$self->remote_ffdb(    $self->remote_master_dir . "/MRC_ffdb" ); 
 	$self->Shotmap::Notify::warn_ssh_keys();
 	#if we aren't staging, does the database exist on the remote server?
 	if( !$self->stage ){
 	    if( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ){
 		my $remote_db_dir = $self->remote_ffdb . "/BLASTdbs/" . $self->search_db_name( "blast" );
-		my $command = "if ssh ${self->remote_user}\@${self->remote_host} \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
+		my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
 		my $results = `$command`;
 		if( $results == 0 ){ 
 		    $self->Shotmap::Notify::dieWithUsageError( 
@@ -417,7 +424,7 @@ sub set_params{
 	    }
 	    if( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan") ){
 		my $remote_db_dir = $self->remote_ffdb . "/HMMdbs/" . $self->search_db_name( "hmm" );
-		my $command = "if ssh ${self->remote_user}\@${self->remote_host} \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
+		my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
 		my $results = `$command`;
 		if( $results == 0 ){ 
 		    $self->Shotmap::Notify::dieWithUsageError( 
@@ -459,7 +466,7 @@ sub set_params{
     $self->class_evalue( $self->opts->{"class-evalue"} ); 
     $self->class_coverage( $self->opts->{"class-coverage"} ); 
     $self->class_score( $self->opts->{"class-score"} ); 
-
+    $self->top_hit_type( $self->opts->{"hit-type"} );
     # Set rarefication parameters
     if( defined( $self->opts->{"prerare-samps"} ) ){ 
 	warn( "You are running with --prerare-samps, so I will only process " . 

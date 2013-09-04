@@ -518,20 +518,6 @@ sub build_db_ffdb {    # This appears not to actually BUILD anything, it just ma
     File::Path::make_path( $path );
 }
 
-sub get_hmmdb_path{
-    my ($self) = @_;
-    (defined($self->ffdb())) or die("ffdb was not defined!");
-    (defined($self->get_hmmdb_name())) or die("hmmdb name was not defined!");
-    return($self->ffdb() . "/HMMdbs/" . $self->get_hmmdb_name());
-}
-
-sub get_blastdb_path{
-    my $self = shift;
-    (defined($self->ffdb())) or die("ffdb was not defined!");
-    (defined($self->get_blastdb_name())) or die("blastdb name was not defined!");
-    return($self->ffdb() . "/BLASTdbs/" . $self->get_blastdb_name());
-}
-
 sub get_number_db_splits{
     my ( $self, $type ) = @_;
     my $n_splits = 0;

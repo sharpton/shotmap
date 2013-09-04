@@ -367,8 +367,8 @@ sub load_samples{
 sub load_families{
     my( $self, $type, $db_name ) = @_;
     my $raw_db_path = undef;
-    if ($type eq "hmm")   { $raw_db_path = $self->Shotmap::DB::get_hmmdb_path(); }
-    if ($type eq "blast") { $raw_db_path = $self->Shotmap::DB::get_blastdb_path(); }
+    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
+    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
     my $file =  "${raw_db_path}/family_lengths.tab";
     if( $self->bulk_load() ){
 	my $tmp    = "/tmp/famlens.sql";	    
@@ -383,7 +383,7 @@ sub load_families{
 
 sub load_family_members{
     my( $self, $type, $db_name ) = @_;
-    my $file = $self->Shotmap::DB::get_blastdb_path() . "/sequence_lengths.tab";
+    my $file = $self->search_db_path("blast") . "/sequence_lengths.tab";
     if( $self->bulk_load() ){
 	my $tmp    = "/tmp/seqlens.sql";	    
 	my $table  = "familymembers";
@@ -399,8 +399,8 @@ sub check_family_loadings{
     my( $self, $type, $db_name ) = @_;
     my $bit = 0;
     my $raw_db_path = undef;
-    if ($type eq "hmm")   { $raw_db_path = $self->Shotmap::DB::get_hmmdb_path(); }
-    if ($type eq "blast") { $raw_db_path = $self->Shotmap::DB::get_blastdb_path(); }
+    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
+    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
     my $famlen_tab  = "${raw_db_path}/family_lengths.tab";
     my $searchdb_id = $self->Shotmap::DB::get_searchdb_id( $type, $db_name );
     my $ff_rows     = _count_lines_in_file( $famlen_tab );
@@ -413,8 +413,8 @@ sub check_familymember_loadings{
     my( $self, $type, $db_name ) = @_;
     my $bit = 0;
     my $raw_db_path = undef;
-    if ($type eq "hmm")   { $raw_db_path = $self->Shotmap::DB::get_hmmdb_path(); }
-    if ($type eq "blast") { $raw_db_path = $self->Shotmap::DB::get_blastdb_path(); }
+    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
+    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
     my $seqlen_tab  = "${raw_db_path}/sequence_lengths.tab";
     my $searchdb_id = $self->Shotmap::DB::get_searchdb_id( $type, $db_name );
     my $ff_rows     = _count_lines_in_file( $seqlen_tab );
@@ -456,18 +456,18 @@ sub back_load_project(){
     my $project_id = shift;
     my $ffdb = $self->ffdb();
     my $dbname = $self->db_name();
-    $self->set_project_id( $project_id );
-    $self->set_project_path("$ffdb/projects/$dbname/$project_id");
-    if( $self->is_remote ){
-	$self->set_remote_hmmscan_script(      $self->remote_project_path() . "/run_hmmscan.sh" );
-	$self->set_remote_hmmsearch_script(    $self->remote_project_path() . "/run_hmmsearch.sh" );
-        $self->set_remote_blast_script(        $self->remote_project_path() . "/run_blast.sh" );
-        $self->set_remote_formatdb_script(     $self->remote_project_path() . "/run_formatdb.sh" );
-        $self->set_remote_lastdb_script(       $self->remote_project_path() . "/run_lastdb.sh" );
-        $self->set_remote_last_script(         $self->remote_project_path() . "/run_last.sh" );
-	$self->set_remote_rapsearch_script(    $self->remote_project_path() . "/run_rapsearch.sh");
-	$self->set_remote_prerapsearch_script( $self->remote_project_path() . "/run_prerapsearch.sh");
-	$self->set_remote_project_log_dir(     $self->remote_project_path() . "/logs" );
+    $self->project_id( $project_id );
+    $self->project_path("$ffdb/projects/$dbname/$project_id");
+    if( $self->remote ){
+	$self->remote_script_path(      "hmmscan",      $self->remote_project_path() . "/run_hmmscan.sh" );
+	$self->remote_script_path(    "hmmsearch",    $self->remote_project_path() . "/run_hmmsearch.sh" );
+        $self->remote_script_path(        "blast",        $self->remote_project_path() . "/run_blast.sh" );
+        $self->remote_script_path(     "formatdb",     $self->remote_project_path() . "/run_formatdb.sh" );
+        $self->remote_script_path(       "lastdb",       $self->remote_project_path() . "/run_lastdb.sh" );
+        $self->remote_script_path(         "last",         $self->remote_project_path() . "/run_last.sh" );
+	$self->remote_script_path(    "rapsearch",    $self->remote_project_path() . "/run_rapsearch.sh");
+	$self->remote_script_path( "prerapsearch", $self->remote_project_path() . "/run_prerapsearch.sh");
+	$self->remote_project_log_dir(     $self->remote_project_path() . "/logs" );
     }
 }
 
@@ -690,9 +690,9 @@ sub classify_reads_old{
 	my $query_seqs_for_function_call = undef;
 
 	if ($algo eq "hmmscan" or $algo eq "hmmsearch") {
-	    $database_name = $self->get_hmmdb_name();
+	    $database_name = $self->search_db_name("hmm");
 	} elsif ($algo eq "blast" or $algo eq "last" or $algo eq "rapsearch" ) {
-	    $database_name = $self->get_blastdb_name();
+	    $database_name = $self->search_db_name("blast");
 	    $query_seqs_for_function_call = $query_seqs; # because blast doesn't give sequence lengths in report, need the input file to get seq lengths. add $query_seqs to function
 	} else { die "Bad algorithm choice : $algo"; }
 	
@@ -1409,13 +1409,13 @@ sub build_search_db{
     my $nr_db       = shift; #0/1 - should we use a non-redundant version of the DB (sequence DB only)
 
     my $ffdb        = $self->ffdb();
-    my $ref_ffdb    = $self->get_ref_ffdb();
+    my $ref_ffdb    = $self->ref_ffdb();
 
     #where is the hmmdb going to go? each hmmdb has its own dir
     my $raw_db_path = undef;
     my $length      = 0;
-    if ($type eq "hmm")   { $raw_db_path = $self->Shotmap::DB::get_hmmdb_path(); }
-    if ($type eq "blast") { $raw_db_path = $self->Shotmap::DB::get_blastdb_path(); }
+    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
+    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
 
     warn "Building $type DB $db_name, placing $split_size per split\n";
 
@@ -1435,7 +1435,7 @@ sub build_search_db{
     #get the paths associated with each family
     my $family_path_hashref = _build_family_ref_path_hash( $ref_ffdb, $type );
     #constrain analysis to a set of families of interest
-    my @families   = sort( @{ $self->get_family_subset() });
+    my @families   = sort( @{ $self->family_subset() });
     if( !@families ){ #is there a subset list? No? then process EVERY family
 	@families = keys( %{ $family_path_hashref->{$type} } );
     }
@@ -1535,8 +1535,7 @@ sub build_search_db{
 	    } else {
 		die ("I could not determine the suffix associated with $family_db_file\n" );
 	    }	   
-	    if( $nr_db ){		
-		
+	    if( $nr_db ){				
 		my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
 		$family_db_file = $nr_tmp;
 	    }
@@ -1858,10 +1857,10 @@ sub _grab_seqs_from_lookup_list{
 sub calculate_blast_db_length{
     my ($self) = @_;
 
-    (defined($self->get_blastdb_name())) or die "dbname was not already defined! This is a fatal error.";
+    (defined($self->search_db_name("blast"))) or die "dbname was not already defined! This is a fatal error.";
     (defined($self->ffdb())) or die "ffdb was not already defined! This is a fatal error.";
 
-    my $db_path = File::Spec->catdir($self->ffdb(), $BLASTDB_DIR, $self->get_blastdb_name());
+    my $db_path = File::Spec->catdir($self->ffdb(), $BLASTDB_DIR, $self->search_db_name("blast"));
     opendir( DIR, $db_path ) || die "Can't opendir $db_path for read: $! ";
     my @files = readdir(DIR);
     closedir DIR;
@@ -1969,10 +1968,10 @@ sub translate_reads_remote($$$$$) {
     ($should_we_split_orfs == 1 or $should_we_split_orfs == 0) or die "Split orf setting should either be 1 or 0! Other values NOT ALLOWED. Even 'undef' is not allowed. Fix this programming error. The value was: <$should_we_split_orfs>.";
     #push translation scripts to remote server
     my $connection = $self->remote_connection();
-    my $remote_script_dir = $self->get_remote_script_dir();
+    my $remote_script_dir = $self->remote_scripts_dir();
 
-    my $local_copy_of_remote_handler  = File::Spec->catfile($self->get_scripts_dir(), "remote", "run_transeq_handler.pl");
-    my $local_copy_of_remote_script   = File::Spec->catfile($self->get_scripts_dir(), "remote", "run_transeq_array.sh"); 
+    my $local_copy_of_remote_handler  = File::Spec->catfile($self->local_scripts_dir(), "remote", "run_transeq_handler.pl");
+    my $local_copy_of_remote_script   = File::Spec->catfile($self->local_scripts_dir(), "remote", "run_transeq_array.sh"); 
     my $transeqPerlRemote = File::Spec->catfile($remote_script_dir, "run_transeq_handler.pl");
     
     $self->Shotmap::Run::transfer_file_into_directory($local_copy_of_remote_handler, "$connection:$remote_script_dir/"); # transfer the script into the remote directory
@@ -1980,9 +1979,9 @@ sub translate_reads_remote($$$$$) {
 
     warn "About to translate reads...";
 
-    my @scriptsToTransfer = (File::Spec->catfile($self->get_scripts_dir(), "remote", "split_orf_on_stops.pl"));
+    my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "split_orf_on_stops.pl"));
     foreach my $transferMe (@scriptsToTransfer) {
-	$self->Shotmap::Run::transfer_file_into_directory($transferMe, $self->remote_connection() . ':' . $self->get_remote_script_dir() . '/'); # transfer the script into the remote directory
+	$self->Shotmap::Run::transfer_file_into_directory($transferMe, $self->remote_connection() . ':' . $self->remote_scripts_dir() . '/'); # transfer the script into the remote directory
     }
 
     my $numReadsTranslated = 0;
@@ -2030,7 +2029,7 @@ sub translate_reads_remote_ping{
     foreach my $sample_id( @{$self->get_sample_ids()} ){
 	my $remote_input  = "$remote_ffdb/projects/$db_name/$pid/$sample_id/raw.fa";
 	my $remote_output = "$remote_ffdb/projects/$db_name/$pid/$sample_id/orfs.fa";
-	my $transeqShRemoteLocation = $self->get_remote_script_dir() . "/run_transeq.sh";
+	my $transeqShRemoteLocation = $self->remote_scripts_dir() . "/run_transeq.sh";
 	my $results = $self->Shotmap::Run::execute_ssh_cmd( $connection, "\'qsub $transeqShRemoteLocation $remote_input $remote_output\'");
 	if ($results =~ m/^Your job (\d+) / ){
 	    my $job_id = $1;
@@ -2134,7 +2133,7 @@ sub gunzip_remote_dbs{
 
 sub format_remote_blast_dbs{
     my($self, $remote_script_path) = @_;
-    my $remote_database_dir   = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $self->get_blastdb_name());
+    my $remote_database_dir   = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $self->search_db_name("blast"));
     my $results               = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), "qsub -sync y $remote_script_path $remote_database_dir");
 }
 
@@ -2143,33 +2142,33 @@ sub run_search_remote {
     ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
 	die "Invalid type passed in! The invalid type was: \"$type\".";
     ( $nsplits > 0 ) || die "Didn't get a properly formatted count for the number of search DB splits! I got $nsplits.";
-    my $remote_orf_dir             = File::Spec->catdir($self->get_remote_sample_path($sample_id), "orfs");
-    my $log_file_prefix            = File::Spec->catfile($self->get_remote_project_log_dir(), "${type}_handler");
-    my $remote_results_output_dir  = File::Spec->catdir($self->get_remote_sample_path($sample_id), "search_results", ${type});
+    my $remote_orf_dir             = File::Spec->catdir(  $self->remote_sample_path($sample_id), "orfs");
+    my $log_file_prefix            = File::Spec->catfile( $self->remote_project_log_dir(),       "${type}_handler");
+    my $remote_results_output_dir  = File::Spec->catdir(  $self->remote_sample_path($sample_id), "search_results", ${type});
     my ($remote_script_path, $db_name, $remote_db_dir);
 
     if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
-	$db_name               = $self->get_blastdb_name();
+	$db_name               = $self->search_db_name("blast");
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $db_name);
-	if ($type eq "last" )     { $remote_script_path  = $self->get_remote_last_script();  } # LAST
-	if ($type eq "blast")     { $remote_script_path  = $self->get_remote_blast_script(); } # BLAST
-	if ($type eq "rapsearch") { $remote_script_path  = $self->get_remote_rapsearch_script(); } # BLAST
+	if ($type eq "last" )     { $remote_script_path  = $self->remote_script_path("last");  } # LAST
+	if ($type eq "blast")     { $remote_script_path  = $self->remote_script_path("blast"); } # BLAST
+	if ($type eq "rapsearch") { $remote_script_path  = $self->remote_script_path("rapsearch"); } # BLAST
     }
     if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
-	$db_name               = $self->get_hmmdb_name();
+	$db_name               = $self->search_db_name("hmm");
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $HMMDB_DIR, $db_name);
-	if ($type eq "hmmsearch") { $remote_script_path = $self->get_remote_hmmsearch_script(); } # HMM *SEARCH*
-	if ($type eq "hmmscan")   { $remote_script_path = $self->get_remote_hmmscan_script();   } # HMM *SCAN*
+	if ($type eq "hmmsearch") { $remote_script_path = $self->remote_script_path("hmmsearch"); } # HMM *SEARCH*
+	if ($type eq "hmmscan")   { $remote_script_path = $self->remote_script_path("hmmscan");   } # HMM *SCAN*
     }
 
     # Transfer the required scripts, such as "run_remote_search_handler.pl", to the remote server. For some reason, these don't get sent over otherwise!
-    my @scriptsToTransfer = (File::Spec->catfile($self->get_scripts_dir(), "remote", "run_remote_search_handler.pl")); # just one file for now
+    my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "run_remote_search_handler.pl")); # just one file for now
     foreach my $transferMe (@scriptsToTransfer) {
-	$self->Shotmap::Run::transfer_file_into_directory($transferMe, ($self->remote_connection() . ':' . $self->get_remote_script_dir() . '/')); # transfer the script into the remote directory
+	$self->Shotmap::Run::transfer_file_into_directory($transferMe, ($self->remote_connection() . ':' . $self->remote_scripts_dir() . '/')); # transfer the script into the remote directory
     }
     
     # See "run_remote_search" in run_remote_search_handler.pl
-    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->get_remote_script_dir(), "run_remote_search_handler.pl")
+    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_search_handler.pl")
 	. " --resultdir=$remote_results_output_dir "
 	. " --dbdir=$remote_db_dir "
 	. " --querydir=$remote_orf_dir "
@@ -2195,35 +2194,35 @@ sub parse_results_remote {
     ( $nsplits > 0 ) || die "Didn't get a properly formatted count for the number of search DB splits! I got $nsplits.";
     my $trans_method = $self->trans_method;
     my $proj_dir     = $self->remote_project_path;
-    my $scripts_dir  = $self->get_remote_script_dir;
+    my $scripts_dir  = $self->remote_scripts_dir;
     my $t_score      = $self->parse_score;
     my $t_coverage   = $self->parse_coverage;
     my $t_evalue     = $self->parse_evalue;
-    my $remote_orf_dir             = File::Spec->catdir($self->get_remote_sample_path($sample_id), "orfs");
-    my $log_file_prefix            = File::Spec->catfile($self->get_remote_project_log_dir(), "run_remote_parse_results_handler");
-    my $remote_results_output_dir  = File::Spec->catdir($self->get_remote_sample_path($sample_id), "search_results", ${type});
+    my $remote_orf_dir             = File::Spec->catdir($self->remote_sample_path($sample_id), "orfs");
+    my $log_file_prefix            = File::Spec->catfile($self->remote_project_log_dir(), "run_remote_parse_results_handler");
+    my $remote_results_output_dir  = File::Spec->catdir($self->remote_sample_path($sample_id), "search_results", ${type});
     my ($remote_script_path, $db_name, $remote_db_dir);
-    $remote_script_path        = $self->get_remote_script_dir() . "/run_parse_results.sh";
+    $remote_script_path        = $self->remote_scripts_dir() . "/run_parse_results.sh";
     if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
-	$db_name               = $self->get_blastdb_name();
+	$db_name               = $self->search_db_name("blast");
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $db_name);
     }
     if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
-	$db_name               = $self->get_hmmdb_name();
+	$db_name               = $self->search_db_name("hmm");
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $HMMDB_DIR, $db_name);
     }
 
     # Transfer the required scripts, such as "run_remote_search_handler.pl", to the remote server. For some reason, these don't get sent over otherwise!
-    my @scriptsToTransfer = (File::Spec->catfile($self->get_scripts_dir(), "remote", "run_remote_parse_results_handler.pl"),
-			     File::Spec->catfile($self->get_scripts_dir(), "remote", "run_parse_results.sh"),
-			     File::Spec->catfile($self->get_scripts_dir(), "remote", "parse_results.pl"),
+    my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "run_remote_parse_results_handler.pl"),
+			     File::Spec->catfile($self->local_scripts_dir(), "remote", "run_parse_results.sh"),
+			     File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
 	); 
     foreach my $transferMe (@scriptsToTransfer) {
-	$self->Shotmap::Run::transfer_file_into_directory($transferMe, ($self->remote_connection() . ':' . $self->get_remote_script_dir() . '/')); # transfer the script into the remote directory
+	$self->Shotmap::Run::transfer_file_into_directory($transferMe, ($self->remote_connection() . ':' . $self->remote_scripts_dir() . '/')); # transfer the script into the remote directory
     }
     
     # See "run_remote_search" in run_remote_search_handler.pl
-    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->get_remote_script_dir(), "run_remote_parse_results_handler.pl")
+    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_parse_results_handler.pl")
 	. " --resultdir=$remote_results_output_dir "
 	. " --querydir=$remote_orf_dir "
 	. " --dbname=$db_name "
@@ -2266,7 +2265,7 @@ sub get_remote_search_results {
 	warn "Handling <$in_orfs>...";
 #	my $remote_results_output_dir = File::Spec->catdir($self->get_remote_sample_path($sample_id), "search_results", $type);
 #	my $remoteFile = $self->remote_connection() . ':' . "$remote_results_output_dir/$in_orfs/";
-	my $remote_results_output_dir = $self->remote_connection() . ':' . File::Spec->catdir($self->get_remote_sample_path($sample_id), "search_results", $type, $in_orfs);
+	my $remote_results_output_dir = $self->remote_connection() . ':' . File::Spec->catdir($self->remote_sample_path($sample_id), "search_results", $type, $in_orfs);
 	my $local_search_res_dir  = File::Spec->catdir($self->get_sample_path($sample_id), "search_results", $type, $in_orfs);
 #	Shotmap::Run::transfer_file_into_directory($remoteFile, "$local_search_res_dir/");
 	if( $self->small_transfer ){ #only grab mysqld files
@@ -2755,6 +2754,19 @@ sub check_prior_analyses{
 	}    
     }
     return $self;
+}
+
+sub check_sample_rarefaction_depth{
+    my ( $self, $sample_id ) = @_;
+    my $switch = 1;
+    if( defined( $self->postrarefy_samples ) ){
+	my $depth        = $self->postrarefy_samples;
+	my $number_reads = $self->Shotmap::DB::get_number_reads_in_sample( $sample_id )->count;
+	if( $number_reads < $depth ){
+	    $switch = 0;
+	}
+    }
+    return $switch;
 }
 
 1;

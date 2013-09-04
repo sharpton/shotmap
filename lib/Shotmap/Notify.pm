@@ -79,7 +79,7 @@ sub dieWithUsageError {
 }
 
 sub exec_and_die_on_nonzero {
-    my ($self, $cmd) = @_;
+    my ( $cmd ) = @_;
     my $results = IPC::System::Simple::capture($cmd);
     (0 == $EXITVAL) or die "Error:  non-zero exit value: $results";
     return($results);

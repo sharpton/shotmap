@@ -84,6 +84,7 @@ sub new{
     $self->{"parse_threshold"}    = undef;
     $self->{"xfer_size"}          = 0; #threshold used in some data transfer processes
     $self->{"opts"}               = undef; #hashref that stores runtime options
+    $self->{"verbose"}            = 0;
     bless($self);
     return $self;
 }
@@ -96,6 +97,13 @@ sub opts{
     return $self->{"opts"};
 }
 
+sub wait{
+    my( $self, $value ) = @_; 
+    if( defined( $value ) ){
+	$self->{"wait"} = $value;
+    }
+    return $self->{"wait"};    
+}
 
 sub project_path{
     my $self = shift;
@@ -118,17 +126,29 @@ sub get_sample_ids {
     return \@sample_ids; # <-- array reference!
 }
 
-sub set_bulk_insert_count{
+sub bulk_insert_count{
     my ($self, $count) = @_;
-    $self->{"bulk_insert_count"} = $count;
+    if( defined( $count ) ){
+	$self->{"bulk_insert_count"} = $count;
+    }
+    return $self->{"bulk_insert_count"};
 }
 
+sub force_search{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"forcesearch"} = $value;
+    }
+    return $self->{"forcesearch"};
+}
 
-=head2 set_project_path
- Usage   : $analysis->set_project_path( "~/data/metaprojects/project1/" );
- Function: Point to the raw project data directory (not the ffdb version)
-=cut 
-
+sub force_build_search_db{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"forcedb"} = $value;
+    }
+    return $self->{"forcedb"};
+}
 
 =head2 get_sample_path
 
@@ -174,7 +194,7 @@ sub project_id{
 
 sub set_samples{
     my $self = shift;
-    my $samples = shift;
+    my $samples = shift; #this is a hashref
     $self->{"samples"} = $samples;
     return $self->{"samples"};
 }
@@ -390,7 +410,7 @@ sub small_transfer{
     return $self->{"xfer_size"};
 }
 
-sub remote_scripts{
+sub remote_scripts_dir{
     my ($self, $path) = @_;
     if( defined( $path ) ){
 	$self->{"remote_script_dir"} = $path;
@@ -401,12 +421,12 @@ sub remote_scripts{
 sub use_search_alg{
     my( $self, $alg, $value ) = @_;
     if( defined( $value ) ){
-	$self->{$alg} = $value;
+	$self->{"search"}->{$alg} = $value;
     }
-    return $self->{$alg};
+    return $self->{"search"}->{$alg};
 }
 
-sub local_script_dir{
+sub local_scripts_dir{
   my $self = shift;
   my $path = shift;
   if(defined($path)){ 
@@ -425,6 +445,14 @@ sub multi_load{
     return $self->{"multiload"};
 }
 
+sub scratch{
+    my $self    = shift;
+    my $scratch = shift;
+    if( defined( $scratch ) ){
+	$self->{"scratch"} = $scratch;
+    }
+    return $self->{"scratch"};
+}
 
 sub ffdb{ # Function: Indicates where the MRC flat file database is located
     my $self = shift;  
@@ -627,15 +655,6 @@ sub set_multiload {
     return $self->{"multiload"};
 }
 
-sub bulk_insert_count{
-    my $self  = shift;
-    my $value = shift;
-    if( defined( $value ) ){
-	$self->{"bulk_insert_count"} = $value;
-    }
-    return $self->{"bulk_insert_count"};
-}
-
 sub is_slim{
     my $self = shift;
     my $slim = shift;
@@ -686,6 +705,69 @@ sub read_split_size{
     return $self->{"seq-split-size"};
 }
 
+sub remote_script_path{
+    my( $self, $type, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"type"} = $value;
+    }
+    return $self->{"type"};
+}
+
+#currently only used for rapsearch
+sub search_db_name_suffix{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"db_suffix"} = $value;
+    }
+    return $self->{"db_suffix"};
+}
+
+sub family_annotations{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"annotations"} = $value;
+    }
+    return $self->{"annotations"};
+}
+
+sub remote_project_log_dir{
+    my $self     = shift;
+    my $filepath = shift;
+    if( defined( $filepath ) ){
+	$self->{"r_project_logs"} = $filepath;
+    }
+    $self->{"r_project_logs"};
+}
+
+sub verbose{
+    my( $self, $value ) = @_; #value is binary 1/0
+    if( defined( $value ) ){
+	$self->{"verbose"} = $value;
+    }
+    return $self->{"verbose"};
+}
+
+sub search_db_path{
+    my ($self, $type) = @_;
+    (defined($type)) or die( "You didn't specify the type of db that you want the path of\n" );
+    (defined($self->ffdb())) or die("ffdb was not defined!");
+    (defined($self->search_db_name($type))) or die("db ${type} is not defined!");
+    if( $type eq "hmm" ){
+	return($self->ffdb() . "/HMMdbs/" . $self->search_db_name("hmm"));
+    }
+    if( $type eq "blast" ){
+	return($self->ffdb() . "/BLASTdbs/" . $self->search_db_name("blast"));
+    }
+}
+
+sub top_hit_type{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"top_hit_type"} = $value;
+    }
+    return $self->{"top_hit_type"};
+}
+
 #######
 # NEED TO VALIDATE THESE
 #######
@@ -705,7 +787,7 @@ sub build_remote_ffdb {
     my ($self, $verbose) = @_;
     my $rffdb      = $self->{"rffdb"};
     my $connection = $self->remote_connection();
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
+    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"         , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/projects", $verbose);
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/HMMdbs"  , $verbose);   
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/BLASTdbs", $verbose);
@@ -718,94 +800,6 @@ sub build_remote_script_dir {
     my $connection = $self->remote_connection();
     MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rscripts"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
 }
-
-=head set_remote_hmmscan_script
-
- Title   : set_remote_hmmscan_script
- Usage   : $analysis->set_remote_hmmscan_script();
- Function: Set the location of the script that is located on the remote server that runs the hmmscan jobs
- Example : my $filepath = $analysis->set_remote_hmmscan_script( "~/projects/MRC/scripts/run_hmmscan.sh" )
- Returns : nothing
- Args    : A filepath to the script (string)
-
-=cut 
-
-sub set_remote_hmmscan_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_hmmscan_script"} = $filepath;
-}
-
-sub set_remote_hmmsearch_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_hmmsearch_script"} = $filepath;
-}
-
-
-sub set_remote_blast_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_blast_script"} = $filepath;
-}
-
-sub set_remote_last_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_last_script"} = $filepath;
-}
-
-
-sub set_remote_formatdb_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_formatdb_script"} = $filepath;
-}
-
-sub set_remote_lastdb_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_lastdb_script"} = $filepath;
-}
-
-sub set_remote_rapsearch_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_rapsearch_script"} = $filepath;
-}
-
-sub set_remote_prerapsearch_script{
-    my $self     = shift;
-    my $filepath = shift; 
-    $self->{"r_prerapsearch_script"} = $filepath;
-}
-
-# Function: Get the location of the script that is located on the remote server
-sub get_remote_hmmscan_script{      my $self = shift;   return $self->{"r_hmmscan_script"}; }
-sub get_remote_hmmsearch_script{    my $self = shift;   return $self->{"r_hmmsearch_script"}; }
-sub get_remote_blast_script{        my $self = shift;   return $self->{"r_blast_script"}; }
-sub get_remote_last_script{         my $self = shift;   return $self->{"r_last_script"}; }
-sub get_remote_lastdb_script{       my $self = shift;   return $self->{"r_lastdb_script"}; }
-sub get_remote_prerapsearch_script{ my $self = shift;   return $self->{"r_prerapsearch_script"}; }
-sub get_remote_rapsearch_script{    my $self = shift;   return $self->{"r_rapsearch_script"}; }
-
-=head set_remote_project_log_dir
-
- Title   : set_remote_project_log_dir
- Usage   : $analysis->set_remote_project_log_dir();
- Function: Set the location of the directory that is located on the remote server that will contain the run logs
- Example : my $filepath = $analysis->set_remote_project_log_dir( "~/projects/MRC/scripts/logs" );
- Returns : A filepath to the directory (string)
- Args    : A filepath to the directory (string)
-
-=cut 
-
-sub set_remote_project_log_dir{
-    my $self     = shift;
-    my $filepath = shift;
-    $self->{"r_project_logs"} = $filepath;
-}
-sub get_remote_project_log_dir{    my $self = shift;    return $self->{"r_project_logs"}; }
 
 1;
 
