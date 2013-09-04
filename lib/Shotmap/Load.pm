@@ -88,6 +88,8 @@ sub check_vars{
     (defined($self->opts->{"blastsplit"})) or  $self->Shotmap::Notify::dieWithUsageError( "Note: blast_db_split_size (total number of sequence database files) was not specified on the command line (--blastsplit=INTEGER)");
     (defined($self->opts->{"hmmsplit"})) or  $self->Shotmap::Notify::dieWithUsageError( "Note: hmm_db_split_size (total number of hmm database files) was not specified on the command line (--hmmsplit=INTEGER)");
 
+    (defined($self->opts->{"normalization-type"})) or  $self->Shotmap::Notify::dieWithUsageError( "You must provide a proper abundance normalization type on the command line (--normalization-type)");
+    (defined($self->opts->{"abundance-type"}))     or  $self->Shotmap::Notify::dieWithUsageError( "You must provide a proper abundance type on the command line (--abundance-type)");
     return $self;
 }
 
@@ -139,6 +141,7 @@ sub get_options{
 	$filter_length,        $p_evalue,              $p_coverage,           $p_score,             $evalue,
 	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,
 	$hmmdb_build,          $blastdb_build,         $force_db_build,       $force_search,        $small_transfer,
+	$normalization_type,   $abundance_type,
 	#non conf-file vars
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
@@ -203,6 +206,9 @@ sub get_options{
 	,    "class-score"    => \$score
 	,    "top-hit"        => \$top_hit
 	,    "hit-type"       => \$top_hit_type
+	#abundance claculation parameters
+	,    "abundance-type" => \$abundance_type
+	,    "normalization-type" => \$normalization_type
 	#usually set at run time
 	, "conf-file"         => \$conf_file
 	, "pid"               => \$input_pid          
@@ -274,9 +280,13 @@ sub get_options{
 			  , "class-score:f"
 			  ,    "top-hit!"      ### NEED TO INTEGRATE METHODS
 			  ,    "hit-type:s"    ### NEED TO INTEGRATE METHODS  
+			  #abundance calculation parameters
+			  , "abundance-type:s"
+			  , "normalization-type:s"			  
+			  #general settings
 			  , "conf-file|c=s" 
 			  , "pid=i"
-			  , "goto|g=s"
+			  , "goto|g=s"			  
 			  #forcing statements
 			  , "stage!"
 			  , "hdb!"  
@@ -286,8 +296,7 @@ sub get_options{
 			  , "verbose|v!"
 			  , "clobber"   
 			  , "dryrun|dry!"
-			  , "reload!"   
-		
+			  , "reload!"   		
 	);
     #grab command line options
     GetOptionsFromArray( \@args, \%options, @opt_type_array );
@@ -436,6 +445,11 @@ sub set_params{
 	}
     }
     
+    # Search specific settings
+    if( defined( $self->opts->{"forcesearch"} ) ){
+	$self->force_search( $self->opts->{"forcesearch"} );
+    }
+
     # Set Relational (MySQL) database values
     $self->db_name( $self->opts->{"dbname"} );
     $self->db_host( $self->opts->{"dbhost"} );
@@ -467,6 +481,11 @@ sub set_params{
     $self->class_coverage( $self->opts->{"class-coverage"} ); 
     $self->class_score( $self->opts->{"class-score"} ); 
     $self->top_hit_type( $self->opts->{"hit-type"} );
+    
+    # Set abundance calculation parameters
+    $self->abundance_type(     $self->opts->{"abundance-type"}     );
+    $self->normalization_type( $self->opts->{"normalization-type"} );
+
     # Set rarefication parameters
     if( defined( $self->opts->{"prerare-samps"} ) ){ 
 	warn( "You are running with --prerare-samps, so I will only process " . 

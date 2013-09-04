@@ -36,7 +36,7 @@ if (!tryToLoadModule("Term::ANSIColor")) {
 sub safeColor($;$) { # one required and one optional argument
     ## Prints colored text, but only if USER_COLORS_CONSTANT is set.
     ## Allows you to totally disable colored printing by just changing USE_COLORS_CONSTANT to 0 at the top of this file
-    my ($str, $color) = @_;
+    my ($self, $str, $color) = @_;
     return (($USE_COLORS_CONSTANT) ? Term::ANSIColor::colored($str, $color) : $str);
 }
 
@@ -44,14 +44,14 @@ sub dryNotify { # one optional argument
     my ($self, $msg) = @_;
     $msg = (defined($msg)) ? $msg : "This was only a dry run, so we skipped executing a command.";
     chomp($msg);
-    print STDERR safeColor("[DRY RUN]: $msg\n", "black on_magenta");
+    print STDERR $self->Shotmap::Notify::safeColor("[DRY RUN]: $msg\n", "black on_magenta");
 }
 
 sub notifyAboutScp {
     my ($self, $msg) = @_;
     chomp($msg);
     my $parentFunction = defined((caller(2))[3]) ? (caller(2))[3] : '';
-    print STDERR (safeColor("[SCP]: $parentFunction: $msg\n", "green on_black")); ## different colors from normal notification message
+    print STDERR ($self->Shotmap::Notify::safeColor("[SCP]: $parentFunction: $msg\n", "green on_black")); ## different colors from normal notification message
     # no point in printing the line number for an SCP command, as they all are executed from Run.pm anyway
 }
 
@@ -59,7 +59,7 @@ sub notifyAboutRemoteCmd{
     my ($self, $msg) = @_;
     chomp($msg);
     my $parentFunction = defined((caller(2))[3]) ? (caller(2))[3] : '';
-    print STDERR (safeColor("[REMOTE CMD]: $parentFunction: $msg\n", "black on_green")); 
+    print STDERR ($self->Shotmap::Notify::safeColor("[REMOTE CMD]: $parentFunction: $msg\n", "black on_green")); 
     ## different colors from normal notification message
     # no point in printing the line number for a remote command, as they all are executed from Run.pm anyway
 }
@@ -67,7 +67,7 @@ sub notifyAboutRemoteCmd{
 sub notify {
     my ($self, $msg) = @_;
     chomp($msg);
-    print STDERR (safeColor("[NOTE]: $msg\n", "cyan on_black"));
+    print STDERR ($self->Shotmap::Notify::safeColor("[NOTE]: $msg\n", "cyan on_black"));
 }
 
 sub dieWithUsageError {
@@ -75,7 +75,7 @@ sub dieWithUsageError {
     chomp($msg);
     print("[TERMINATED DUE TO USAGE ERROR]: " . $msg . "\n");
     print STDOUT <DATA>;
-    die(MRC::safeColor("[TERMINATED DUE TO USAGE ERROR]: " . $msg . " ", "yellow on_red"));
+    die($self->Shotmap::Notify::safeColor("[TERMINATED DUE TO USAGE ERROR]: " . $msg . " ", "yellow on_red"));
 }
 
 sub exec_and_die_on_nonzero {
@@ -112,7 +112,7 @@ sub printBanner($$) {
     chomp($dateStr); # remote always-there newline from the `date` command
     my $stringWithDate = $string . " ($dateStr)";
     my $pad  = "#" x (length($stringWithDate) + 4); # add four to account for extra # and whitespce on either side of string
-    print STDERR MRC::safeColor("$pad\n" . "# " . $stringWithDate . " #\n" . "$pad\n", "cyan on_blue");
+    print STDERR $self->Shotmap::Notify::safeColor("$pad\n" . "# " . $stringWithDate . " #\n" . "$pad\n", "cyan on_blue");
 }
 
 sub check_env_var{

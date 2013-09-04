@@ -2584,7 +2584,7 @@ sub build_classification_maps_by_sample{
 
 sub calculate_abundances{
     my ( $self, $sample_id, $class_id, $abund_type, $norm_type ) = @_;
-    my $abundance_type_id = $self->Shotmap::DB::get_abundance_type_id( $abund_type, $norm_type );
+    my $abundance_parameter_id = $self->Shotmap::DB::get_abundance_parameter_id( $abund_type, $norm_type )->abundance_parameter_id();
     my $dbh  = $self->Shotmap::DB::build_dbh();
     my $members_rs = $self->Shotmap::DB::get_classified_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
     #did mysql return any results for this query?
@@ -2631,11 +2631,11 @@ sub calculate_abundances{
 	    } elsif( $abund_type eq 'coverage' ){ #number of bases in read that match the family
 		my $coverage;
 		#have to accumulate coverage totals for normalization as we loop
-		if( $norm_type eq 'none' ){
+		if( $norm_type eq "none" ){
 		    $coverage = $aln_length;
-		} elsif( $norm_type eq 'target_length' ){
+		} elsif( $norm_type eq "target_length" ){
 		    $coverage = $aln_length / $target_length;
-		} elsif( $norm_type eq 'family_length' ){
+		} elsif( $norm_type eq "family_length" ){
 		    $coverage = $aln_length / $family_length;
 		} else{
 		    die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
@@ -2654,7 +2654,7 @@ sub calculate_abundances{
 	my $raw = $abundances->{$famid}->{"raw"};
 	my $ra  = $raw / $total;
 	#now, insert the data into mysql.
-	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_type_id );
+	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
     }
     $self->Shotmap::DB::disconnect_dbh( $dbh );	
     return $self;
@@ -2694,6 +2694,66 @@ sub get_post_rarefied_reads{
 	$post_rare_reads->{$sample_id}->{$selected_id}++; #should never be greater than 1.....
     }
     return $post_rare_reads;
+}
+
+
+sub build_intersample_abundance_map{
+    my( $self, $class_id, $abund_param_id ) = @_;
+    #dump family abundance data for each sample id to flat file
+    my $outdir     = File::Spec->catdir( 
+	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" 
+	);
+    #my $abundances = $self->Shotmap::DB::get_sample_abundances( $sample_id, $class_id, $abund_param_id );
+    my $sample_abund_out  = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
+    my $sample_Rabund_out = $outdir . "/RelativeAbundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
+    open( RA, "   >$sample_Rabund_out" ) || die "Can't open $sample_Rabund_out for write: $!\n";
+    my $max_rows          = 10000;
+    my $dbh               = $self->Shotmap::DB::build_dbh();
+    my $famids            = {};
+    my $counter           = 0; #how many samples have we processed
+    foreach my $sample_id( @{ $self->get_sample_ids() } ){
+	$counter++;
+	my $values            = {};
+	my $abunds_rs         = $self->Shotmap::DB::get_sample_abundances_for_all_classed_fams( $dbh, $sample_id, $class_id, $abund_param_id );
+	while( my $rows = $abunds_rs->fetchall_arrayref( {}, $max_rows ) ){
+	    foreach my $row( @$rows ){
+		my $famid              = $row->{"famid"};
+		my $abundance          = $row->{"abundance"};
+		my $relative_abundance = $row->{"relative_abundance"};
+		if( !defined( $abundance) ){
+		    $values->{$famid}->{"raw"} = 0;
+		    $values->{$famid}->{"ra"}  = 0;
+		} else {
+		    $values->{$famid}->{"raw"} = $abundance;
+		    $values->{$famid}->{"ra"}  = $relative_abundance;
+		}
+		if( $counter == 1 ){
+		    $famids->{$famid}++;
+		}
+	    }
+	}
+	if( $counter == 1 ){ #printer header row
+	    my @col_names = sort( keys( %{ $famids } ) );
+	    print ABUND join( "\t", @col_names, "\n" );
+	    print RA join( "\t", @col_names, "\n" );
+	}
+	print ABUND "${sample_id}\t";
+	print RA    "${sample_id}\t";
+	foreach my $fam( sort( keys( %{ $famids } ) ) ){
+	    if( !defined( $values->{$fam} ) ){
+		die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
+	    }	    
+	    print ABUND $values->{$fam}->{"raw"} . "\t";
+	    print RA    $values->{$fam}->{"ra"}  . "\t";	    
+	}
+	print ABUND "\n";
+	print RA    "\n";
+    }
+    $self->Shotmap::DB::disconnect_dbh( $dbh );	
+    close ABUND;
+    close RA;
+    return $self;
 }
 
 #this could be made to be more efficient...
@@ -2757,16 +2817,95 @@ sub check_prior_analyses{
 }
 
 sub check_sample_rarefaction_depth{
-    my ( $self, $sample_id ) = @_;
-    my $switch = 1;
-    if( defined( $self->postrarefy_samples ) ){
-	my $depth        = $self->postrarefy_samples;
-	my $number_reads = $self->Shotmap::DB::get_number_reads_in_sample( $sample_id )->count;
-	if( $number_reads < $depth ){
-	    $switch = 0;
+    my ( $self, $sample_id, $post_rare_reads ) = @_;
+    my $bit = 1;
+    return $bit if( !defined( $post_rare_reads ) );
+    my $reads = $self->Shotmap::DB::get_reads_by_sample( $sample_id );
+    if( $reads->count() > $post_rare_reads ){
+	warn( "There are not enough reads in sample ${sample_id} to rarefy to a depth of ${post_rare_reads}. I will have to skip all downstream analyses for this sample.\n" );
+	$bit = 0;
+    }
+    return $bit;
+}
+
+sub calculate_diversity{
+    my( $self, $class_id, $abund_param_id ) = @_; #abundance type is "abundance" or "relative_abundance"
+    #set output directory
+    my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" );
+    my $scripts_dir     = $self->local_scripts_dir();
+    #build a sample metadata table that maps sample_id to metadata properties. dump to file
+    my $metadata_table  = $self->Shotmap::Run::get_project_metadata();
+    my $abund_map   = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
+    my $r_abund_map = $outdir . "/RelativeAbundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+
+    #CALCULATE DIVERSITY AND COMPARE SAMPLES
+    #open output directory that contains per sample diversity data
+    my $sample_diversity_prefix  = $outdir . "/Sample_Diversity_cid_${class_id}_aid_${abund_param_id}";
+    my $compare_diversity_prefix = $outdir . "/Compare_samples_cid_${class_id}_aid_${abund_param_id}";
+    #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
+    #produce pltos and output tables
+    my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
+    my $cmd               = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${sample_diversity_prefix} ${compare_diversity_prefix} < ${script}";
+    print $cmd . "\n";
+    Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
+
+    #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
+
+    #INTERFAMILY ANALYSIS
+    #open directory that contains sample-famid abundance maps for all samples for given class/abundparam id
+    my $family_abundance_prefix = $outdir . "/Family_Abundances";
+    my $intrafamily_prefix      = $outdir . "/Compare_families_cid_${class_id}_aid_${abund_param_id}";
+    #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
+    #produce plots and output tables for this analysis
+    $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
+    $cmd               = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
+    Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
+
+    #COMPARE SAMPLES BY MULTIDIMENSIONAL SCALING
+    #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
+    my $pca_prefix              = $outdir . "/Sample_PCA";
+    $script                     = File::Spec->catdir( $scripts_dir, "R", "sample_pca.R" );
+    $cmd                        = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
+    $self;
+}
+
+#MODIFIED
+sub get_project_metadata{
+    my( $self )  = @_;
+    my $output   = File::Spec->catdir( $self->ffdb, "projects", $self->db_name, $self->project_id(), "output", "sample_metadata.tab" );
+    my $samples  = $self->Shotmap::DB::get_samples_by_project_id( $self->project_id() );
+    open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
+    my $data   = {}; #will push rows to data, need to know all fields before printing header
+    my $fields = {};
+    while( my $row = $samples->next ){
+	my $sample_id     = $row->sample_id;
+	my $sample_alt_id = $row->sample_alt_id;
+	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
+	my $metadata      = $row->metadata;
+	my( @fields )  = split( ",", $metadata );
+	foreach my $field( @fields ){
+	    my( $field_name, $field_value ) = split( "\=", $field );
+	    $data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
+	    $fields->{$field_name}++;
 	}
     }
-    return $switch;
+    #print the header
+    print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
+    foreach my $sample_id( keys( %{ $data } ) ){
+	my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	print OUT join( "\t", $sample_id, $sample_alt_id, $sample_id );
+	my @fields        = keys( %{ $data->{$sample_id}->{"metadata"} } );
+	foreach my $field( sort( @fields ) ){
+	    if( $field eq $fields[-1] ){
+		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
+	    } else{
+		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
+	    }
+	}   
+    }
+    close OUT;
+    return $output;
 }
+
 
 1;

@@ -14,10 +14,9 @@ package Shotmap;
 
 use Shotmap::Load;
 use Shotmap::Notify;
-use MRC::DB;
-use MRC::Run;
-use SFams::Schema;
-use MRC::Schema;
+use Shotmap::DB;
+use Shotmap::Run;
+use Shotmap::Schema;
 use Data::Dumper;
 use File::Basename;
 use File::Path;
@@ -766,6 +765,22 @@ sub top_hit_type{
 	$self->{"top_hit_type"} = $value;
     }
     return $self->{"top_hit_type"};
+}
+
+sub abundance_type{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"abund_type"} = $value;
+    }
+    return $self->{"abund_type"};
+}
+
+sub normalization_type{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"norm_type"} = $value;
+    }
+    return $self->{"norm_type"};
 }
 
 #######

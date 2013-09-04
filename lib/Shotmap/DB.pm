@@ -522,8 +522,8 @@ sub get_number_db_splits{
     my ( $self, $type ) = @_;
     my $n_splits = 0;
     my $db_path;
-    if( $type eq "hmm" ) {       $db_path = $self->Shotmap::DB::get_hmmdb_path();
-    } elsif( $type eq "blast" ){ $db_path = $self->Shotmap::DB::get_blastdb_path();
+    if( $type eq "hmm" ) {       $db_path = $self->search_db_path("hmm");
+    } elsif( $type eq "blast" ){ $db_path = $self->search_db_path("blast");
     } else { die "invalid $type"; }
 
     opendir( DIR, $db_path ) || die "Can't opendir <$db_path> for readng: $! ";
@@ -544,7 +544,7 @@ sub get_number_db_splits{
 sub get_number_hmmdb_scans{
     my ( $self, $n_seqs_per_db_split ) = @_;
     my $n_splits = 0;
-    opendir( DIR, $self->Shotmap::DB::get_hmmdb_path ) || die "Can't opendir " . $self->get_hmmdb_path() . " for read: $! ";
+    opendir( DIR, $self->search_db_path("hmm") ) || die "Can't opendir " . $self->search_db_path("hmm") . " for read: $! ";
     my @files = readdir( DIR );  # <-- Note that "@files" also includes the "fake" files '.' and '..'
     closedir( DIR );
     foreach my $file( @files ){
@@ -598,7 +598,7 @@ sub get_number_sequences{
 sub get_blast_db_length{
     my($self, $db_name) = @_;
     my $length  = 0;
-    my $db_path = $self->Shotmap::DB::get_blastdb_path();
+    my $db_path = $self->search_db_path("blast");
     my $db_length_filename = "$db_path/database_length.txt";
     if( -e $db_length_filename ){
 	open( IN, $db_length_filename ) or die "Can't open ${db_length_filename} for reading: $! ";
@@ -807,7 +807,7 @@ sub get_hmmdbs{
 	next if( $file =~ m/\.h3[i|m|p|f]/ );
 	#if grabbing from remote server, use the fact that HMMdb is a mirror to get proper remote path
 	if ($is_remote) {
-	    $hmmdbs{$file} = $self->get_remote_ffdb() . "/HMMdbs/$hmmdb_name/$file";
+	    $hmmdbs{$file} = $self->remote_ffdb() . "/HMMdbs/$hmmdb_name/$file";
 	} else {
 	    $hmmdbs{$file} = "$hmmdb_local_path/$file";
 	}
@@ -1457,17 +1457,6 @@ sub get_searchdb_id{
     return $inserted;
 }
 
-sub get_abundance_type_id{
-    my ( $self, $abund_type, $norm_type ) = @_; 
-    my $inserted = $self->get_schema->resultset( "AbundanceParameter" )->find_or_create(
-	{
-	    abundance_type        => $abund_type,
-	    normalization_type    => $norm_type,
-	}
-	);
-    return $inserted;
-}
-
 sub get_families_by_searchdb_id{
     my( $self, $searchdb_id ) = @_;
     my $fams = $self->get_schema->resultset( "Family" )->search(
@@ -1950,8 +1939,8 @@ sub get_read_ids_from_ffdb{
 sub load_families{
     my( $self, $type ) = @_;
     my $raw_db_path = undef;
-    if ($type eq "hmm")   { $raw_db_path = $self->Shotmap::DB::get_hmmdb_path(); }
-    if ($type eq "blast") { $raw_db_path = $self->Shotmap::DB::get_blastdb_path(); }
+    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
+    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
     open( FAMLENS, "${raw_db_path}/family_lengths.tab" ) || die "Can't open ${raw_db_path}/family_lengths.tab for read: $!\n";
     while( <FAMLENS> ){
 	chomp $_;
@@ -1976,7 +1965,7 @@ sub load_families{
 #too slow. obsolete
 sub load_family_members{
     my( $self ) = @_;
-    my $sequence_map = $self->Shotmap::DB::get_blastdb_path() . "/sequence_lengths.tab";
+    my $sequence_map = $self->search_db_path("blast") . "/sequence_lengths.tab";
     open( SEQLENS, "$sequence_map" ) || die "Can't open $sequence_map for read: $!\n";
     while( <SEQLENS> ){
 	chomp $_;
@@ -2030,6 +2019,89 @@ sub insert_abundance{
 	}
 	);
     return $inserted;
+}
+
+sub get_abundance_parameter_id{
+    my ( $self, $abund_type, $norm_type ) = @_; 
+    my ( $rarefaction_depth, $rarefaction_type );
+    if( defined( $self->postrarefy_samples ) ){ #post rarefaction is always smallest
+	$rarefaction_depth = $self->postrarefy_samples;
+	$rarefaction_type  = "post-rarefaction";
+    } elsif( defined( $self->prerarefy_samples ) ){
+	$rarefaction_depth = $self->prerarefy_samples;
+	$rarefaction_type  = "pre-rarefaction";
+    }
+    my $inserted = $self->get_schema->resultset( "AbundanceParameter" )->find_or_create(
+	{
+	    abundance_type        => $abund_type,
+	    normalization_type    => $norm_type,
+	    rarefaction_depth     => $rarefaction_depth,
+	    rarefaction_type      => $rarefaction_type,
+	}
+	);
+    return $inserted;
+}
+
+sub insert_abundance{
+    my( $self, $sample_id, $famid, $abundance, $relative_abundance, $abundance_parameter_id, $class_id ) = @_;
+    my $inserted = $self->get_schema->resultset("Abundance")->find_or_create(
+	{
+	    sample_id => $sample_id,
+	    famid     => $famid,
+	    abundance => $abundance,
+	    relative_abundance => $relative_abundance,
+	    abundance_parameter_id  => $abundance_parameter_id,
+	    classification_id       => $class_id,
+	}
+	);
+    return $inserted;
+}
+
+sub insert_sample_diversity{
+    my( $self, $sample_id, $class_id, $abund_param_id, $richness, $shannon, $goods_coverage ) = @_;
+    my $inserted = $self->get_schema->resultset("Diversity")->find_or_create(
+	{
+	    sample_id               => $sample_id,
+	    class_id                => $class_id,
+	    abundance_parameter_id  => $abund_param_id,
+	    richness                => $richness,
+	    shannon_entropy         => $shannon,
+	    goods_coverage          => $goods_coverage,
+	}
+	);
+    return $inserted;
+}
+
+sub get_sample_abundance{
+    my( $self, $sample_id, $class_id, $abund_param_id ) = @_;
+    my $inserted = $self->get_schema->resultset("Abundance")->search(
+	{
+	    sample_id               => $sample_id,
+	    abundance_parameter_id  => $abund_param_id,
+	    classification_id       => $class_id,
+	}
+	);
+    return $inserted;
+}    
+
+sub get_sample_abundances_for_all_classed_fams{
+    my ( $self, $dbh, $sample_id, $class_id, $abund_param_id ) = @_;
+    my $sql = "SELECT a.famid, b.sample_id, b.abundance, b.relative_abundance FROM (SELECT DISTINCT famid FROM abundances) a LEFT OUTER JOIN abundances b ON a.famid = b.famid AND b.sample_id = ${sample_id} " .
+	"AND b.classification_id = ${class_id} AND b.abundance_parameter_id = ${abund_param_id}";
+    print $sql . "\n";
+    my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
+    $sth->execute();
+    return $sth;
+}
+
+sub get_abundance_parameters{
+    my( $self, $abund_param_id ) = @_;
+    my $params = $self->get_schema->resultset("AbundanceParameter")->find(
+	{
+	    abundance_parameter_id => $abund_param_id,
+	}
+	);
+    return $params
 }
 
 1;

@@ -303,6 +303,32 @@ CREATE TABLE `annotations` (
   KEY `searchdb_id` (`searchdb_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
+--
+-- Table structure for table `annotations`
+--
+
+DROP TABLE IF EXISTS `diversity`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `diversity` (
+  `diversity_id` int(11) NOT NULL AUTO_INCREMENT,
+  `sample_id`  int(11) unsigned NOT NULL, /*NOTE NO FOREIGN KEY CHECK!*/
+  `famid` varchar(256) NOT NULL, /*does not have to be unique, may map to multiple annotations*/
+  `abundance_parameter_id` int(10) unsigned NOT NULL,
+  `classification_id` int(11) unsigned DEFAULT NULL,  
+  `richness` float DEFAULT NULL, /*THIS IS AN ANNOTATION STRING, LIKE "GLYCOSIDE HYDROLASE"*/
+  `shannon_entropy` float DEFAULT NULL,
+  `goods_coverage` float DEFAULT NULL,
+  PRIMARY KEY (`diversity_id`),
+  UNIQUE KEY `sample_fam_abund_class_id` (`sample_id`,`famid`,`abundance_parameter_id`,`classification_id`), /*THIS IS FOR SAFETY*/ 
+  KEY `fam_sample_id` (`famid`,`sample_id`),
+  KEY `type_class_sample_id` (`abundance_parameter_id`,`classification_id`,`sample_id`),
+  KEY `famid` (`famid`),
+  KEY `sampleid` (`sample_id`),
+  KEY `abundid` (`abundance_parameter_id`),
+  KEY `classid` (`classification_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
 
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

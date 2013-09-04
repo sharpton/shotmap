@@ -114,3 +114,4 @@ $pipe->Shotmap::Reads::load_project();
  CLASSIFYREADS: $pipe->Shotmap::Results::classify_reads();
 # Calculate diversity
  CALCDIVERSITY: $pipe->Shotmap::Results::calculate_diversity();
+$pipe->Shotmap::Notify::printBanner("ANALYSIS COMPLETED!");
