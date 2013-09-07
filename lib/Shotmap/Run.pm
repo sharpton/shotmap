@@ -918,7 +918,7 @@ sub build_search_db{
 		    $seq_len = 0;		
 		}
 		#we've hit our desired size (or at the end). Process the split
-		if( ( scalar( keys( %$seqs ) ) >= $split_size ) || ( $family == $families[-1] && eof )) {
+		if( ( scalar( keys( %$seqs ) ) >= $split_size ) || ( $family eq $families[-1] && eof )) {
 		    foreach my $id( keys( %$seqs ) ){
 			print $tmp $id;
 			print $tmp $seqs->{$id};

@@ -15,9 +15,18 @@ metadata.tab      <- Args[6]
 family.stem       <- Args[7]
 compare.stem      <- Args[8]
 
+###Set autodetection thresholds
+cont.thresh    = 0.2 #if there are fewer than this fraction of uniq vars in list, force discrete
+n.type.plot.lim = 10  #if there are more than this number of uniq vars in list, don't plot results, only produce table files
+
+###Set some multiple testing parameters
+procs         <- c("Bonferroni", "Holm", "Hochberg", "SidakSS", "SidakSD", "BH", "BY") #used in multtest
+proc2plot     <- "BH" #must be one of the above
+sig.threshold <- 0.05
+
 ###Autodetect metadata variable type
-###takes a list of values and determines if likely discrete or continuous. May not be perfect!
-autodetect <- function( val.list ) {
+###takes a list of values and determines if likely discrete or continuous. User defined thresholds required!
+autodetect <- function( val.list, cont.thresh) {
   cont.thresh = 0.2 #what is min number of unique vals that constitutes a continuous list?
   type = NULL
   ##if any item matches a character, label as discrete
@@ -40,11 +49,6 @@ autodetect <- function( val.list ) {
   return( type )
 }
 
-###Set some multiple testing parameters
-procs         <- c("Bonferroni", "Holm", "Hochberg", "SidakSS", "SidakSD", "BH", "BY") #used in multtest
-proc2plot     <- "BH" #must be one of the above
-sig.threshold <- 0.05
-
 ####get the metadata
 meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
 meta.names <- colnames( meta )
@@ -57,6 +61,7 @@ famids     <- colnames(ra.map)
 
 ###map sampleid to family id to relative abundance using melt
 for( a in 1:length( meta.names ) ){
+  to.plot = 1
   meta.field <- meta.names[a]    
   if( meta.field == "SAMPLE_ID" ){
     next
@@ -65,8 +70,11 @@ for( a in 1:length( meta.names ) ){
     next
   }
   types       <- unique( meta[,field] )
+  if( length(types) > n.type.plot.lim ){
+    to.plot = 0
+  }
   ##right now, we only do wilcoxon on discrete classes if no more than 2 categories. Talk to KP about other options
-  if( length( types ) == 2 & autodetect( meta[,meta.field] ) == "discrete"){
+  if( length( types ) == 2 & autodetect( meta[,meta.field], cont.thresh ) == "discrete"){
     type.x    <- types[1]
     type.y    <- types[2]
     x.samps   <- subset( meta, meta[,meta.field] == type.x )$SAMPLE.ID
@@ -85,9 +93,14 @@ for( a in 1:length( meta.names ) ){
     ##now do something with this output
     tab.file <- paste( family.stem, "-", meta.field, "-", type.x, "-", type.y, "-pvals.tab", sep="" )
     write.table( rnd.p, tab.file )
+    if( to.plot ){
+      ##plot the results
+    }
+  } else if( length( types ) > 2 & autodetect( meta[,meta.field], cont.thresh ) == "discrete" ){
+    
   }
   ##Correlation analyses on continuous vars
-  else if( lengths(meta$SAMPLE.ID) > 2 & autodetect( meta[,meta.field] ) == "continuous" ){ #spearman's correlation and lm analysis, reqs 3 or more samples
+  else if( lengths(meta$SAMPLE.ID) > 2 & autodetect( meta[,meta.field], cont.thresh ) == "continuous" ){ #spearman's correlation and lm analysis, reqs 3 or more samples
     meta.vals     <- meta[order(meta$SAMPLE.ID),][,meta.field] #have to order by sample id to map to ra.map
     res           <- as.data.frame(t(apply( t(ra.map), 1, function(row){
       s<-cor.test( row, meta.vals, type="spearman" )
