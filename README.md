@@ -31,6 +31,7 @@ Requirements & Dependencies
 
 ####Non-standard Libraries (you probably have to install these)
 
+* DBIx::Class
 * DBIx::BulkLoader::mysql 
 * IPC::System::Simple
 * IO::Uncompress::Gunzip
