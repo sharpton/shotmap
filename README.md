@@ -325,22 +325,22 @@ OPTIONS
 
 --goto=STRING
 
-    Go to a specific step in the workflow. Will complete all subsequent steps, but none of the prior ones. As a result, it requires
-    that the prior steps successfully completed.
-    Valid options are:
-      * 'T' or 'TRANSLATE'   - Read translation/coding sequence annotation
-      * 'O' or 'LOADORFS'    - Load translated reads (orfs) into mysql database
-      * 'B' or 'BUILD'       - Build search database
-      * 'R' or 'REMOTE'      - Stage search database on remote cluster
-      * 'S' or 'SCRIPT'      - Build script for conducting massively parallel search on remote cluster
-      * 'X' or 'SEARCH'      - Search all orfs against all protein families
-      * 'P' or 'PARSE'       - Parse the search results and prepare
-      * 'G' or 'GET'         - Transfer the results from the remote cluster
-      * 'L' or 'LOADRESULTS' - Load the results into the mysql database
-      * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families
-      * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
+Go to a specific step in the workflow. Will complete all subsequent steps, but none of the prior ones. As a result, it requires
+that the prior steps successfully completed.
+Valid options are:
+* 'T' or 'TRANSLATE'   - Read translation/coding sequence annotation
+* 'O' or 'LOADORFS'    - Load translated reads (orfs) into mysql database
+* 'B' or 'BUILD'       - Build search database
+* 'R' or 'REMOTE'      - Stage search database on remote cluster
+* 'S' or 'SCRIPT'      - Build script for conducting massively parallel search on remote cluster
+* 'X' or 'SEARCH'      - Search all orfs against all protein families
+* 'P' or 'PARSE'       - Parse the search results and prepare
+* 'G' or 'GET'         - Transfer the results from the remote cluster
+* 'L' or 'LOADRESULTS' - Load the results into the mysql database
+* 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families
+* 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
 
---reload (optional, default=DISABLED)
+* --reload (optional, default=DISABLED)
 
 Normally, shotmap emits a warning when you attempt to analyze data that you have already processed at some level with shotmap.
 It prefers that you use the --goto option and amend your settings, but you can completely start over using the --reload option.
@@ -348,7 +348,7 @@ It prefers that you use the --goto option and amend your settings, but you can c
 
 --verbose (optional, default=DISABLED)
 
-    Verbose output is produced. Helpful for troubleshooting. Not currently implemented!
+Verbose output is produced. Helpful for troubleshooting. Not currently implemented!
 
 
 Details
