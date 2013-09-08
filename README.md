@@ -231,7 +231,7 @@ OPTIONS
 * **--ruser=USERNAME**                       (REQUIRED argument)
 
     Remote username for logging into the remote computational cluster / machine.
-    Note that you have to set up passphrase-less SSH for this to work. Google it!
+    Note that you have to set up passphrase-less SSH for this to work.
 
 * **--rdir=/PATH/ON/REMOTE/SERVER**          (REQUIRED argument)
 
