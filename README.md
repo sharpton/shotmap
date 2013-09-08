@@ -27,6 +27,47 @@ Once you have a configuration file built (see below), all you need to do to anno
 Requirements & Dependencies
 ---------------------------
 
+###Perl Modules
+
+####Non-standard Libraries (you probably have to install these)
+
+* DBIx::BulkLoader::mysql 
+* IPC::System::Simple
+* IO::Uncompress::Gunzip
+* IO::Compress::Gzip
+* Bio::SeqIO 
+* Carp
+
+####Standard Libraries (you probably don't have to install these)
+
+* DBI
+* DBD::mysql
+* File::Basename
+* File::Copy
+* File::Path
+* File::Spec
+* Getopt::Long
+
+###MySQL
+
+
+###R Packages
+
+* vegan
+* ggplot2
+* multtest
+* reshape (still?)
+
+###Translation/Gene Annotation Tools
+
+* transeq
+
+###Homology Detection Tools
+
+* HMMER (v3)
+* BLAST
+* LAST
+* RAPsearch (v2)
 
 Installation
 ------------
