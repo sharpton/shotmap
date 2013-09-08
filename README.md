@@ -76,7 +76,8 @@ OPTIONS
 
 ###CONFIGURATION FILE:
 
-#####--conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
+--conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
+
 Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
 a list of shotmap run-time arguments, as below, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
 You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
@@ -87,46 +88,52 @@ read-only permissions. Note that this is NOT a failsafe security method!
 
 ###METAGENOME DATA ARGUMENTS:
 
-#####--projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
-    Location of the metagenomic sequences to be processed. Each metagenomic samples should be in a single
-    and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa as the file suffix.
-    Shotmap currently only accepts fasta formatted input sequence files.
+--projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
 
-    This directory can optionally contain a file that encodes sample metadata \(i.e., ecological conditions
-    associated with the metagenomic sample\). This file should be named "sample_metadata.tab". See the 
-    [details] section of the documentation or the sample data for more information on this file format. The
-    contents of this file will be placed in the samples table and used to partition samples into groups 
-    during statistical analysis and identify covariation between family abundance and metadata parameters.
+Location of the metagenomic sequences to be processed. Each metagenomic samples should be in a single
+and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa as the file suffix.
+Shotmap currently only accepts fasta formatted input sequence files.
 
-    This directory can optionally contain a file that describes the project data \(e.g., "Healhy human gut
-    microbiome samples"\). This file should be names "project_description.txt" and has no format. The 
-    contents of this file will be placed in the project table of the database.
+This directory can optionally contain a file that encodes sample metadata \(i.e., ecological conditions
+associated with the metagenomic sample\). This file should be named "sample_metadata.tab". See the 
+[details] section of the documentation or the sample data for more information on this file format. The
+contents of this file will be placed in the samples table and used to partition samples into groups 
+during statistical analysis and identify covariation between family abundance and metadata parameters.
+
+This directory can optionally contain a file that describes the project data \(e.g., "Healhy human gut
+microbiome samples"\). This file should be names "project_description.txt" and has no format. The 
+contents of this file will be placed in the project table of the database.
 
 ###SHOTMAP DATA REPOSITORY ARGUMENTS:
 
-#####--ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
+--ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
     local flat file database path
 
 ###DATABASE ARGUMENTS:
 
-*--dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)*
-    The ip address or hostname of machine that hosts the remote MySQL database. 
+--dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)
 
-    Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
-    to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
+The ip address or hostname of machine that hosts the remote MySQL database. 
 
-**--dbuser=MYSQL_USERNAME                     (REQUIRED argument)**
-    MySQL username for logging into mysql on the remote database server.
+Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
+to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
+
+--dbuser=MYSQL_USERNAME                     (REQUIRED argument)
+
+MySQL username for logging into mysql on the remote database server.
 
 --dbpass=MYSQL_PASSWORD (in plain text)     (REQUIRED argument)
-    The MySQL password for <dbuser>, on the remote database server.
-    It is best to store this in a secure configuration file as calling this option on the command line will
-    store your password in your terminal history.
 
---dbname=DATABASENAME (OPTIONAL argument: default is "ShotDB")
+The MySQL password for <dbuser>, on the remote database server.
+It is best to store this in a secure configuration file as calling this option on the command line will
+store your password in your terminal history.
+
+* --dbname=DATABASENAME (OPTIONAL argument: default is "ShotDB")
+
     The name of the MySQL database that will store the project data and all results.
 
---dbschema=SCHEMANAME (OPTIONAL argument: default is "Shotmap::Schema")
+* --dbschema=SCHEMANAME (OPTIONAL argument: default is "Shotmap::Schema")
+  
     The DBIx schema name. If modifications to the database schema are made and saved under a different DBIx library,
     then change this name. Most users will never need to worry about this option.
 
