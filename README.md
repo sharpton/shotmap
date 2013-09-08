@@ -76,7 +76,7 @@ OPTIONS
 
 ###CONFIGURATION FILE:
 
---conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
+#####--conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
     Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
     a list of shotmap run-time arguments, as below, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
     You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
