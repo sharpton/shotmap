@@ -309,6 +309,7 @@ OPTIONS
     alignment length (i.e., abundance is equal to total number of base pairs that align to the family).
 
 --normalization-type=STRING (required, default="target-length")
+
     Determines if estimates of abundance should be length corrected, which could be important if family length varies greatly within
     a metagenome. Currently accepts ("none", "family_length", "target_length").
  
@@ -319,9 +320,11 @@ OPTIONS
 ###GENERAL ARGUMENTS, NOT SET IN CONFIGURATION FILE:
 
 --pid=INTEGER (optional, no default)
+
     The MySQL project identifier corresponding to data that you want to reprocess. Not used when analyzing data for the first time!
 
 --goto=STRING
+
     Go to a specific step in the workflow. Will complete all subsequent steps, but none of the prior ones. As a result, it requires
     that the prior steps successfully completed.
     Valid options are:
@@ -338,11 +341,13 @@ OPTIONS
       * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
 
 --reload (optional, default=DISABLED)
-    Normally, shotmap emits a warning when you attempt to analyze data that you have already processed at some level with shotmap.
-    It prefers that you use the --goto option and amend your settings, but you can completely start over using the --reload option.
-    !!!Note that this will remove your prior data from the MySQL database and the shotmap data repository!!!
+
+Normally, shotmap emits a warning when you attempt to analyze data that you have already processed at some level with shotmap.
+It prefers that you use the --goto option and amend your settings, but you can completely start over using the --reload option.
+!!!Note that this will remove your prior data from the MySQL database and the shotmap data repository!!!
 
 --verbose (optional, default=DISABLED)
+
     Verbose output is produced. Helpful for troubleshooting. Not currently implemented!
 
 
