@@ -460,9 +460,8 @@ GENERAL ARGUMENTS, NOT SET IN CONFIGURATION FILE:
 --verbose (optional, default=DISABLED)
     Verbose output is produced. Helpful for troubleshooting. Not currently implemented!
 
-KNOWN BUGS:
 
-  None known at the moment...
 
+Please report bugs to the author.
 --------------
 
