@@ -23,13 +23,11 @@ Running Shotmap
 Options
 -------
 
+Requirements & Dependencies
+---------------------------
 
 Installation
 ------------
-
-
-###Requirements & Dependencies
-
 
 Details
 -------

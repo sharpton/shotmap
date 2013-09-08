@@ -783,6 +783,14 @@ sub normalization_type{
     return $self->{"norm_type"};
 }
 
+sub search_db_name_suffix{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"search_suffix"} = $value;
+    }
+    return $self->{"search_suffix"};
+}
+
 #######
 # NEED TO VALIDATE THESE
 #######
