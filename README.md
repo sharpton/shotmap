@@ -340,7 +340,7 @@ Valid options are:
 * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families
 * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
 
-* --reload (optional, default=DISABLED)
+  --reload (optional, default=DISABLED)
 
 Normally, shotmap emits a warning when you attempt to analyze data that you have already processed at some level with shotmap.
 It prefers that you use the --goto option and amend your settings, but you can completely start over using the --reload option.
