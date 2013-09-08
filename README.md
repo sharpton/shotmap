@@ -17,7 +17,7 @@ Shotmap manages the information and data associated with this workflow in a rela
 handle the communication with and transfer of data between a database server and a distributed computer cluster (SGE).
 
 Quickstart
-__________
+----------
 
 Once you have a configuration file built (see below), all you need to do to annotate your metagenome is:
 
