@@ -76,7 +76,7 @@ OPTIONS
 
 ###CONFIGURATION FILE:
 
---conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
+* --conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
 
 Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
 a list of shotmap run-time arguments, as below, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
@@ -88,7 +88,7 @@ read-only permissions. Note that this is NOT a failsafe security method!
 
 ###METAGENOME DATA ARGUMENTS:
 
---projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
+* --projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
 
 Location of the metagenomic sequences to be processed. Each metagenomic samples should be in a single
 and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa as the file suffix.
@@ -106,23 +106,27 @@ contents of this file will be placed in the project table of the database.
 
 ###SHOTMAP DATA REPOSITORY ARGUMENTS:
 
---ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
-    local flat file database path
+* --ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
+  
+    Location of the flat file shotmap data repository. Shotmap creates this location and stores both
+    the search database and the reads, orfs, search results, and statistical output. Multiple projects
+    can be stored in the same data repository. See details for more information about the structure of
+    this directory.
 
 ###DATABASE ARGUMENTS:
 
---dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)
+* --dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)
 
 The ip address or hostname of machine that hosts the remote MySQL database. 
 
 Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
 to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
 
---dbuser=MYSQL_USERNAME                     (REQUIRED argument)
+* --dbuser=MYSQL_USERNAME                     (REQUIRED argument)
 
 MySQL username for logging into mysql on the remote database server.
 
---dbpass=MYSQL_PASSWORD (in plain text)     (REQUIRED argument)
+* --dbpass=MYSQL_PASSWORD (in plain text)     (REQUIRED argument)
 
 The MySQL password for <dbuser>, on the remote database server.
 It is best to store this in a secure configuration file as calling this option on the command line will
