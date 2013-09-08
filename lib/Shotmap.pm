@@ -1,6 +1,5 @@
 #!/usr/bin/perl -w
 
-#MRC.pm - The MRC workflow manager
 #Copyright (C) 2011  Thomas J. Sharpton 
 #author contact: thomas.sharpton@gladstone.ucsf.edu
 #This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -24,20 +23,11 @@ use File::Spec;
 use IPC::System::Simple qw(capture $EXITVAL);
 use Data::Dumper;
 
-
-=head2 new
- Usage   : $project = MRC->new()
- Function: initializes a new MRC analysis object
- Example : $analysus = MRC->new();
- Returns : A MRC analysis object
-=cut
-
 sub new{
     my ($proto) = @_;
     my $class = ref($proto) || $proto;
     my $self  = {};
-    warn "Setting default values: is_remote, is_strict, and multiload have default values.";
-    $self->{"workdir"}     = undef; #master path to MRC scripts
+    $self->{"workdir"}     = undef; 
     $self->{"ffdb"}        = undef; #master path to the flat file database
     $self->{"dbi"}         = undef; #DBI string to interact with DB
     $self->{"user"}        = undef; #username to interact with DB
@@ -184,7 +174,7 @@ sub project_id{
 
  Title   : set_samples
  Usage   : $analysis->set_samples( $sample_paths_hash_ref );
- Function: Store a hash that relates sample names to sample ffdb paths in the MRC object   
+ Function: Store a hash that relates sample names to sample ffdb paths in the Shotmap object   
  Example : my $hash_ref = $analysis->set_samples( \%sample_paths );
  Returns : A hash_ref of sample names to sample ffdb paths (hash reference)
  Args    : A hash_ref of sample names to sample ffdb paths (hash reference)
@@ -198,11 +188,12 @@ sub set_samples{
     return $self->{"samples"};
 }
 
+
 =head2 get_sample_hashref
 
  Title   : get_sample_hashref
  Usage   : $analysis->get_sample_hashref()
- Function: Retrieve a hash reference that relates sample names to sample ffdb path from the MRC object
+ Function: Retrieve a hash reference that relates sample names to sample ffdb path from the Shotmap object
  Example : my %samples = %{ $analysis->get_sample_hashref() };
  Returns : A hash_ref of sample names to sample ffdb paths (hash reference)
  Args    : None
@@ -219,7 +210,7 @@ sub get_sample_hashref {
 
  Title   : project_desc
  Usage   : $analysis->project_desc( $projet_description_text );
- Function: Obtain or retrieve the project description and store in the MRC object
+ Function: Obtain or retrieve the project description and store in the Shotmap object
  Example : my $description = $analysis->project_description( "A metagenomic study of the Global Open Ocean, 28 samples total" );
  Returns : The project description (string)
  Args    : The project description (string)
@@ -239,7 +230,7 @@ sub project_desc{
 
  Title   : sample_metadta
  Usage   : $analysis->sample_metadata( $sample_metadata_table_text );
- Function: Obtain or retrieve the sample metadata table associated with the project and store in the MRC object. 
+ Function: Obtain or retrieve the sample metadata table associated with the project and store in the Shotmap object. 
  Example : my $metadata_table_string = $analysis->sample_metadata()
  Returns : The sample metadata tab delimited table (string)
  Args    : The sample metadata tab delimited table (string)
@@ -319,7 +310,7 @@ sub remote_ffdb{
 
 sub remote_project_path{
    my ($self) = @_;
-   (defined($self->remote_ffdb())) or warn "get_remote_project_path: Remote ffdb path was NOT defined at this point, but we requested it anyway!\n";
+   (defined($self->remote_ffdb())) or warn "get_remote_project_path: Remote repository path was NOT defined at this point, but we requested it anyway!\n";
    (defined($self->project_id())) or warn "get_remote_project_path: Project ID was NOT defined at this point, but we requested it anyway!.\n";
    (defined($self->db_name())) or warn "get_remote_project_path: Database name was NOT defined at this point, but we requested it anyway!.\n";
    my $path = $self->remote_ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/";
@@ -453,7 +444,7 @@ sub scratch{
     return $self->{"scratch"};
 }
 
-sub ffdb{ # Function: Indicates where the MRC flat file database is located
+sub ffdb{ # Function: Indicates where the Shotmap flat file database is located
     my $self = shift;  
     my $path = shift;
     if( defined( $path ) ){
@@ -810,10 +801,10 @@ sub build_remote_ffdb {
     my ($self, $verbose) = @_;
     my $rffdb      = $self->{"rffdb"};
     my $connection = $self->remote_connection();
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"         , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/projects", $verbose);
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/HMMdbs"  , $verbose);   
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/BLASTdbs", $verbose);
+    Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"         , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
+    Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/projects", $verbose);
+    Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/HMMdbs"  , $verbose);   
+    Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/BLASTdbs", $verbose);
 }
 
 sub build_remote_script_dir {
@@ -821,7 +812,7 @@ sub build_remote_script_dir {
     my $rscripts      = $self->{"remote_script_dir"};
     ( defined($rscripts) ) || die "The remote scripts directory was not defined, so we cannot create it!\n";
     my $connection = $self->remote_connection();
-    MRC::Run::execute_ssh_cmd( $connection, "mkdir -p $rscripts"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
+    Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rscripts"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
 }
 
 1;

@@ -1,6 +1,5 @@
 #!/usr/bin/perl -w
 
-#MRC.pm - The MRC workflow manager
 #Copyright (C) 2011  Thomas J. Sharpton 
 #author contact: thomas.sharpton@gladstone.ucsf.edu
 #This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -118,11 +117,11 @@ sub printBanner($$) {
 sub check_env_var{
     my ( $self, $env ) = @_;
     if (!defined( $env )) {
-	print STDOUT ("[ERROR]: The MRC_LOCAL environment variable was NOT EXPORTED and is UNDEFINED.\n");
-	print STDOUT ("[ERROR]: MRC_LOCAL needs to be defined as the local code directory where the MRC files are located.\n");
+	print STDOUT ("[ERROR]: The SHOTMAP_LOCAL environment variable was NOT EXPORTED and is UNDEFINED.\n");
+	print STDOUT ("[ERROR]: SHOTMAP_LOCAL needs to be defined as the local code directory where the shotmap files are located.\n");
 	print STDOUT ("[ERROR]: This is where you'll do the github checkout, if you haven't already.\n");
-	print STDOUT ("[ERROR]: I recommend setting it to a location in your home directory. Example: export MRC_LOCAL='/some/location/MRC'\n");
-	die "Environment variable MRC_LOCAL must be EXPORTED. Example: export MRC_LOCAL='/path/to/your/directory/for/MRC'\n";
+	print STDOUT ("[ERROR]: I recommend setting it to a location in your home directory. Example: export SHOTMAP_LOCAL='/some/location/shotmap'\n");
+	die "Environment variable SHOTMAP_LOCAL must be EXPORTED. Example: export SHOTMAP_LOCAL='/path/to/your/directory/for/shotmap'\n";
     }
 }
 

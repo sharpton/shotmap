@@ -1,27 +1,10 @@
 #!/usr/bin/perl -w
 
-#mrc_handler.pl - The control script responsible for executing an MRC run.
-#Usage: 
-#perl mrc_handler.pl -u <username> -p <password> -d <path_to_flat_file_db> -s <path_to_mrc_scripts_directory> -i <path_to_metagenome_data> -h <hmm_database_name> > <path_to_out_log> 2> <path_to_error_log>
-#
-#Example Usage:
-#nohup perl mrc_handler.pl -u username -p password -d /bueno_not_backed_up/sharpton/MRC_ffdb -s ./ -i ../data/randsamp_subset_perfect_2 -h OPFs_all_v1.0 > randsamp_perfect_2.all.out 2> randsamp_perfect_2.all.err &
-
-## examples:
-# perl ./MRC/scripts/mrc_handler.pl --dbuser=alexgw --dbpass=$PASS --dbhost=lighthouse.ucsf.edu --rhost=chef.compbio.ucsf.edu --ruser=alexgw --ffdb=/home/alexgw/MRC_ffdb --refdb=/home/alexgw/sifting_families  --projdir=./MRC/data/randsamp_subset_perfect_2/ 
-
-# perl ./MRC/scripts/mrc_handler.pl --dbuser=alexgw --dbpass=$PASS --dbhost=lighthouse.ucsf.edu --rhost=chef.compbio.ucsf.edu --ruser=alexgw --ffdb=/home/alexgw/MRC_ffdb --refdb=/home/alexgw/sifting_families  --projdir=./MRC/data/randsamp_subset_perfect_2/ --dryrun
-# perl ./MRC/scripts/mrc_handler.pl --dbuser=alexgw --dbpass=$PASS --dbhost=lighthouse.ucsf.edu --rhost=chef.compbio.ucsf.edu --ruser=alexgw --rdir=/scrapp2/alexgw/MRC --ffdb=/home/alexgw/MRC_ffdb --refdb=/home/alexgw/sifting_families --projdir=./MRC/data/randsamp_subset_perfect_2/
-
-# Note that Perl "use" takes effect at compile time!!!!!!!! So you can't put any control logic to detect whether the ENV{'MRC_LOCAL'}
-# exists --- that logic will happen AFTER 'use' has already been invoked. From here: http://perldoc.perl.org/functions/use.html
-# Added by Alex Williams, Feb 2013.
-use lib ($ENV{'MRC_LOCAL'} . "/scripts"); ## Allows "MRC.pm" to be found in the MRC_LOCAL directory
-use lib ($ENV{'MRC_LOCAL'} . "/lib"); ## Allows "Schema.pm" to be found in the MRC_LOCAL directory. DB.pm needs this.
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/scripts"); ## Allows shotmap scripts to be found in the SHOTMAP_LOCAL directory
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/lib"); ## Allows "Shotmap.pm and Schema.pm" to be found in the SHOTMAP_LOCAL directory. DB.pm needs this.
 ## Note: you may want to set MRC_LOCAL with the following commands in your shell:
 ##       export MRC_LOCAL=/home/yourname/MRC          (assumes your MRC directory is in your home directory!)
 ##       You can also add that line to your ~/.bashrc so that you don't have ot set MRC_LOCAL every single time!
-#use if ($ENV{'MRC_LOCAL'}), "MRC";
 
 use strict;
 use warnings;
@@ -46,8 +29,8 @@ print STDERR ">> ARGUMENTS TO mrc_handler.pl: perl mrc_handler.pl @ARGV\n";
 
 # Initialize a new pipeline
 my $pipe = Shotmap->new();
-$pipe->Shotmap::Notify::printBanner( "Initializing the shotmap Pipeline" );
-$pipe->Shotmap::Notify::check_env_var( $ENV{'MRC_LOCAL'} );
+$pipe->Shotmap::Notify::printBanner( "Initializing the shotmap pipeline" );
+$pipe->Shotmap::Notify::check_env_var( $ENV{'SHOTMAP_LOCAL'} );
 $pipe->Shotmap::Load::get_options( @ARGV );
 $pipe->Shotmap::Load::check_vars();
 $pipe->Shotmap::Load::set_params();
@@ -69,7 +52,6 @@ if (defined($pipe->opts->{"goto"}) && $pipe->opts->{"goto"}) {
     (defined($pipe->project_id) && $pipe->project_id) or die "You CANNOT specify --goto without also specifying an input PID (--pid=NUMBER).\n";
     if (!$pipe->dryrun) {
 	$pipe->Shotmap::Run::back_load_project($pipe->project_id);
-	#$analysis->MRC::Run::get_part_samples($project_dir);
 	$pipe->Shotmap::Run::back_load_samples();
     } else {
 	$pipe->Shotmap::Notify::dryNotify("Skipped loading samples.");

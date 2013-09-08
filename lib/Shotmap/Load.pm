@@ -1,6 +1,5 @@
 #!/usr/bin/perl -w
 
-#MRC.pm - The MRC workflow manager
 #Copyright (C) 2011  Thomas J. Sharpton 
 #author contact: thomas.sharpton@gladstone.ucsf.edu
 #This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -19,14 +18,14 @@ use Data::Dumper;
 
 sub check_vars{
     my $self = shift;
-    (defined($self->opts->{"rdir"})) or $self->Shotmap::Notify::dieWithUsageError("--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/MRC). This is mandatory!");
+    (defined($self->opts->{"rdir"})) or $self->Shotmap::Notify::dieWithUsageError("--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/shotmap). This is mandatory!");
     (defined($self->opts->{"remoteExePath"})) or warn("Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.");
     
     (!$self->opts->{"dryrun"}) or $self->Shotmap::Notify::dieWithUsageError("Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies.");
-    (defined($self->opts->{"ffdb"})) or $self->Shotmap::Notify::dieWithUsageError("--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/MRC_ffdb (or use the shorter '-d' option to specify it. This used to be hard-coded as being in /bueno_not_backed_up/yourname/MRC_ffdb");
+    (defined($self->opts->{"ffdb"})) or $self->Shotmap::Notify::dieWithUsageError("--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo (or use the shorter '-d' option to specify it. This used to be hard-coded as being in /bueno_not_backed_up/yourname/shotmap_repo");
     (-d $self->opts->{"ffdb"} ) or $self->Shotmap::Notify::dieWithUsageError("--ffdb (local flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, so please specify the full path in that case. You must specify a directory that already exists.");
     
-    (defined($self->opts->{"refdb"})) or $self->Shotmap::Notify::dieWithUsageError("--refdb (local REFERENCE flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/MRC_ffdb (or use the shorter '-d' option to specify it. This used to be hard-coded as being in /bueno_not_backed_up/yourname/sifting_families");
+    (defined($self->opts->{"refdb"})) or $self->Shotmap::Notify::dieWithUsageError("--refdb (local REFERENCE flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo (or use the shorter '-d' option to specify it. This used to be hard-coded as being in /bueno_not_backed_up/yourname/sifting_families");
     (-d $self->opts->{"refdb"})      or $self->Shotmap::Notify::dieWithUsageError("--refdb (local REFERENCE flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, so please specify the full path in that case. Specify a directory that exists.");
     (defined($self->opts->{"dbhost"}))          or $self->Shotmap::Notify::dieWithUsageError("--dbhost (remote database hostname: example --dbhost='data.youruniversity.edu') MUST be specified!");
     (defined($self->opts->{"dbuser"}))          or $self->Shotmap::Notify::dieWithUsageError("--dbuser (remote database mysql username: example --dbuser='dataperson') MUST be specified!");
@@ -355,7 +354,7 @@ sub set_params{
     $self->use_search_alg( "hmmscan",   $self->opts->{"use_hmmscan"}   );
 
     # Set local repository data
-    $self->local_scripts_dir( $ENV{'MRC_LOCAL'} . "/scripts" ); #point to location of the MRC scripts. Auto-detected from MRC_LOCAL variable.
+    $self->local_scripts_dir( $ENV{'SHOTMAP_LOCAL'} . "/scripts" ); #point to location of the shotmap scripts. Auto-detected from SHOTMAP_LOCAL variable.
     $self->ffdb( $self->opts->{"ffdb"} ); 
     $self->ref_ffdb( $self->opts->{"refdb"} ); 
     $self->family_subset( $self->opts->{"family-subset"} ); #constrain analysis to a set of families of interest
@@ -416,7 +415,7 @@ sub set_params{
 	$self->remote_exe_path( $self->opts->{"rpath"} );
 	$self->remote_master_dir( $self->opts->{"rdir"} );
 	$self->remote_scripts_dir( $self->remote_master_dir . "/scripts" ); 
-	$self->remote_ffdb(    $self->remote_master_dir . "/MRC_ffdb" ); 
+	$self->remote_ffdb(    $self->remote_master_dir . "/shotmap_ffdb" ); 
 	$self->Shotmap::Notify::warn_ssh_keys();
 	#if we aren't staging, does the database exist on the remote server?
 	if( !$self->stage ){
