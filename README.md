@@ -21,7 +21,7 @@ __________
 
 Once you have a configuration file built (see below), all you need to do to annotate your metagenome is:
 
-perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configutation_file>
+     perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configutation_file>
 
 
 Requirements & Dependencies
@@ -33,7 +33,9 @@ Installation
 
 You have to set your SHOTMAP_LOCAL environment variable.
 
-export SHOTMAP_LOCAL=/my/home/directory/shotmapt       <-- this is your github-checked-out copy of shotmap
+    export SHOTMAP_LOCAL=/my/home/directory/shotmap       
+
+Where this is your github-checked-out copy of shotmap
 
 Now you need build a configuration file using build_conf_file.pl as follows:
    
@@ -49,10 +51,10 @@ Running Shotmap
 
 You can run shotmap.pl as follows. 
 
- perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file>
+    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file>
 
 Note that the FIRST TIME you run it, you need to build either a HMM (--hdb) or blast (--bdb) search database, and you have to STAGE (i.e. transfer) the files to the remote cluster with the --stage option. So your first run will look something like this:
-   perl $SHOTMAP_LOCAL/scripts/shotmap.pl --bdb --stage 
+     perl $SHOTMAP_LOCAL/scripts/shotmap.pl --bdb --stage 
 
 On subsequent runs, you can omit "--hdb" and "--bdb" and "--stage". 
 
@@ -64,7 +66,7 @@ If you want to rerun or reprocess part of the workflow (say, with different opti
 also requires setting the --pid (project_id) options so that shotmap knows which data set in the MySQL database it should reference. The command would
 subsequently look like the following:
 
-    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> --goto=<goto_value> --pid=<project_id>
+   perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> --goto=<goto_value> --pid=<project_id>
 
 For a full list of the values that the --goto option can accept, see the [options] documentation. To obtain a project identifier, either see previous
 shotmap output, check your flat file data repository, or check your mysql database for the project identifier that corresponds to your data.
