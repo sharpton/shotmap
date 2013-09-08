@@ -77,17 +77,17 @@ OPTIONS
 ###CONFIGURATION FILE:
 
 #####--conf-file=/PATH/TO/CONFIGURATION_FILE (optional, but RECOMMENDED, no default)
-    Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
-    a list of shotmap run-time arguments, as below, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
-    You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
+Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
+a list of shotmap run-time arguments, as below, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
+You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
 
-    When building a configuation file, you will be asked to enter your MySQL password. You are not required to put your password in this file, though it is
-    recommended as passing that argument to shotmap.pl at run time will place your password in your history. The configuation file is secured with user-only,
-    read-only permissions. Note that this is NOT a failsafe security method!
+When building a configuation file, you will be asked to enter your MySQL password. You are not required to put your password in this file, though it is
+recommended as passing that argument to shotmap.pl at run time will place your password in your history. The configuation file is secured with user-only,
+read-only permissions. Note that this is NOT a failsafe security method!
 
 ###METAGENOME DATA ARGUMENTS:
 
---projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
+#####--projdir=/PATH/TO/PROJECT/DIR (or -i /PATH/TO/PROJECT/DIR)     (REQUIRED argument)
     Location of the metagenomic sequences to be processed. Each metagenomic samples should be in a single
     and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa as the file suffix.
     Shotmap currently only accepts fasta formatted input sequence files.
@@ -104,18 +104,18 @@ OPTIONS
 
 ###SHOTMAP DATA REPOSITORY ARGUMENTS:
 
---ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
+#####--ffdb=/PATH/TO/FLATFILES  (or -d /PATH/TO/FLATFILES)     (REQUIRED argument)
     local flat file database path
 
 ###DATABASE ARGUMENTS:
 
---dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)
+*--dbhost=YOUR.DATABASE.SERVER.COM           (REQUIRED argument)*
     The ip address or hostname of machine that hosts the remote MySQL database. 
 
     Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
     to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
 
---dbuser=MYSQL_USERNAME                     (REQUIRED argument)
+**--dbuser=MYSQL_USERNAME                     (REQUIRED argument)**
     MySQL username for logging into mysql on the remote database server.
 
 --dbpass=MYSQL_PASSWORD (in plain text)     (REQUIRED argument)
