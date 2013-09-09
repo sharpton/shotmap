@@ -2,9 +2,9 @@
 
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/scripts"); ## Allows shotmap scripts to be found in the SHOTMAP_LOCAL directory
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/lib"); ## Allows "Shotmap.pm and Schema.pm" to be found in the SHOTMAP_LOCAL directory. DB.pm needs this.
-## Note: you may want to set MRC_LOCAL with the following commands in your shell:
-##       export MRC_LOCAL=/home/yourname/MRC          (assumes your MRC directory is in your home directory!)
-##       You can also add that line to your ~/.bashrc so that you don't have ot set MRC_LOCAL every single time!
+## Note: you may want to set SHOTMAP_LOCAL with the following commands in your shell:
+##       export SHOTMAP_LOCAL=/home/yourname/shotmap          (assumes your SHOTMAP directory is in your home directory!)
+##       You can also add that line to your ~/.bashrc so that you don't have ot set SHOTMAP_LOCAL every single time!
 
 use strict;
 use warnings;
