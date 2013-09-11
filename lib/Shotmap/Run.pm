@@ -1030,7 +1030,7 @@ sub _get_family_path_from_dir{
 		}
 	    }
 	}
-	elsif( $path =~ m/seqs_all$/ ){ #then this dir contains seqs that we want to process
+	elsif( $path =~ m/seqs/ ){ #then this dir contains seqs that we want to process
 	    if( $type eq "blast" ){ #find the seqs and build the db
 		print "Grabbing family paths from $path\n";
 		opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
