@@ -255,7 +255,7 @@ CREATE TABLE `familymembers` (
   `target_length` int(11) DEFAULT NULL, /*HOW LONG IS THE TARGET SEQUENCE, NULL FOR HMMS*/
   `searchdb_id` int(11) NOT NULL,
   PRIMARY KEY (`member_id`),
-  UNIQUE KEY `member_id` (`member_id`), /*THIS IS FOR SAFETY*/
+  UNIQUE KEY `target_searchdb_id` (`target_id`, `searchdb_id`), /*THIS IS FOR SAFETY*/
   KEY `famid` (`famid`),
   KEY `target_id` (`target_id`),
   KEY `searchdb_id` (`searchdb_id`)

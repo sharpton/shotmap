@@ -91,7 +91,7 @@ sub build_search_script{
 	    my $nsplits        = $self->Shotmap::DB::get_number_db_splits("hmm"); #do we still need this?
 	    print "number of hmm searches: $n_hmm_searches\n";
 	    print "number of hmm splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_hmmscan_script.pl -z $n_hmm_searches " .
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_hmmscan_script.pl -z $n_hmm_searches " .
 						     "-o $h_script -n $nsplits --name $hmmdb_name -p $project_path -s $use_scratch");
 	    $self->Shotmap::Run::transfer_file($h_script, $self->remote_connection() . ":" . $self->remote_script_path("hmmscan"));
 	}
@@ -103,7 +103,7 @@ sub build_search_script{
 	    my $nsplits     = $self->Shotmap::DB::get_number_db_splits("hmm");
 	    print "number of searches: $n_sequences\n";
 	    print "number of hmmdb splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_hmmsearch_script.pl -z $n_sequences -o $h_script " .
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_hmmsearch_script.pl -z $n_sequences -o $h_script " .
 						     "-n $nsplits --name $hmmdb_name -p $project_path -s $use_scratch");
 	    Shotmap::Run::transfer_file($h_script, $self->remote_connection() . ":" . $self->remote_script_path("hmmsearch"));
 	}
@@ -114,7 +114,7 @@ sub build_search_script{
 	    my $nsplits    = $self->Shotmap::DB::get_number_db_splits("blast");
 	    print "database length is $db_length\n";
 	    print "number of blast db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_blast_script.pl -z $db_length " . 
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_blast_script.pl -z $db_length " . 
 						     "-o $b_script -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
 	    Shotmap::Run::transfer_file($b_script, $self->remote_connection() . ":" . $self->remote_script_path("blast"));
 	}
@@ -126,7 +126,7 @@ sub build_search_script{
 	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
 	    print "database length is $db_length\n";
 	    print "number of last db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_last_script.pl -z $db_length " . 
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_last_script.pl -z $db_length " . 
 						     "-o $last_local -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
 	    Shotmap::Run::transfer_file($last_local, $self->remote_connection() . ":" . $self->remote_script_path("last"));
 	}
@@ -138,7 +138,7 @@ sub build_search_script{
 	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
 	    print "database length is $db_length\n";
 	    print "number of rapsearch db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_rapsearch_script.pl -z $db_length " .
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_rapsearch_script.pl -z $db_length " .
 						     "-o $rap_local -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
 	    $self->Shotmap::Run::transfer_file($rap_local, $self->remote_connection() . ":" . $self->remote_script_path("rapsearch"));
 	}
@@ -229,7 +229,7 @@ sub stage_search_db{
 	    if ($self->use_search_alg("blast")){
 		print "Building remote formatdb script...\n";
 		my $formatdb_script_path = "$local_ffdb/projects/$dbname/$projID/run_formatdb.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_formatdb_script.pl -o $formatdb_script_path " .
+		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_formatdb_script.pl -o $formatdb_script_path " .
 							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
 		$self->Shotmap::Run::transfer_file($formatdb_script_path, ($self->remote_connection() . ":" . $self->remote_script_path("formatdb") ));
 		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("formatdb") );
@@ -237,7 +237,7 @@ sub stage_search_db{
 	    if ($self->use_search_alg("last")){
 		print "Building remote lastdb script...\n";
 		my $lastdb_script = "$local_ffdb/projects/$dbname/$projID/run_lastdb.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_lastdb_script.pl -o $lastdb_script " . 
+		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_lastdb_script.pl -o $lastdb_script " . 
 							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
 		$self->Shotmap::Run::transfer_file($lastdb_script, ($self->remote_connection() . ":" . $self->remote_script_path("lastdb") ));
 		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("lastdb") ); #this will work for last
@@ -246,7 +246,7 @@ sub stage_search_db{
 		print "Building remote prerapsearch script...\n";
 		my $db_suffix = $self->search_db_name_suffix();
 		my $prerapsearch_script = "$local_ffdb/projects/$dbname/$projID/run_prerapsearch.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/build_remote_prerapsearch_script.pl -o $prerapsearch_script " . 
+		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_prerapsearch_script.pl -o $prerapsearch_script " . 
 							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch --suf $db_suffix");
 		$self->Shotmap::Run::transfer_file($prerapsearch_script, ($self->remote_connection() . ":" . $self->remote_script_path("prerapsearch") ));
 		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("prerapsearch") ); #this will work for rapsearch

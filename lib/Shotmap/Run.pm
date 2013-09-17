@@ -778,10 +778,12 @@ sub build_search_db{
     #get the paths associated with each family
     my $family_path_hashref = _build_family_ref_path_hash( $ref_ffdb, $type );
     #constrain analysis to a set of families of interest
-    my @families   = sort( @{ $self->family_subset() });
-    if( !@families ){ #is there a subset list? No? then process EVERY family
+    my @families = ();
+    if( defined( $self->family_subset() ) ){
+	@families = sort( @{ $self->family_subset() });
+    } else {
 	@families = keys( %{ $family_path_hashref->{$type} } );
-    }
+    } 
     my $n_fams = @families;
     my $count      = 0;
     my @split      = (); #array of family HMMs/sequences (compressed)
@@ -1237,9 +1239,12 @@ sub compress_hmmdb{
 sub load_project_remote {
     my ($self) = @_;
     my $project_dir_local = File::Spec->catdir($self->ffdb(), "projects", $self->db_name(), $self->project_id());
-    my $remote_dir  = $self->remote_connection() . ":" . File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name(),  $self->project_id());
+    my $remote_dir     = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name(),  $self->project_id());
+    my $ssh_remote_dir = $self->remote_connection() . ":" . $remote_dir;
     warn("Pushing $project_dir_local to the remote (" . $self->remote_host() . ") server's ffdb location in <$remote_dir>\n");
-    my $results = $self->Shotmap::Run::transfer_directory($project_dir_local, $remote_dir);
+    my $remote_cmd = "mkdir -p ${remote_dir}";
+    $self->Shotmap::Run::execute_ssh_cmd( $self->remote_connection(), $remote_cmd );
+    my $results = $self->Shotmap::Run::transfer_directory($project_dir_local, $ssh_remote_dir);
     return $results;
 }
 
