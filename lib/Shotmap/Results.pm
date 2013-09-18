@@ -47,8 +47,9 @@ sub calculate_diversity{
 	$abund_param_id = $self->Shotmap::DB::get_abundance_parameter_id(
 	    $self->abundance_type, $self->normalization_type
 	    )->abundance_parameter_id;
-	$self->Shotmap::Run::build_intersample_abundance_map( $class_id, $abund_param_id );
+#	$self->Shotmap::Run::build_intersample_abundance_map( $class_id, $abund_param_id );
 	$self->Shotmap::Run::calculate_diversity( $class_id, $abund_param_id );
+
     }
 }
 

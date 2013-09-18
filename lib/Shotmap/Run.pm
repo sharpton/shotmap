@@ -1707,69 +1707,27 @@ sub build_intersample_abundance_map{
 	);
     #my $abundances = $self->Shotmap::DB::get_sample_abundances( $sample_id, $class_id, $abund_param_id );
     my $sample_abund_out  = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
-    my $sample_Rabund_out = $outdir . "/RelativeAbundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
-    open( RA, "   >$sample_Rabund_out" ) || die "Can't open $sample_Rabund_out for write: $!\n";
     my $max_rows          = 10000;
     my $dbh               = $self->Shotmap::DB::build_dbh();
-    my $famids            = {};
-    my $counter           = 0; #how many samples have we processed
+    print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "ABUNDANCE", "REL.ABUND", "\n" );
     foreach my $sample_id( @{ $self->get_sample_ids() } ){
-	$counter++;
-	my $values            = {};
-	my $abunds_rs         = $self->Shotmap::DB::get_sample_abundances_for_all_classed_fams( $dbh, $sample_id, $class_id, $abund_param_id );
+	my $abunds_rs   = $self->Shotmap::DB::get_sample_abundances_for_all_classed_fams( $dbh, $sample_id, $class_id, $abund_param_id );
 	while( my $rows = $abunds_rs->fetchall_arrayref( {}, $max_rows ) ){
-	    foreach my $row( @$rows ){
+	    foreach my $row( @$rows ){ 
 		my $famid              = $row->{"famid"};
 		my $abundance          = $row->{"abundance"};
 		my $relative_abundance = $row->{"relative_abundance"};
 		if( !defined( $abundance) ){
-		    $values->{$famid}->{"raw"} = 0;
-		    $values->{$famid}->{"ra"}  = 0;
-		} else {
-		    $values->{$famid}->{"raw"} = $abundance;
-		    $values->{$famid}->{"ra"}  = $relative_abundance;
+		    $abundance = 0;
+		    $relative_abundance = 0;
 		}
-		if( $counter == 1 ){
-		    $famids->{$famid}++;
-		}
-	    }
-	}
-	if( 0 ){
-	    if( $counter == 1 ){ #printer header row
-		my @col_names = sort( keys( %{ $famids } ) );
-		print ABUND join( "\t", @col_names, "\n" );
-		print RA join( "\t", @col_names, "\n" );
-	    }
-	    print ABUND "${sample_id}\t";
-	    print RA    "${sample_id}\t";
-	    foreach my $fam( sort( keys( %{ $famids } ) ) ){
-		if( !defined( $values->{$fam} ) ){
-		    die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
-		}	    
-		print ABUND $values->{$fam}->{"raw"} . "\t";
-		print RA    $values->{$fam}->{"ra"}  . "\t";	    
-	    }
-	    print ABUND "\n";
-	    print RA    "\n";
-	} 
-	else{ #if we go this route, then I don't think that we will need to build the values hash....
-	    if( $counter == 1 ){ #print header row
-		print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "ABUNDANCE", "\n" );
-		print RA    join( "\t", "SAMPLE.ID", "FAMILY.ID", "REL.ABUND", "\n" );
-	    }
-	    foreach my $fam( sort( keys( %{ $famids } ) ) ){
-		if( !defined( $values->{$fam} ) ){
-		    die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
-		}	    
-		print ABUND join( "\t", $sample_id, $fam, $values->{$fam}->{"raw"}, "\n" );
-		print RA    join( "\t", $sample_id, $fam, $values->{$fam}->{"ra"} , "\n" );	    
+		print ABUND join( "\t", $sample_id, $famid, $abundance, $relative_abundance, "\n" );
 	    }
 	}
     }
     $self->Shotmap::DB::disconnect_dbh( $dbh );	
     close ABUND;
-    close RA;
     return $self;
 }
 
@@ -1843,7 +1801,6 @@ sub calculate_diversity{
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
     my $metadata_table  = $self->Shotmap::Run::get_project_metadata();
     my $abund_map   = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
-    my $r_abund_map = $outdir . "/RelativeAbundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
     #open output directory that contains per sample diversity data
@@ -1852,7 +1809,7 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${sample_diversity_prefix} ${compare_diversity_prefix} < ${script}";
+    my $cmd               = "R --slave --args ${abund_map} ${metadata_table} ${sample_diversity_prefix} ${compare_diversity_prefix} < ${script}";
     print $cmd . "\n";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 
@@ -1865,14 +1822,14 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --vanilla --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
+    $cmd               = "R --vanilla --args ${abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #COMPARE SAMPLES BY MULTIDIMENSIONAL SCALING
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
     my $pca_prefix              = $outdir . "/Sample_PCA";
     $script                     = File::Spec->catdir( $scripts_dir, "R", "sample_pca.R" );
-    $cmd                        = "R --vanilla --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
+    $cmd                        = "R --vanilla --args ${abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
     $self;
 }
 

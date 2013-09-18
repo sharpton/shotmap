@@ -2,20 +2,18 @@
 
 require(vegan)
 require(ggplot2)
-require(data.table)
+require(reshape2)
 
 options(error=traceback)
 options(error=recover)
 
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]
-samp.relabund.map <- Args[5]
 metadata.tab      <- Args[6]
 sample.stem       <- Args[7]
 compare.stem      <- Args[8]
 
 samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-samp.relabund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/RelativeAbundance_Map_cid_54_aid_1.tab"
 metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
 sample.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Sample_Diversity_cid_54_aid_1"
 compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_samples_cid_54_aid_1"
@@ -66,7 +64,7 @@ meta.names <- colnames( meta )
 ###get family abundances by samples
 print( "Grabbing family abundance data..." )
 abund.df <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
-abund.map  <- acast(abund.map, SAMPLE.ID~FAMILY.ID ) #could try to do all work in the .df object instead, enables ggplot
+abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
 samples    <- rownames(abund.map)
 famids     <- colnames(abund.map)
 
@@ -75,8 +73,7 @@ famids     <- colnames(abund.map)
 ### we need this in case we calc abundance as family coverage, where
 ### normalization is a function of total target length
 print( "Grabbing relative abundance data..." )
-ra.df   <- read.table( file=samp.relabund.map, header=TRUE, row.names=1, check.names=FALSE)
-ra.map  <- acast(ra.map, SAMPLE.ID~FAMILY.ID ) #could try to do all work in .df object, enables ggplot
+ra.map  <- acast(ra.map, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND" ) #could try to do all work in .df object, enables ggplot
 
 ###calculate various types of diversity
 print( "Calculating Shannon Entropy..." )
