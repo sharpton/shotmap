@@ -12,7 +12,7 @@ use warnings;
 package Shotmap::Notify;
 
 use Shotmap;
-use IPC::System::Simple qw(capture $EXITVAL);
+use IPC::System::Simple qw(capture run $EXITVAL);
 
 my $USE_COLORS_CONSTANT = 1; ## Set this to '0' to avoid printing colored output to the terminal, or '1' to print colored output.
 
@@ -79,7 +79,8 @@ sub dieWithUsageError {
 
 sub exec_and_die_on_nonzero {
     my ( $cmd ) = @_;
-    my $results = IPC::System::Simple::capture($cmd);
+    #my $results = IPC::System::Simple::capture($cmd);
+    my $results = IPC::System::Simple::run($cmd);
     (0 == $EXITVAL) or die "Error:  non-zero exit value: $results";
     return($results);
 }

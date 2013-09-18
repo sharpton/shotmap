@@ -28,7 +28,7 @@ use File::Basename;
 use File::Cat;
 use File::Copy;
 use File::Path;
-use IPC::System::Simple qw(capture $EXITVAL);
+use IPC::System::Simple qw(capture run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
 use Bio::SearchIO;
@@ -1735,22 +1735,37 @@ sub build_intersample_abundance_map{
 		}
 	    }
 	}
-	if( $counter == 1 ){ #printer header row
-	    my @col_names = sort( keys( %{ $famids } ) );
-	    print ABUND join( "\t", @col_names, "\n" );
-	    print RA join( "\t", @col_names, "\n" );
+	if( 0 ){
+	    if( $counter == 1 ){ #printer header row
+		my @col_names = sort( keys( %{ $famids } ) );
+		print ABUND join( "\t", @col_names, "\n" );
+		print RA join( "\t", @col_names, "\n" );
+	    }
+	    print ABUND "${sample_id}\t";
+	    print RA    "${sample_id}\t";
+	    foreach my $fam( sort( keys( %{ $famids } ) ) ){
+		if( !defined( $values->{$fam} ) ){
+		    die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
+		}	    
+		print ABUND $values->{$fam}->{"raw"} . "\t";
+		print RA    $values->{$fam}->{"ra"}  . "\t";	    
+	    }
+	    print ABUND "\n";
+	    print RA    "\n";
+	} 
+	else{ #if we go this route, then I don't think that we will need to build the values hash....
+	    if( $counter == 1 ){ #print header row
+		print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "ABUNDANCE", "\n" );
+		print RA    join( "\t", "SAMPLE.ID", "FAMILY.ID", "REL.ABUND", "\n" );
+	    }
+	    foreach my $fam( sort( keys( %{ $famids } ) ) ){
+		if( !defined( $values->{$fam} ) ){
+		    die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
+		}	    
+		print ABUND join( "\t", $sample_id, $fam, $values->{$fam}->{"raw"}, "\n" );
+		print RA    join( "\t", $sample_id, $fam, $values->{$fam}->{"ra"} , "\n" );	    
+	    }
 	}
-	print ABUND "${sample_id}\t";
-	print RA    "${sample_id}\t";
-	foreach my $fam( sort( keys( %{ $famids } ) ) ){
-	    if( !defined( $values->{$fam} ) ){
-		die( "Couldn't find an abundance value for family ${fam} in sample ${sample_id}'s data. Exiting!\n" );
-	    }	    
-	    print ABUND $values->{$fam}->{"raw"} . "\t";
-	    print RA    $values->{$fam}->{"ra"}  . "\t";	    
-	}
-	print ABUND "\n";
-	print RA    "\n";
     }
     $self->Shotmap::DB::disconnect_dbh( $dbh );	
     close ABUND;
@@ -1850,14 +1865,14 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
+    $cmd               = "R --vanilla --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #COMPARE SAMPLES BY MULTIDIMENSIONAL SCALING
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
     my $pca_prefix              = $outdir . "/Sample_PCA";
     $script                     = File::Spec->catdir( $scripts_dir, "R", "sample_pca.R" );
-    $cmd                        = "R --slave --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
+    $cmd                        = "R --vanilla --args ${abund_map} ${r_abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
     $self;
 }
 
@@ -1885,10 +1900,10 @@ sub get_project_metadata{
     print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
     foreach my $sample_id( keys( %{ $data } ) ){
 	my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	print OUT join( "\t", $sample_id, $sample_alt_id, $sample_id );
-	my @fields        = keys( %{ $data->{$sample_id}->{"metadata"} } );
-	foreach my $field( sort( @fields ) ){
-	    if( $field eq $fields[-1] ){
+	print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	my @values = sort(keys( %{$fields} ));
+	foreach my $field( @values ){
+	    if( $field eq $values[-1] ){
 		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
 	    } else{
 		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";

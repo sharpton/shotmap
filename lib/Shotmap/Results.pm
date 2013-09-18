@@ -33,16 +33,16 @@ sub calculate_diversity{
     if ($use_last)      { push(@algosToRun, "last"); }
     if ($use_rapsearch) { push(@algosToRun, "rapsearch"); }
     foreach my $algo (@algosToRun) {
-	my ( $class_id, $db_name, $abund_param_id );
+	my ( $class_id, $searchdb_name, $abund_param_id );
 	my $abundance_type = "coverage";
 	if( $algo eq "hmmsearch" || $algo eq "hmmscan" ){
-	    $db_name = $hmmdb_name;
+	    $searchdb_name = $self->search_db_name( "hmm" );
 	}
 	if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
-	    $db_name = $blastdb_name;
+	    $searchdb_name = $self->search_db_name( "blast" );
 	}
 	$class_id = $self->Shotmap::DB::get_classification_id(
-	    $self->class_evalue(), $self->class_coverage(), $self->class_score, $self->db_name, $algo, $self->top_hit_type,
+	    $self->class_evalue(), $self->class_coverage(), $self->class_score, $searchdb_name, $algo, $self->top_hit_type,
 	    )->classification_id();
 	$abund_param_id = $self->Shotmap::DB::get_abundance_parameter_id(
 	    $self->abundance_type, $self->normalization_type
@@ -64,7 +64,6 @@ sub classify_reads{
     my $use_hmmscan    = $self->use_search_alg("hmmscan");
     my $hmmdb_name     = $self->search_db_name("hmm");
     my $blastdb_name   = $self->search_db_name("blast");
-    my $db_name        = $self->db_name;
 
     $self->Shotmap::Notify::printBanner("CLASSIFYING READS");
     foreach my $sample_id( @{ $self->get_sample_ids() } ){
@@ -76,15 +75,15 @@ sub classify_reads{
 	if ($use_last)      { push(@algosToRun, "last"); }
 	if ($use_rapsearch) { push(@algosToRun, "rapsearch"); }
 	foreach my $algo (@algosToRun) {
-	    my ( $class_id, $db_name );
+	    my ( $class_id, $searchdb_name );
 	    if( $algo eq "hmmsearch" || $algo eq "hmmscan" ){
-		$db_name = $hmmdb_name;
+		$searchdb_name = $self->search_db_name( "hmm" );
 	    }
 	    if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
-		$db_name = $blastdb_name;
+		$searchdb_name = $self->search_db_name( "blast" );
 	    }
 	    $class_id = $self->Shotmap::DB::get_classification_id(
-		$self->class_evalue(), $self->class_coverage(), $self->class_score(), $db_name, $algo, $self->top_hit_type(),
+		$self->class_evalue(), $self->class_coverage(), $self->class_score(), $searchdb_name, $algo, $self->top_hit_type(),
 		)->classification_id();
 	    print "Calculating diversity using classification_id ${class_id}\n";
 	    if( defined( $self->postrarefy_samples ) ){

@@ -300,7 +300,7 @@ sub get_options{
     #grab command line options
     GetOptionsFromArray( \@args, \%options, @opt_type_array );
     if( defined( $conf_file ) ){
-	if( ! -e $conf_file ){ dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); }
+	if( ! -e $conf_file ){ $self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); }
 	my $opt_str = get_conf_file_options( $conf_file, \%options );
 	GetOptionsFromString( $opt_str, \%options, @opt_type_array );
 
