@@ -826,7 +826,7 @@ sub build_search_db{
 	    push( @split, $family_db_file );
 	    $count++;
 	    #if we've hit our split size, process the split
-	    if($count >= $split_size || $family == $families[-1]) {
+	    if($count >= $split_size || $family eq $families[-1]) {
 		$n_proc++; 	    #build the DB
 		my $split_db_path;
 		if( $type eq "hmm" ){
@@ -932,7 +932,7 @@ sub build_search_db{
 		    gzip_file($split_db_path); # We want DBs to be gzipped.
 		    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
 		    $seqs = {};
-		    unless( $family == $families[-1] && eof ){
+		    unless( $family eq $families[-1] && eof ){
 			open( TMP, ">${db_path_with_name}.tmp" ) || die "Can't open ${db_path_with_name}.tmp for write: $!\n";
 			$tmp = *TMP;	    
 		    }
