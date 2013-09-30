@@ -889,7 +889,8 @@ sub build_search_db{
 	    my $fam_nseqs    = 0; #used to calculate $family_length	    
 	    my $seq_len      = 0;
 	    while(<FILE>){
-		if ( $_ =~ m/^\>/ ){ 
+		if ( $_ =~ m/^\>(.*?)\s/ ){ #we have to do a greedy search for the seqid in case the header contains annotation, as rapsearch truncates to just seqid
+		    my $temporary = $1; #holds the seqid, drop into $id after checking if old $id is defined
 		    $total++;
 		    $fam_nseqs++;
 		    #no longer need _append_famids_to_seqids, we just do it here now
@@ -903,7 +904,7 @@ sub build_search_db{
 			$seq = '';
 			$seq_len = 0;
 		    }
-		    $id = $_ . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
+		    $id = $temporary . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
 		} else{
 		    chomp $_; # remove the newline
 		    $length += length($_);
