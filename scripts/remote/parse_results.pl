@@ -243,7 +243,7 @@ sub get_sequence_lengths_from_file{
 sub parse_famid_from_ffdb_seqid {
     my $hit = shift;
     my $famid;
-    if( $hit =~ m/^(.*?)\_(\d+)$/ ){
+    if( $hit =~ m/^(.*)\_(.*?)$/ ){
 	$famid = $2;
     }
     else{

@@ -904,7 +904,7 @@ sub build_search_db{
 			$seq = '';
 			$seq_len = 0;
 		    }
-		    $id = $temporary . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
+		    $id = ">" . $temporary . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
 		} else{
 		    chomp $_; # remove the newline
 		    $length += length($_);
