@@ -64,7 +64,7 @@ sub remote_transfer {
     my ($self, $src_path, $dest_path, $path_type) = @_;
     ($path_type eq 'directory' or $path_type eq 'file') or die "unsupported path type! must be 'file' or 'directory'. Yours was: '$path_type'.";
     my $COMPRESSION_FLAG = '--compress';
-    my $PRESERVE_MODIFICATION_TIMES = '--times';
+    my $PRESERVE_MODIFICATION_TIMES = ''; #'--times'; #turned off because of autodeletion tool on cluster
     my $PRESERVE_PERMISSIONS_FLAG = '--perms';
     my $RECURSIVE_FLAG = ($path_type eq 'directory') ? '--recursive' : ''; # only specify recursion if DIRECTORIES are being transferred!
     my $FLAGS = "$COMPRESSION_FLAG $RECURSIVE_FLAG $PRESERVE_MODIFICATION_TIMES $PRESERVE_PERMISSIONS_FLAG";
@@ -1800,7 +1800,8 @@ sub calculate_diversity{
     my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" );
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table  = $self->Shotmap::Run::get_project_metadata();
+    my $metadata_table = $self->Shotmap::Run::get_project_metadata();
+
     my $abund_map   = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
@@ -1810,7 +1811,7 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${abund_map} ${metadata_table} ${sample_diversity_prefix} ${compare_diversity_prefix} < ${script}";
+    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} < ${script}";
     print $cmd . "\n";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 
@@ -1823,14 +1824,14 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --vanilla --args ${abund_map} ${metadata_table} ${family_abundance_prefix} ${intrafamily_prefix} < ${script}";
+    $cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${intrafamily_prefix} ${metadata_table} < ${script}";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #COMPARE SAMPLES BY MULTIDIMENSIONAL SCALING
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
     my $pca_prefix              = $outdir . "/Sample_PCA";
     $script                     = File::Spec->catdir( $scripts_dir, "R", "sample_pca.R" );
-    $cmd                        = "R --vanilla --args ${abund_map} ${metadata_table} ${family_abundance_prefix} ${pca_prefix} < ${script}";
+    $cmd                        = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${pca_prefix} ${metadata_table} < ${script}";
     $self;
 }
 
@@ -1847,6 +1848,11 @@ sub get_project_metadata{
 	my $sample_alt_id = $row->sample_alt_id;
 	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
 	my $metadata      = $row->metadata;
+	if( !( defined( $metadata ) ) ){
+	    warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
+	    $fields = {};
+	    goto PRINTMETA;
+	}
 	my( @fields )  = split( ",", $metadata );
 	foreach my $field( @fields ){
 	    my( $field_name, $field_value ) = split( "\=", $field );
@@ -1854,21 +1860,32 @@ sub get_project_metadata{
 	    $fields->{$field_name}++;
 	}
     }
-    #print the header
-    print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
-    foreach my $sample_id( keys( %{ $data } ) ){
-	my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
-	my @values = sort(keys( %{$fields} ));
-	foreach my $field( @values ){
-	    if( $field eq $values[-1] ){
-		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
-	    } else{
-		print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
-	    }
-	}   
+  PRINTMETA:;
+    if( defined( $fields ) ){ #then we found metadata
+	#print the header
+	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
+	foreach my $sample_id( keys( %{ $data } ) ){
+	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	    my @values = sort(keys( %{$fields} ));
+	    foreach my $field( @values ){
+		if( $field eq $values[-1] ){
+		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
+		} else{
+		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
+		}
+	    }   
+	}
+	close OUT;
     }
-    close OUT;
+    else{
+	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", "\n" );
+	foreach my $sample_id( keys( %{ $data } ) ){
+	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	}
+	close OUT;
+    }
     return $output;
 }
 

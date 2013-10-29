@@ -44,10 +44,12 @@ fi
 RESFILE=${RESNAME_PRE}_${INT_TASK_ID}${RESNAME_SUFF}
 LOGS=${PROJDIR}/logs
 
-#if [ -e ${RESPATH}/${RESFILE}.mysqld ]
-#then
+#we want old jobs to be wiped in the case that we've run force_parse in the control script
+if [ -e ${RESPATH}/${RESFILE}.mysqld ]
+then
+rm  ${RESPATH}/${RESFILE}.mysqld 
 #exit
-#fi
+fi
 
 ALL_OUT_FILE=${LOGS}/parse_results/${JOB_ID}.${INT_TASK_ID}.all
 echo ${ALL_OUT_FILE}
