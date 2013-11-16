@@ -81,8 +81,8 @@ __PACKAGE__->set_primary_key("searchdb_id");
 __PACKAGE__->add_unique_constraint("name_type", ["db_name", "db_type"]);
 
 
-# Created by DBIx::Class::Schema::Loader v0.07035 @ 2013-09-04 11:41:56
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:L8qjIM6wmImApE/m/KQYpg
+# Created by DBIx::Class::Schema::Loader v0.07035 @ 2013-11-15 16:04:47
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:mJx8r5Wy9ze/NEjk6PYY0Q
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration

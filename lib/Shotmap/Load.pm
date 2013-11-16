@@ -60,8 +60,9 @@ sub check_vars{
      }
      
      #try to detect if we need to stage the database or not on the remote server based on runtime options
-     if ($self->opts->{"remote"} and ($self->opts->{"hdb"} or $self->opts->{"bdb"} and !$self->opts->{"stage"}) ){
-	 #$stage = 1;
+     if ($self->opts->{"remote"} and ($self->opts->{"hdb"} or $self->opts->{"bdb"} and !$self->opts->{"stage"}) ){	
+	 #This error is problematic in the case that we reclassify old search results, need to create a better check that
+	 #considers goto variable.
 	 $self->Shotmap::Notify::dieWithUsageError("If you specify hmm_build or blastdb_build AND you are using a remote server, you MUST specify the --stage option to copy/re-stage the database on the remote machine!");
      }
      

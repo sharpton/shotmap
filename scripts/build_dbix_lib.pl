@@ -8,8 +8,8 @@ use DBIx::Class::Schema::Loader qw/ make_schema_at /;
 
 my ( $username, $password );
 my $dumppath = "./lib";
-my $dbname   = "MRC_dev";
-my $libname  = "MRC";
+my $dbname   = "ShotDB_dev";
+my $libname  = "Shotmap";
 my $hostname = "localhost";
 
 GetOptions(

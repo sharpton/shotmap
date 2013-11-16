@@ -404,13 +404,13 @@ sub insert_abundance{
     my( $self, $sample_id, $famid, $abundance, $relative_abundance, $abundance_parameter_id, $class_id ) = @_;
     my $inserted = $self->get_schema->resultset("Abundance")->find_or_create(
 	{
-	    sample_id => $sample_id,
-	    famid     => $famid,
-	    abundance => $abundance,
-	    relative_abundance => $relative_abundance,
+	    sample_id               => $sample_id,
+	    famid                   => $famid,
+	    abundance               => $abundance,
+	    relative_abundance      => $relative_abundance,
 	    abundance_parameter_id  => $abundance_parameter_id,
 	    classification_id       => $class_id,
-	}
+	},
 	);
     return $inserted;
 }

@@ -87,8 +87,8 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key("abundance_parameter_id");
 
 
-# Created by DBIx::Class::Schema::Loader v0.07035 @ 2013-09-04 11:41:56
-# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:QBF0kCiAiIZzrBuTq1+Yzw
+# Created by DBIx::Class::Schema::Loader v0.07035 @ 2013-11-15 16:04:47
+# DO NOT MODIFY THIS OR ANYTHING ABOVE! md5sum:36pKrswADvdM69j2LUEvmA
 
 
 # You can replace this text with custom code or comments, and it will be preserved on regeneration
