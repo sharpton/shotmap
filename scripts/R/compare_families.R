@@ -5,15 +5,25 @@ require(ggplot2)
 require(reshape2)
 require(multtest)
 
+###NOTE: you may need to update bioconductor for multtest. Open R and do the following
+### > source("http://bioconductor.org/biocLite.R")
+### > biocLite("multtest")
+
+
 options(error=traceback)
 options(error=recover)
 
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]
-samp.relabund.map <- Args[5]
 metadata.tab      <- Args[6]
 family.stem       <- Args[7]
 compare.stem      <- Args[8]
+
+#For testing purposes only
+samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
+metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
+sample.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Family_Diversity_cid_54_aid_1"
+compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_Families_cid_54_aid_1"
 
 ###Set autodetection thresholds
 cont.thresh    = 0.2 #if there are fewer than this fraction of uniq vars in list, force discrete
@@ -49,28 +59,39 @@ autodetect <- function( val.list, cont.thresh) {
   return( type )
 }
 
+print( "Loading data..." );
+
 ####get the metadata
 meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
 meta.names <- colnames( meta )
 
 ###get family abundances by samples
-abund.map  <- read.table( file=samp.abund.map,    header=TRUE, row.names=1, check.names=FALSE )
-ra.map     <- read.table( file=samp.relabund.map, header=TRUE, row.names=1, check.names=FALSE)
-samples    <- rownames(ra.map)
-famids     <- colnames(ra.map)
+abund.map <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE)
+ra.map    <- abund.map
+ra.map$ABUNDANCE <- NULL #don't need the abundance field for this script
+a.tmp     <- melt(ra.map, id=c("SAMPLE.ID","FAMILY.ID") ) #reshape ra.map to get sample.ids by fam.ids
+ra.map    <- dcast(a.tmp, SAMPLE.ID~FAMILY.ID) 
+row.names(ra.map) <- ra.map$SAMPLE.ID #push sampleids to the rowname and drop the column from the df
+ra.map$SAMPLE.ID <- NULL
+samples   <- rownames(ra.map)
+famids    <- colnames(ra.map)
 
 ###map sampleid to family id to relative abundance using melt
 for( a in 1:length( meta.names ) ){
   to.plot = 1
   meta.field <- meta.names[a]    
-  if( meta.field == "SAMPLE_ID" ){
+  if( meta.field == "SAMPLE.ID" | meta.field == "SAMPLE.ALT.ID" ){
     next
   }
+  ##was was this here previously? I don't think it make sense to skip, we just don't want to plot
   if( autodetect( meta[,meta.field] ) == "continuous" ){
-    next
+    ##next
   }
-  types       <- unique( meta[,field] )
+  print( paste("Processing <", meta.field, ">...", sep="") )
+  types <- unique( meta[,meta.field] )
+  
   if( length(types) > n.type.plot.lim ){
+    print( paste( "There are ", length(types), " types of the field <", meta.field, ">, so I will only output tables for it" ) )
     to.plot = 0
   }
   ##right now, we only do wilcoxon on discrete classes if no more than 2 categories. Talk to KP about other options
@@ -79,9 +100,9 @@ for( a in 1:length( meta.names ) ){
     type.y    <- types[2]
     x.samps   <- subset( meta, meta[,meta.field] == type.x )$SAMPLE.ID
     y.samps   <- subset( meta, meta[,meta.field] == type.y )$SAMPLE.ID
-    fam.map.x <- t( ra.map )[,as.character(x.samps)]
-    fam.map.y <- t( ra.map )[,as.character(y.samps)]
-    test.data <- cbind( fam.map.x, fam.map.y )
+    fam.map.x <- ra.map[as.character(x.samps),]
+    fam.map.y <- ra.map[as.character(y.samps),]
+    test.data <- t(rbind( fam.map.x, fam.map.y )) #this needs to be families by samples for multtest
     test.type <- c( rep(0, length(x.samps) ), rep(1, length(y.samps ) ) )
     teststat  <- mt.teststat( test.data, test.type, test="wilcoxon" )
     ##from: http://www.bioconductor.org/packages/2.12/bioc/vignettes/multtest/inst/doc/multtest.pdf
