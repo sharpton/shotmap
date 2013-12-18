@@ -1827,10 +1827,10 @@ sub calculate_diversity{
     $cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${intrafamily_prefix} ${metadata_table} < ${script}";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
-    #COMPARE SAMPLES BY MULTIDIMENSIONAL SCALING
+    #ORDINATE SAMPLES BY FAMILY RELATIVE ABUNDANCE (e.g. PCA Coordinates)
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
-    my $pca_prefix              = $outdir . "/Sample_PCA";
-    $script                     = File::Spec->catdir( $scripts_dir, "R", "sample_pca.R" );
+    my $pca_prefix              = $outdir . "/Sample_Ordination";
+    $script                     = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
     $cmd                        = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${pca_prefix} ${metadata_table} < ${script}";
     $self;
 }
