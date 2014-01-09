@@ -642,8 +642,8 @@ sub delete_unsplit_orfs{
 #delete's a subdirectory within a sample's ffdb within a project
 sub delete_sample_subpath{ 
     my $self       = shift;
-    my $project_id = shift;
     my $subpath    = shift; #e.g., "/unsplit_orfs/" or "/search_results/rapsearch/"
+    my $project_id = $self->project_id;
     my $ffdb       = $self->ffdb();
     my $samples    = $self->get_sample_ids();
     foreach my $sample( @$samples ){
