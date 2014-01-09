@@ -617,7 +617,7 @@ sub delete_sample{
 }
 
 #
-# GENERAL 
+# FFDB METHODS
 #
 
 sub delete_ffdb_project{
@@ -627,6 +627,33 @@ sub delete_ffdb_project{
     my $project_ffdb = "$ffdb/projects/$project_id";
     File::Path::rmtree($project_ffdb);
 }
+
+sub delete_unsplit_orfs{
+    my $self       = shift;
+    my $project_id = shift;
+    my $ffdb       = $self->ffdb();
+    my $samples    = $self->get_sample_ids();
+    foreach my $sample( @$samples ){
+	my $path = $self->get_sample_path( $sample ) . "/unsplit_orfs/";
+	print "File::Path::rmtree($path)";
+    }
+}
+
+#delete's a subdirectory within a sample's ffdb within a project
+sub delete_sample_subpath{ 
+    my $self       = shift;
+    my $project_id = shift;
+    my $subpath    = shift; #e.g., "/unsplit_orfs/" or "/search_results/rapsearch/"
+    my $ffdb       = $self->ffdb();
+    my $samples    = $self->get_sample_ids();
+    foreach my $sample( @$samples ){
+	my $path = $self->get_sample_path( $sample ) . $subpath;
+	if( -d $path ){
+	    print "Deleting ${path}\n";
+	    File::Path::rmtree($path);
+	}
+    }
+}    
 
 sub get_number_reads_in_sample{
     my ($self, $sample) = @_;
