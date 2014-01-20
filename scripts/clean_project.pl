@@ -31,5 +31,6 @@ $pipe->Shotmap::Run::back_load_project($pipe->project_id);
 $pipe->Shotmap::Run::back_load_samples();
 
 #Now specify the sample path level directories that we want to delete
+$pipe->Shotmap::DB::delete_sample_subpath( "/raw/" );
 $pipe->Shotmap::DB::delete_sample_subpath( "/unsplit_orfs/" );
 $pipe->Shotmap::DB::delete_sample_subpath( "/orfs/" );
