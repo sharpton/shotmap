@@ -973,7 +973,7 @@ sub classify_orfs_by_sample{
     my $sql; #will differ depending on what we want to grab.
     $sql = "INSERT IGNORE INTO classifications ( score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length, classification_id ) ";
     if( !defined( $count ) ){ #grab results for all read
-	$sql .= "SELECT MAX( score ) AS score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length, '${class_id}' FROM searchresults WHERE sample_id = ${sample_id} "; #note that we want the proper class_id, not the one from searchresults
+	$sql .= "SELECT MAX( score ) AS score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length,  '{$class_id}' FROM searchresults WHERE sample_id = ${sample_id} "; #note that we want the proper class_id, not the one from searchresults
 	if( defined( $class_params->evalue_threshold ) ){
 	    $sql .= " AND evalue <= " . $class_params->evalue_threshold . " ";
 	}
@@ -991,7 +991,7 @@ sub classify_orfs_by_sample{
 	    die( "There seems to be a best_type in your database that I don't know about. We parsed <${best_type}> from the method string <{$class_method}> using class_id $class_id\n" );
 	}
     } else{
-	$sql  .= "SELECT MAX( score ) AS score, orf_alt_id, tab2.read_alt_id, tab2.sample_id, target_id, famid, aln_length, '${class_id} FROM ";
+	$sql  .= "SELECT MAX( score ) AS score, orf_alt_id, tab2.read_alt_id, tab2.sample_id, target_id, famid, aln_length, '${class_id}' FROM ";
 	$sql .= "( SELECT * FROM metareads WHERE sample_id = ${sample_id} ORDER BY RAND() LIMIT ${count} ) tab1 ";
 	$sql .= "JOIN searchresults tab2 on tab1.read_alt_id = tab2.read_alt_id ";
 	$sql .= "WHERE tab2.sample_id = ${sample_id} "; #redundant, but enable easy extension of the clauses below
