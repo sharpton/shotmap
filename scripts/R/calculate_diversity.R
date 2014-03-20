@@ -9,9 +9,9 @@ options(error=recover)
 
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]
-metadata.tab      <- Args[6]
-sample.stem       <- Args[7]
-compare.stem      <- Args[8]
+sample.stem       <- Args[5]
+compare.stem      <- Args[6]
+metadata.tab      <- Args[7]
 
 #For testing purposes only
 #samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
@@ -99,7 +99,7 @@ for( i in 1:dim(abund.map)[1] ){
   sorted         <- sort( ra.data, decreasing = TRUE )
   ##sample RA
   ##all Families
-  file <- paste( sample.stem, "_sample_", samp, "RA_all.pdf", sep="" )
+  file <- paste( sample.stem, "_sample_", samp, "_RA_all.pdf", sep="" )
   pdf( file )
   plot( 1:length(sorted), sorted, type="l",
        xlab = "Family Rank",
@@ -109,7 +109,7 @@ for( i in 1:dim(abund.map)[1] ){
   dev.off()
   ##topN
   if( dim(abund.map)[2] > topN ){
-    file <- paste( sample.stem, "_sample_", samp, "RA_top", topN, ".pdf", sep="" )
+    file <- paste( sample.stem, "_sample_", samp, "_RA_top", topN, ".pdf", sep="" )
     pdf(file)
     plot( 1:topN, sorted[1:topN], type="l",
          xlab = "Family Rank",
@@ -131,7 +131,7 @@ for( i in 1:dim(abund.map)[1] ){
     dev.off()
     ##topN
     if( dim(abund.map)[2] > topN ){
-      file <- paste( sample.stem, "_sample_", samp, "RA_log_top", topN, ".pdf", sep="" )
+      file <- paste( sample.stem, "_sample_", samp, "_RA_log_top", topN, ".pdf", sep="" )
       pdf(file)
       plot( 1:topN, sorted[1:topN], type="l",
            xlab = "Family Rank",

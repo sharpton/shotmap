@@ -40,7 +40,7 @@ use List::Util qw( shuffle );
 # ServerAliveInterval : in SECONDS
 # ServerAliveCountMax : number of times to keep the connection alive
 # Total keep-alive time in minutes = (ServerAliveInterval*ServerAliveCountMax)/60 minutes
-my $GLOBAL_SSH_TIMEOUT_OPTIONS_STRING = '-o TCPKeepAlive=no -o ServerAliveInterval=30 -o ServerAliveCountMax=480';
+my $GLOBAL_SSH_TIMEOUT_OPTIONS_STRING = '-o TCPKeepAlive=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=480';
 
 my $HMMDB_DIR = "HMMdbs";
 my $BLASTDB_DIR = "BLASTdbs";
@@ -1533,13 +1533,30 @@ sub get_remote_search_results {
     }
 }
 
+sub classify_reads{
+    my( $self, $sample_id, $class_id, $dbh) = @_;
+
+    $self->Shotmap::DB::classify_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
+    #now get the classified results for this sample, store in results hash
+    my $members_rs = $self->Shotmap::DB::get_classified_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
+    #did mysql return any results for this query?
+    my $nrows = 0;
+    $nrows    = $members_rs->rows();
+    print "MySQL return $nrows rows for the above query.\n";
+    if( $nrows == 0 ){
+	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
+	next;
+    }
+    return $members_rs;
+}
+
 sub build_classification_maps_by_sample{
-    my ($self, $sample_id, $class_id, $post_rare_reads) = @_; # $post_rare_reads is a hashref mapping sample to read_ids, may not be defined, meaning use all reads. Note that we no longer use post_rare_reads to rarefy (see Shotmap::DB::get_classified_orfs_by_sample)
+    my ($self, $sample_id, $class_id, $members_rs ) = @_; 
     #create the outfile
     #my $map    = {}; #maps project_id -> sample_id -> read_id -> orf_id -> famid NO LONGER NEEDED SINCE WE USE R TO PARSE MAP
     my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
     if( defined( $self->postrarefy_samples ) ){
-	my @samples   = keys( %$post_rare_reads );
+	#my @samples   = keys( %$post_rare_reads );
 	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
 	my $rare_size = $self->postrarefy_samples;
 	$output .= "_Rare_${rare_size}";
@@ -1557,19 +1574,6 @@ sub build_classification_maps_by_sample{
     } else{
 	$read_count = $self->postrarefy_samples();
     }
-    #classify reads
-    my $dbh  = $self->Shotmap::DB::build_dbh();
-    $self->Shotmap::DB::classify_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
-    #now get the classified results for this sample, build classification map
-    my $members_rs = $self->Shotmap::DB::get_classified_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
-    #did mysql return any results for this query?
-    my $nrows = 0;
-    $nrows    = $members_rs->rows();
-    print "MySQL return $nrows rows for the above query.\n";
-    if( $nrows == 0 ){
-	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
-	next;
-    }
     my $max_rows  = 10000;
     my $must_pass = 0; #how many reads get dropped from SQL result set because not sampled in rarefaction stage. Should not be used any longer.
     while( my $rows = $members_rs->fetchall_arrayref( {}, $max_rows ) ){
@@ -1582,15 +1586,34 @@ sub build_classification_maps_by_sample{
 	    print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
 	}
     }
-    $self->Shotmap::DB::disconnect_dbh( $dbh );	
     close OUT;
 }
 
-sub calculate_abundances{
-    my ( $self, $sample_id, $class_id, $abund_type, $norm_type ) = @_;
+#also builds classification map, have to do both in one function b/c of mysql loop
+sub calculate_abundances{ 
+    my ( $self, $sample_id, $class_id, $abund_type, $norm_type, $members_rs, $dbh ) = @_;
     my $abundance_parameter_id = $self->Shotmap::DB::get_abundance_parameter_id( $abund_type, $norm_type )->abundance_parameter_id();
-    my $dbh  = $self->Shotmap::DB::build_dbh();
-    my $members_rs = $self->Shotmap::DB::get_classified_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
+    #some bookkeeping for our classification map
+    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
+    if( defined( $self->postrarefy_samples ) ){
+	#my @samples   = keys( %$post_rare_reads );
+	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
+	my $rare_size = $self->postrarefy_samples;
+	$output .= "_Rare_${rare_size}";
+    }
+    $output .= ".tab";
+    print "Building a classification map for sample ${sample_id}. Will dump results to ${output}\n";
+    open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
+    print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
+    #how many reads should we count for relative abundance analysis?
+    my $read_count;
+    if(!defined( $self->postrarefy_samples() ) ){
+	print( "Calculating classification results using all reads loaded into the database\n" );
+#	$read_count = @{ $self->Shotmap::DB::get_read_ids_from_ffdb( $sample_id ) }; #need this for relative abundance calculations
+	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count();
+    } else{
+	$read_count = $self->postrarefy_samples();
+    }
     #did mysql return any results for this query?
     my $nrows = 0;
     $nrows    = $members_rs->rows();
@@ -1612,6 +1635,7 @@ sub calculate_abundances{
 	    my $read_alt_id = $row->{"read_alt_id"};
 	    my $target_id   = $row->{"target_id"};
 	    my $aln_length  = $row->{"aln_length"};
+	    print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
 	    my ( $target_length, $family_length );
 	    if( $norm_type eq 'target_length' ){
 		$target_length = $self->Shotmap::DB::get_target_length( $target_id );
@@ -1652,6 +1676,7 @@ sub calculate_abundances{
 	}
     }
     #now that all of the classified reads are processed, calculate relative abundances
+    print "Inserting Abundance Data\n";
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
@@ -1660,7 +1685,6 @@ sub calculate_abundances{
 	#now, insert the data into mysql.
 	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
     }
-    $self->Shotmap::DB::disconnect_dbh( $dbh );	
     return $self;
 }
 
@@ -1707,7 +1731,7 @@ sub build_intersample_abundance_map{
 	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" 
 	);
     #my $abundances = $self->Shotmap::DB::get_sample_abundances( $sample_id, $class_id, $abund_param_id );
-    my $sample_abund_out  = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
+    my $sample_abund_out  = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
     my $max_rows          = 10000;
     my $dbh               = $self->Shotmap::DB::build_dbh();
@@ -1801,8 +1825,7 @@ sub calculate_diversity{
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
     my $metadata_table = $self->Shotmap::Run::get_project_metadata();
-
-    my $abund_map   = $outdir . "/Abundance_Map_cid_"         . "${class_id}_aid_${abund_param_id}.tab";
+    my $abund_map   = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
     #open output directory that contains per sample diversity data
@@ -1819,7 +1842,7 @@ sub calculate_diversity{
 
     #INTERFAMILY ANALYSIS
     #open directory that contains sample-famid abundance maps for all samples for given class/abundparam id
-    my $family_abundance_prefix = $outdir . "/Family_Abundances";
+    my $family_abundance_prefix = $outdir . "/Family_Abundances_cid_${class_id}_aid_${abund_param_id}";
     my $intrafamily_prefix      = $outdir . "/Compare_families_cid_${class_id}_aid_${abund_param_id}";
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
@@ -1831,7 +1854,7 @@ sub calculate_diversity{
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
     my $pca_prefix              = $outdir . "/Sample_Ordination";
     $script                     = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
-    $cmd                        = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${pca_prefix} ${metadata_table} < ${script}";
+    $cmd                        = "R --vanilla --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
     $self;
 }
 

@@ -47,9 +47,8 @@ sub calculate_diversity{
 	$abund_param_id = $self->Shotmap::DB::get_abundance_parameter_id(
 	    $self->abundance_type, $self->normalization_type
 	    )->abundance_parameter_id;
-#	$self->Shotmap::Run::build_intersample_abundance_map( $class_id, $abund_param_id );
+	$self->Shotmap::Run::build_intersample_abundance_map( $class_id, $abund_param_id );
 	$self->Shotmap::Run::calculate_diversity( $class_id, $abund_param_id );
-
     }
 }
 
@@ -86,13 +85,17 @@ sub classify_reads{
 	    $class_id = $self->Shotmap::DB::get_classification_id(
 		$self->class_evalue(), $self->class_coverage(), $self->class_score(), $searchdb_name, $algo, $self->top_hit_type(),
 		)->classification_id();
-	    print "Calculating diversity using classification_id ${class_id}\n";
+	    print "Classifying reads using classification_id ${class_id}\n";
 	    if( defined( $self->postrarefy_samples ) ){
 		print "Rarefying to " . $self->postrarefy_samples . " reads per sample\n";
 	    }
-	    print "Building classification map...\n";  
-	    $self->Shotmap::Run::build_classification_maps_by_sample($sample_id, $class_id ); 
-	    $self->Shotmap::Run::calculate_abundances( $sample_id, $class_id, $self->abundance_type, $self->normalization_type );
+	    print "Calculating abundances and building classification map...\n";  
+	    my $dbh  = $self->Shotmap::DB::build_dbh();
+	    my $result_set = $self->Shotmap::Run::classify_reads( $sample_id, $class_id, $dbh );
+	    #build_classification_maps_by_sample is now integrated into calculate_abundances
+	    #$self->Shotmap::Run::build_classification_maps_by_sample($sample_id, $class_id, $result_set, $dbh ); 
+	    $self->Shotmap::Run::calculate_abundances( $sample_id, $class_id, $self->abundance_type, $self->normalization_type, $result_set, $dbh );
+	    $self->Shotmap::DB::disconnect_dbh( $dbh );	
 	}
     }
     return $self;

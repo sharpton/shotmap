@@ -11,8 +11,8 @@ options(error=recover)
 
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]
-metadata.tab      <- Args[5]
-file.stem         <- Args[6]
+file.stem         <- Args[5]
+metadata.tab      <- Args[6]
 method            <- "pca" #not currently used, but reserved for later
 to.scale          <- 1
 to.center         <- 1
@@ -35,9 +35,9 @@ if( to.plotloadings ){
 plotstem <- method
 
 #For testing purposes only
-samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-metadata.tab   <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
-file.stem      <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Sample_ordination_cid_54_aid_1"
+#samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
+#metadata.tab   <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
+#file.stem      <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Sample_ordination_cid_54_aid_1"
 
 ###Thanks to crayola (http://stackoverflow.com/questions/6578355/plotting-pca-biplot-with-ggplot2)
 PCbiplot <- function(PC, x="PC1", y="PC2", plotloadings=TRUE, topN=10, metatypes=NULL) {

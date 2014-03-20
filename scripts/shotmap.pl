@@ -25,7 +25,7 @@ use Benchmark;
 use Carp;
 $SIG{ __DIE__ } = sub { Carp::confess( @_ ) }; # prints a STACK TRACE whenever there is a fatal error! Very handy
 
-print STDERR ">> ARGUMENTS TO mrc_handler.pl: perl mrc_handler.pl @ARGV\n";
+print STDERR ">> ARGUMENTS TO shotmap.pl: perl shotmap.pl @ARGV\n";
 
 # Initialize a new pipeline
 my $pipe = Shotmap->new();
@@ -36,12 +36,7 @@ $pipe->Shotmap::Load::check_vars();
 $pipe->Shotmap::Load::set_params();
 $pipe->Shotmap::Notify::pipeline_params();
 
-#add these to the get_options routine above
-my $is_strict = 1; #strict (single classification per read, e.g. top hit) v. fuzzy (all hits passing thresholds) clustering. 1 = strict. 0 = fuzzy. Fuzzy not yet implemented!
-
 my $path_to_family_annotations;
-my $abundance_type = "coverage";
-my $normalization_type = "target_length";
 
 # What step of the pipeline are we running?
 ## If the user has specified something in the --goto option, then we skip some parts of the analysis and go directly

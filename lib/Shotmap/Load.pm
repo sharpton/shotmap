@@ -207,7 +207,7 @@ sub get_options{
 	,    "top-hit"        => \$top_hit
 	,    "hit-type"       => \$top_hit_type
 	#abundance claculation parameters
-	,    "abundance-type" => \$abundance_type
+	,    "abundance-type"     => \$abundance_type
 	,    "normalization-type" => \$normalization_type
 	#usually set at run time
 	, "conf-file"         => \$conf_file

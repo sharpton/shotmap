@@ -217,9 +217,23 @@ sub get_orf_from_alt_id_dbi{
     return $sth;
 }
 
+#
 sub get_classified_orfs_by_sample{
     my ( $self, $sample_id, $class_id, $dbh, $count ) = @_; #if count is defined, subsample using the metareads table
-    my $sql = "SELECT * FROM classifications WHERE sample_id = ${sample_id} and classification_id = ${class_id}";
+    my $sql;
+    if( !defined( $count) ){
+	$sql = "SELECT * FROM classifications WHERE sample_id = ${sample_id} and classification_id = ${class_id}";
+    }
+    else{
+	#rarefy based on metareads
+	$sql = "SELECT b.result_id, b.orf_alt_id, b.read_alt_id, b.sample_id, " .
+	    "b.target_id, b.famid, b.classification_id, b.aln_length, b.score " .
+	    "FROM " .
+	    "(SELECT * FROM metareads WHERE sample_id = ${sample_id} order by rand() limit ${count}) a " .
+	    "JOIN classifications b ON a.read_alt_id=b.read_alt_id " .
+	    "WHERE b.sample_id = ${sample_id} and classification_id = ${class_id}";
+	#can add rarefaction based on orfs or classified orfs below, if desired
+    }
     print "$sql\n";
     my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
     $sth->execute();
@@ -360,8 +374,9 @@ sub get_sample_abundance{
 
 sub get_sample_abundances_for_all_classed_fams{
     my ( $self, $dbh, $sample_id, $class_id, $abund_param_id ) = @_;
-    my $sql = "SELECT a.famid, b.sample_id, b.abundance, b.relative_abundance FROM (SELECT DISTINCT famid FROM abundances) a LEFT OUTER JOIN abundances b ON a.famid = b.famid AND b.sample_id = ${sample_id} " .
-	"AND b.classification_id = ${class_id} AND b.abundance_parameter_id = ${abund_param_id}";
+    my $sql = "SELECT a.famid, b.sample_id, b.abundance, b.relative_abundance FROM " .
+	"(SELECT DISTINCT famid FROM abundances) a LEFT OUTER JOIN abundances b ON a.famid = b.famid AND b.sample_id = ${sample_id} " .
+	"AND b.classification_id = ${class_id} AND b.abundance_parameter_id = ${abund_param_id} ";
     print $sql . "\n";
     my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
     $sth->execute();
@@ -973,7 +988,7 @@ sub classify_orfs_by_sample{
     my $sql; #will differ depending on what we want to grab.
     $sql = "INSERT IGNORE INTO classifications ( score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length, classification_id ) ";
     if( !defined( $count ) ){ #grab results for all read
-	$sql .= "SELECT MAX( score ) AS score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length,  '{$class_id}' FROM searchresults WHERE sample_id = ${sample_id} "; #note that we want the proper class_id, not the one from searchresults
+	$sql .= "SELECT MAX( score ) AS score, orf_alt_id, read_alt_id, sample_id, target_id, famid, aln_length, ${class_id} FROM searchresults WHERE sample_id = ${sample_id} "; #note that we want the proper class_id, not the one from searchresults
 	if( defined( $class_params->evalue_threshold ) ){
 	    $sql .= " AND evalue <= " . $class_params->evalue_threshold . " ";
 	}
@@ -990,8 +1005,9 @@ sub classify_orfs_by_sample{
 	} else {
 	    die( "There seems to be a best_type in your database that I don't know about. We parsed <${best_type}> from the method string <{$class_method}> using class_id $class_id\n" );
 	}
-    } else{
-	$sql  .= "SELECT MAX( score ) AS score, orf_alt_id, tab2.read_alt_id, tab2.sample_id, target_id, famid, aln_length, '${class_id}' FROM ";
+    } else{ #here we post-rare from metareads table. May not be necessary, since we can also do this in
+	    # DB::get_classified_orfs_by_sample. But, also doin here keeps from classifying unnecessary data...OA
+	$sql  .= "SELECT MAX( score ) AS score, orf_alt_id, tab2.read_alt_id, tab2.sample_id, target_id, famid, aln_length, ${class_id} FROM ";
 	$sql .= "( SELECT * FROM metareads WHERE sample_id = ${sample_id} ORDER BY RAND() LIMIT ${count} ) tab1 ";
 	$sql .= "JOIN searchresults tab2 on tab1.read_alt_id = tab2.read_alt_id ";
 	$sql .= "WHERE tab2.sample_id = ${sample_id} "; #redundant, but enable easy extension of the clauses below

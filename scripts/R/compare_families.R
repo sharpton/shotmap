@@ -15,16 +15,16 @@ options(error=recover)
 
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]  #required
-metadata.tab      <- Args[6]  #required
-family.stem       <- Args[7]  #required
-compare.stem      <- Args[8]  #required
-test.type         <- Args[9]  #optional, is auto set below if NA
+family.stem       <- Args[5]  #required
+compare.stem      <- Args[6]  #required
+metadata.tab      <- Args[7]  #required
+test.type         <- Args[8]  #optional, is auto set below if NA
 
 ###For testing purposes only
-samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata_test.tab"
-family.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Family_Diversity_cid_54_aid_1"
-compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_Families_cid_54_aid_1"
+#samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
+#metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata_test.tab"
+#family.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Family_Diversity_cid_54_aid_1"
+#compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_Families_cid_54_aid_1"
 
 ###Set autodetection thresholds
 cont.thresh    = 0.2 #if there are fewer than this fraction of uniq vars in list, force discrete
