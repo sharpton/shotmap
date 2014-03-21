@@ -1821,16 +1821,19 @@ sub check_sample_rarefaction_depth{
 sub calculate_diversity{
     my( $self, $class_id, $abund_param_id ) = @_; #abundance type is "abundance" or "relative_abundance"
     #set output directory
-    my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" );
+    my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output/", "cid_${class_id}_aid_${abund_param_id}" );
+    File::Path::make_path($outdir);
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table = $self->Shotmap::Run::get_project_metadata();
+    my $metadata_table = $self->Shotmap::Run::get_project_metadata();    
     my $abund_map   = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
     #open output directory that contains per sample diversity data
-    my $sample_diversity_prefix  = $outdir . "/Sample_Diversity_cid_${class_id}_aid_${abund_param_id}";
-    my $compare_diversity_prefix = $outdir . "/Compare_samples_cid_${class_id}_aid_${abund_param_id}";
+    my $sample_path_stem = "Inter_Sample_Results";
+    File::Path::make_path($outdir . "/${sample_path_stem}/");
+    my $sample_diversity_prefix  = $outdir . "/${sample_path_stem}/Sample_Diversity_cid_${class_id}_aid_${abund_param_id}";
+    my $compare_diversity_prefix = $outdir . "/${sample_path_stem}/Sample_Comparison_cid_${class_id}_aid_${abund_param_id}";
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
@@ -1842,20 +1845,26 @@ sub calculate_diversity{
 
     #INTERFAMILY ANALYSIS
     #open directory that contains sample-famid abundance maps for all samples for given class/abundparam id
-    my $family_abundance_prefix = $outdir . "/Family_Abundances_cid_${class_id}_aid_${abund_param_id}";
-    my $intrafamily_prefix      = $outdir . "/Compare_families_cid_${class_id}_aid_${abund_param_id}";
+    my $family_path_stem = "Inter_Family_Results";
+    File::Path::make_path( $outdir . "/${family_path_stem}/" );
+    my $family_abundance_prefix = $outdir . "/${family_path_stem}/Family_Tests_cid_${class_id}_aid_${abund_param_id}";
+    #my $intrafamily_prefix      = $outdir . "/${family_path_stem}/Family_Comparisons_cid_${class_id}_aid_${abund_param_id}";
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${intrafamily_prefix} ${metadata_table} < ${script}";
+    $cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
+    #$cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${intrafamily_prefix} ${metadata_table} < ${script}";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #ORDINATE SAMPLES BY FAMILY RELATIVE ABUNDANCE (e.g. PCA Coordinates)
     #use family abundance tables to conduct a PCA analysis of the samples, producing a loadings table and biplot as output
-    my $pca_prefix              = $outdir . "/Sample_Ordination";
-    $script                     = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
-    $cmd                        = "R --vanilla --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
-    $self;
+    my $ordin_path_stem  = "Ordinations";
+    File::Path::make_path( $outdir . "/${ordin_path_stem}/" );
+    File::Path::make_path( $outdir . "/${ordin_path_stem}/" );
+    my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
+    $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
+    $cmd                 = "R --vanilla --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
+    Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }
 
 #MODIFIED

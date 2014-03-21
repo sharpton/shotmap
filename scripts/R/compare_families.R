@@ -16,9 +16,9 @@ options(error=recover)
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]  #required
 family.stem       <- Args[5]  #required
-compare.stem      <- Args[6]  #required
-metadata.tab      <- Args[7]  #required
-test.type         <- Args[8]  #optional, is auto set below if NA
+#compare.stem      <- Args[6]  #required
+metadata.tab      <- Args[6]  #required
+test.type         <- Args[7]  #optional, is auto set below if NA
 
 ###For testing purposes only
 #samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"

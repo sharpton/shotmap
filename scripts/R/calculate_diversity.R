@@ -297,7 +297,7 @@ if( is.null( meta ) ){
           labs( title = paste( div.type, " by ", meta.names[b], sep="" ) ) +
             xlab( meta.type ) +
               ylab( div.type )
-      file <- paste( sample.stem, "-", meta.type, "-", div.type, "-boxes.pdf", sep="" )
+      file <- paste( compare.stem, "-", meta.type, "-", div.type, "-boxes.pdf", sep="" )
       print(file)
       ggsave( filename = file, plot = last_plot() )
     }
@@ -319,7 +319,7 @@ if( is.null( meta ) ){
           labs( title = paste( div.type, " by ", meta.names[b], sep="" ) ) +
             xlab( meta.type ) +
               ylab( div.type )
-      file <- paste( sample.stem, "-", meta.type, "-", div.type, "-scatter.pdf", sep="" )
+      file <- paste( compare.stem, "-", meta.type, "-", div.type, "-scatter.pdf", sep="" )
       print(file)
       ggsave( filename = file, plot = last_plot() )
     }
@@ -343,7 +343,7 @@ if( is.null( meta ) ){
             labs( title = paste( div.type, " by ", meta.names[b], sep="" ) ) +
               xlab( meta.type ) +
                 ylab( div.type )
-        file <- paste( sample.stem, "-", meta.type, "-", div.type, "-line.pdf", sep="" )
+        file <- paste( compare.stem, "-", meta.type, "-", div.type, "-line.pdf", sep="" )
         print(file)
         ggsave( filename = file, plot = last_plot() )
       }
