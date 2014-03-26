@@ -16,7 +16,7 @@ options(error=recover)
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]  #required
 family.stem       <- Args[5]  #required
-#compare.stem      <- Args[6]  #required
+#compare.stem     <- Args[6]  #required
 metadata.tab      <- Args[6]  #required
 test.type         <- Args[7]  #optional, is auto set below if NA
 
@@ -90,7 +90,9 @@ for( a in 1:length( meta.names ) ){
   }
   print( paste("Processing <", meta.field, ">...", sep="") )
   types <- unique( meta[,meta.field] )
-  
+  if( length( types ) < 2 ){
+      next
+  }     
   if( length(types) > n.type.plot.lim ){
     print( paste( "There are ", length(types), " types of the field <", meta.field, ">, so I will only output tables for it", sep="" ))
     to.plot = 0
@@ -127,14 +129,14 @@ for( a in 1:length( meta.names ) ){
       ##teststat  <- mt.teststat( test.data, classes, test="wilcoxon" )
       ##rawp0           <- 2 * (1 - pnorm(abs(teststat)))
     }
-    res             <- mt.rawp2adjp(rawp0, procs)
+    res             <- mt.rawp2adjp(rawp0, procs, na.rm=TRUE)
     adjp            <- res$adjp[order(res$index), ]
     num.p           <- length(procs) + 1  #add 1 for raw.p
     rnd.p           <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
     rnd.p2 <- data.frame( test.type=test.type, rnd.p)
     ##now do something with this output
-    tab.file <- paste( family.stem, "-", meta.field, "-", type.x, "-", type.y, "-pvals.tab", sep="" )
+    tab.file <- paste( family.stem, "-", meta.field, "-", test.type, "-pvals.tab", sep="" )
     print( paste( "Generating p-value table for ", tab.file, sep="") )
     write.table( rnd.p2, tab.file )
     if( to.plot ){
@@ -149,14 +151,14 @@ for( a in 1:length( meta.names ) ){
     test.data <- t( ra.map )
     classes   <- classes.unsort[ colnames( test.data ) ]
     rawp0     <- apply( test.data, 1, function(x) kruskal.test( x~classes)$p.value )
-    res             <- mt.rawp2adjp(rawp0, procs)
+    res             <- mt.rawp2adjp(rawp0, procs, na.rm=TRUE)
     adjp            <- res$adjp[order(res$index), ]
     num.p           <- length(procs) + 1  #add 1 for raw.p
     rnd.p           <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
     rnd.p2          <- data.frame( test.type="kruskal.test", rnd.p)
     ##now do something with this output
-    tab.file        <- paste( family.stem, "-", meta.field, "-", type.x, "-", type.y, "-pvals.tab", sep="" )
+    tab.file        <- paste( family.stem, "-", meta.field, "-kruskal-pvals.tab", sep="" )
     print( paste( "Generating p-value table for ", tab.file, sep="") )
     write.table( rnd.p2, tab.file )
   }  
@@ -173,7 +175,7 @@ for( a in 1:length( meta.names ) ){
     colnames(rawp0) <- c( "cor.estimate", "p.value" )
     rownames(rawp0) <- rownames( test.data )
     #do we need to correct for multiple tests? I think so...
-    res           <- mt.rawp2adjp( rawp0$p.value, procs )
+    res           <- mt.rawp2adjp( rawp0$p.value, procs, na.rm=TRUE )
     adjp          <- res$adjp[order(res$index), ] #according to help, this returns rows in original order in res
     num.p         <- length(procs) + 1  #add 1 for raw.p
     rnd.p         <- round(adjp[,1:num.p], 4)
