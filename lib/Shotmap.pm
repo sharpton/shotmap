@@ -703,15 +703,6 @@ sub remote_script_path{
     return $self->{"type"};
 }
 
-#currently only used for rapsearch
-sub search_db_name_suffix{
-    my( $self, $value ) = @_;
-    if( defined( $value ) ){
-	$self->{"db_suffix"} = $value;
-    }
-    return $self->{"db_suffix"};
-}
-
 sub family_annotations{
     my( $self, $value ) = @_;
     if( defined( $value ) ){
@@ -774,12 +765,21 @@ sub normalization_type{
     return $self->{"norm_type"};
 }
 
+#currently only used for rapsearch
 sub search_db_name_suffix{
     my( $self, $value ) = @_;
     if( defined( $value ) ){
 	$self->{"search_suffix"} = $value;
     }
     return $self->{"search_suffix"};
+}
+
+sub nprocs{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"nprocs"} = $value;
+    }
+    return $self->{"nprocs"};
 }
 
 #######

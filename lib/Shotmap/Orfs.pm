@@ -72,12 +72,21 @@ sub translate_reads{
 	    my $remoteLogDir = File::Spec->catdir($self->remote_project_path(), "logs");
 	    $self->Shotmap::Run::translate_reads_remote($waittime, $remoteLogDir, $should_split_orfs, $filter_length);
 	} else {
-	    # local... this never actually gets called though, since we never run without $is_remote right now
 	    foreach my $sampleID (@{$self->get_sample_ids()}){
-		my $raw_reads_dir   = File::Spec->catdir(${local_ffdb}, "projects", $self->project_id(), ${sampleID}, "raw");
-		my $orfs_output_dir = File::Spec->catdir(${local_ffdb}, "projects", $self->project_id(), ${sampleID}, "orfs");
+		my $raw_reads_dir   = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "raw");
+		my $orfs_output_dir;
+		if( $should_split_orfs ){
+		    $orfs_output_dir = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "unsplit_orfs");
+		} else {
+		   $orfs_output_dir =  File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
+		}
 		$self->Shotmap::Notify::notify("Translating reads for sample ID $sampleID from $raw_reads_dir -> $orfs_output_dir...");
-		$self->Shotmap::Run::translate_reads($raw_reads_dir, $orfs_output_dir);
+		$self->Shotmap::Run::translate_reads($raw_reads_dir, $orfs_output_dir, $waittime); #make this function work...
+		if( $should_split_orfs ){
+		    my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
+		    $self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID from $orfs_output_dir -> $split_out...");
+		    $self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out); #build this function....
+		}
 	    }
 	}
     } else {

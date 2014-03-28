@@ -30,6 +30,7 @@ use DBIx::Class::ResultClass::HashRefInflator;
 use DBI; #used only for DBIx::BulkLoader::Mysql
 use DBD::mysql;
 use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
+use POSIX qw(ceil);
 
 #
 # CONNECTION
@@ -809,9 +810,9 @@ sub build_project_ffdb {
 }
 
 sub build_sample_ffdb{
-    my ($self, $nseqs_per_samp_split) = @_;
-    my $ffdb = $self->ffdb();
-    my $pid = $self->project_id();
+    my ($self)  = @_;
+    my $ffdb    = $self->ffdb();
+    my $pid     = $self->project_id();
     my $projDir = $self->project_dir; # no trailing slashes please!
     my $outDir  = "$projDir/output";
     my $logDir  = "$projDir/logs";
@@ -857,7 +858,7 @@ sub build_sample_ffdb{
 	    File::Path::make_path($dirToMake); # <-- make_path ALREADY dies on "severe" errors, so no need to check for them. See http://search.cpan.org/~dland/File-Path-2.09/Path.pm#ERROR_HANDLING
 	}
 	my $nameprefix = "${sampleName}_raw_split_"; # the "base name" here.
-	$self->Shotmap::DB::split_sequence_file( $self->get_sample_hashref()->{$sampleName}->{"path"}, $raw_sample_dir, $nameprefix, $nseqs_per_samp_split );
+	$self->Shotmap::DB::split_sequence_file( $self->get_sample_hashref()->{$sampleName}->{"path"}, $raw_sample_dir, $nameprefix );
     }
 }
 
@@ -866,7 +867,13 @@ sub split_sequence_file{
     my $full_seq_file    = shift;
     my $split_dir        = shift;
     my $basename         = shift;
-    my $nseqs_per_split  = shift;
+    my $nseqs_per_split;
+    if( $self->remote ){
+	$nseqs_per_split  = $self->read_split_size();
+    } else {
+	my $total_reads  = $self->Shotmap::Run::count_seqs_in_file( $full_seq_file );
+	$nseqs_per_split = ceil($total_reads / $self->nprocs()  ); #round up to nearest integer to be sure we get all reads
+    }
     #a list of filenames
     my @output_names = ();
     open( SEQS, $full_seq_file ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";

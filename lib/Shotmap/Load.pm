@@ -18,9 +18,15 @@ use Data::Dumper;
 
 sub check_vars{
     my $self = shift;
-    (defined($self->opts->{"rdir"})) or $self->Shotmap::Notify::dieWithUsageError("--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/shotmap). This is mandatory!");
-    (defined($self->opts->{"remoteExePath"})) or warn("Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.");
-    
+     if( $self->opts->{"remote"} ){
+	 (defined($self->opts->{"rhost"}))      or $self->Shotmap::Notify::dieWithUsageError("--rhost (remote computational cluster primary note) must be specified since you set --remote. Example --rhost='main.cluster.youruniversity.edu')!");
+	 (defined($self->opts->{"ruser"}))          or $self->Shotmap::Notify::dieWithUsageError("--ruser (remote computational cluster username) must be specified since you set --remote. Example username: --ruser='someguy'!");
+	 (defined($self->opts->{"rdir"})) or $self->Shotmap::Notify::dieWithUsageError("--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/shotmap). This is mandatory!");
+	 (defined($self->opts->{"remoteExePath"})) or warn("Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.");
+    } else {
+	warn( "You did not specify that a remote procedure should be run, so shotmap will run on your local compute server..." );
+	(defined($self->opts->{"nprocs"})) or $self->Shotmap::Notify::dieWithUsageError( "You did not specify the number of processors that shotmap should use on your local compute server. Rerun by specifying --nprocs or run a remote job" );
+    }
     (!$self->opts->{"dryrun"}) or $self->Shotmap::Notify::dieWithUsageError("Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies.");
     (defined($self->opts->{"ffdb"})) or $self->Shotmap::Notify::dieWithUsageError("--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo (or use the shorter '-d' option to specify it. This used to be hard-coded as being in /bueno_not_backed_up/yourname/shotmap_repo");
     (-d $self->opts->{"ffdb"} ) or $self->Shotmap::Notify::dieWithUsageError("--ffdb (local flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, so please specify the full path in that case. You must specify a directory that already exists.");
@@ -33,10 +39,6 @@ sub check_vars{
     if( defined( $self->opts->{"conf-file"} ) ){
 	( -e $self->opts->{"conf-file"} ) or $self->Shotmap::Notify::dieWithUsageError("You have specified a password file by using the --conf-file option, but I cannot find that file. You entered <" . $self->opts->{"conf-file"} . ">");
      }
-     if( $self->opts->{"remote"} ){
-	 (defined($self->opts->{"rhost"}))      or $self->Shotmap::Notify::dieWithUsageError("--rhost (remote computational cluster primary note) must be specified since you set --remote. Example --rhost='main.cluster.youruniversity.edu')!");
-	 (defined($self->opts->{"ruser"}))          or $self->Shotmap::Notify::dieWithUsageError("--ruser (remote computational cluster username) must be specified since you set --remote. Example username: --ruser='someguy'!");
-     }	 
      ($self->opts->{"use_hmmsearch"} || $self->opts->{"use_hmmscan"} || 
       $self->opts->{"use_blast"}     || $self->opts->{"use_last"}    || 
       $self->opts->{"use_rapsearch"} ) or 
@@ -142,6 +144,8 @@ sub get_options{
 	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,
 	$hmmdb_build,          $blastdb_build,         $force_db_build,       $force_search,        $small_transfer,
 	$normalization_type,   $abundance_type,
+	#vars being tested
+	$nprocs,
 	#non conf-file vars
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
@@ -175,6 +179,8 @@ sub get_options{
 	, "rpath"      => \$remoteExePath
 	, "scratch"    => \$use_scratch
 	, "wait"       => \$waittime        #   <-- in seconds
+	# Local compute related variables
+	, "nprocs"     => \$nprocs
 	#db communication method (NOTE: use EITHER multi OR bulk OR neither)
 	,    "multi"        => \$multi
 	,    "multi_count"  => \$mult_row_insert_count
@@ -249,6 +255,8 @@ sub get_options{
 			  , "rpath=s"
 			  , "scratch!"
 			  , "wait|w=i"    
+			  # Local compute related vars
+			  , "nprocs=i" #this overrides read_split_size!
 			  #db communication method (NOTE: use EITHER multi OR bulk OR neither)
 			  , "multi!"         ### OBSOLETE?
 			  , "multi_count:i"  ### OBSOLETE?
@@ -336,7 +344,8 @@ sub set_params{
     $self->scratch( $self->opts->{"scratch"} );
 
     # Set read parameters
-    $self->read_split_size( $self->opts->{"seq-split-size"} );
+    $self->read_split_size( $self->opts->{"seq-split-size"} ); 
+    $self->nprocs( $self->opts->{"nprocs"} ); #this overrides read_split_size
 
     # Set orf calling parameters
     my $trans_method = $self->opts->{"trans-method"};

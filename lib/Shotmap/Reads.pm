@@ -42,7 +42,7 @@ sub load_project{
     $self->Shotmap::Run::check_prior_analyses( $self->opts->{"reload"} ); #have any of these samples been processed already?
     
     if (!$dryRun) {
-	$self->Shotmap::Run::load_project($project_dir, $self->read_split_size() );
+	$self->Shotmap::Run::load_project($project_dir );
     } else {
 	$self->set_project_id(-99); # Dummy project ID
 	$self->Shotmap::Notify::dryNotify("Skipping the local load of the project.");

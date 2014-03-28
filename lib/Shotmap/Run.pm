@@ -28,7 +28,7 @@ use File::Basename;
 use File::Cat;
 use File::Copy;
 use File::Path;
-use IPC::System::Simple qw(capture run $EXITVAL);
+use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
 use Bio::SearchIO;
@@ -244,7 +244,7 @@ sub load_project{
     #process the samples associated with project
     $self->Shotmap::Run::load_samples();
     $self->Shotmap::DB::build_project_ffdb();
-    $self->Shotmap::DB::build_sample_ffdb($nseqs_per_samp_split); #this also splits the sample file
+    $self->Shotmap::DB::build_sample_ffdb(); #this also splits the sample file
     warn("Project with PID " . $proj->project_id() . ", with files found at <$path>, was successfully loaded!\n");
 }
 
@@ -496,15 +496,129 @@ sub back_load_samples{
 
 # Note this message: "this is a compute side function. don't use db vars"
 sub translate_reads {
-    my ($self, $input, $output) = @_;
-
+    my ($self, $input, $output, $waitTimeInSeconds) = @_;
+    my $to_split = $self->split_orfs();
+    my $method   = $self->trans_method();
+    my $nprocs   = $self->nprocs();
     (-d $input) or die "Unexpectedly, the input directory <$input> was NOT FOUND! Check to see if this directory really exists.";
     (-d $output) or die "Unexpectedly, the output directory <$output> was NOT FOUND! Check to see if this directory really exists.";
-    my $results  = IPC::System::Simple::capture("transeq $input $output -frame=6");
-    (0 == $EXITVAL) or die("Error translating sequences in $input -> $output. Result was: $results ");
-    return $results;
+    my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($input) . "split_"; 
+    if( !defined( $inbasename ) ){
+	die( "Couldn't obtain a raw file input basename to input into ${method}!");
+    }
+    my $outbasename = $inbasename;
+    $outbasename =~ s/\_raw\_/\_orf\_/; # change "/raw/" to "/orf/"                                                                                                                      
+    if( !defined( $outbasename) ){
+	die( "Couldn't obtain a raw file output basename to input into ${method}!");
+    }
+    TRANSLATEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	my $cmd;
+	if( $method eq 'transeq' || $method eq 'transeq_split' ){	
+	    my $infile   = "${input}/${inbasename}${i}.fa";
+	    my $outfile  = "${output}/${outbasename}${i}.fa";
+	    $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
+	    print "$cmd\n";
+	}
+	#ADD ADDITIONAL METHODS HERE
+	
+        #SPAWN THREADS
+	$self->Shotmap::Run::spawn_local_threads( $cmd, "translate" );
+    }
+    warn( "Finished ${method}. Proceeding");
+    return $self;
 }
 
+sub split_orfs_local{
+    my ($self, $input, $output) = @_;
+    my $splitscript   = File::Spec->catfile( $self->local_scripts_dir, "remote/split_orf_on_stops.pl" );
+    my $length_cutoff = $self->orf_filter_length;
+    my $nprocs   = $self->nprocs();
+    (-d $input) or die "Unexpectedly, the input directory <$input> was NOT FOUND! Check to see if this directory really exists.";
+    (-d $output) or die "Unexpectedly, the output directory <$output> was NOT FOUND! Check to see if this directory really exists.";
+    my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($input) . "split_"; 
+    if( !defined( $inbasename ) ){
+	die( "Couldn't obtain a raw file input basename to input into ${splitscript}!");
+    }
+    my $outbasename = $inbasename;
+    $outbasename =~ s/\_orf\_/\_orf\_split\_/; # change "/raw/" to "/orf/"                                                                                                                      
+    if( !defined( $outbasename) ){
+	die( "Couldn't obtain a raw file output basename to input into ${splitscript}!");
+    }
+    warn( "About to split orfs...");
+    SPLITFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	my $cmd;
+	my $infile   = "${input}/${inbasename}${i}.fa";
+	my $outfile  = "${output}/${outbasename}${i}.fa";
+	$cmd      = "perl $splitscript -l $length_cutoff -i $infile -o $outfile > /dev/null 2>&1";
+	#SPAWN THREADS
+	$self->Shotmap::Run::spawn_local_threads( $cmd, "split_orfs" );
+    }
+    warn( "Finished splitting orfs. Proceeding");
+    return $self;
+
+}
+
+sub get_file_basename_from_dir($$){
+    my( $self, $input ) = @_; #input is directory
+    my $inbasename;
+    my $outbasename;
+    (-d $input) or die "Unexpectedly, the input directory <$input> was NOT FOUND! Check to see if this directory really exists.";
+    opendir( IN, $input ) || die "Can't opendir $input for read: $!";
+    my @infiles = readdir(IN);
+    closedir( IN );
+    if(!defined($inbasename)) { #let's set some vars, but we won't process until we've looped over the entire directory                                                                      
+	foreach my $file( @infiles ){
+	    next if ($file =~ m/^\./ ); # Skip any files starting with a dot, including the special ones: "." and ".."
+	    ($file =~ m/(.*)split\_*/) or die "Can't grab the new basename from the file <$file>!";
+	    $inbasename  = $1;
+	}
+    }
+    if( !defined( $inbasename ) ){
+	die( "Couldn't obtain a raw file input basename from ${input}!");
+    }
+    return $inbasename;
+}
+
+sub spawn_local_threads($$$){
+    my( $self, $cmd, $type ) = @_;
+    #for more on forks, see http://www.resoo.org/docs/perl/perl_tutorial/lesson12.html
+    my $pid = $$;
+    my $parent = 0;
+    my @children = ();
+
+    my $newpid  = fork();
+    if( !defined( $newpid ) ){ #this shouldn't happen...
+	die "fork didn't work: $!\n";
+    } elsif( $newpid == 0 ) {
+	# if return value is 0, this is the child process
+	$parent   = $pid; # which has a parent called $pid
+	$pid      = $$;   # and which will have a process ID of its very own
+	@children = ();   # the child doesn't want this baggage from the parent
+	exec($cmd) or die ("Couldn't exec $cmd: $!");
+	if( $type eq "translate" ){
+	    last TRANSLATEFORK;      # and we don't want the child making babies either
+	} elsif( $type eq "split_orfs" ){
+	    last SPLITFORK;
+	}
+	
+    } else{
+	push( @children, $newpid );
+    }
+    if( $parent ){ # if I have a parent, i.e. if I'm the child process
+	#could optionally do something here
+	exit( 0 );
+    } else {
+	# parent process needs to preside over the death of its kids
+	while ( my $child = shift @children ) {
+	    print "Parent waiting for thread with pid $child to die\n";
+	    my $reaped = waitpid( $child, 0 );
+	    unless ( $reaped == $child )
+	    {
+		print "Something went wrong with our child $child: $?\n";
+	    }
+	}
+    }
+}
 
 sub load_multi_orfs{
     my ($self, $orfsBioSeqObject, $sample_id, $algo) = @_;   # $orfsBioSeqObject is a Bio::Seq object
@@ -1339,7 +1453,7 @@ sub remote_job_listener{
 
 sub local_job_listener{
     my ($self, $jobsArrayRef, $waitTimeInSeconds) = @_;
-    return($self->job_listener($jobsArrayRef, $waitTimeInSeconds, 0));
+    return($self->Shotmap::Run::job_listener($jobsArrayRef, $waitTimeInSeconds, 0));
 }
 
 sub remote_transfer_search_db{
@@ -1825,7 +1939,9 @@ sub calculate_diversity{
     File::Path::make_path($outdir);
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table = $self->Shotmap::Run::get_project_metadata();    
+    my $metadata_table = "/mnt/data/home/sharpton/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4_KO/1/output/sample_metadata.tab";
+#    my $metadata_table = $self->Shotmap::Run::get_project_metadata();    
+
     my $abund_map   = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
@@ -1920,5 +2036,19 @@ sub get_project_metadata{
     }
     return $output;
 }
+
+sub count_seqs_in_file{
+    my ( $self, $file ) = @_;
+    open( FILE, "$file" ) || die "Can't open $file for read: $!\n";
+    my $counter = 0;
+    while(<FILE>){
+	if( $_ =~ m/^>/ ){
+	    $counter++;
+	}
+    }
+    close FILE;
+    return $counter;       
+}
+
 
 1;
