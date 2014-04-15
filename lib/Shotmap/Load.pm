@@ -180,7 +180,7 @@ sub get_options{
 	, "scratch"    => \$use_scratch
 	, "wait"       => \$waittime        #   <-- in seconds
 	# Local compute related variables
-	, "nprocs"     => \$nprocs
+	, "nprocs"     => \$nprocs #overrides hmmsplit, blastsplit (both =1) and seq-split-size (total seqs/nprocs)
 	#db communication method (NOTE: use EITHER multi OR bulk OR neither)
 	,    "multi"        => \$multi
 	,    "multi_count"  => \$mult_row_insert_count
@@ -343,6 +343,10 @@ sub set_params{
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
 
+    # Set remote - do here because it f/x many downstream vars
+    # more on remote variables below.
+    $self->remote( $self->opts->{"remote"} );
+
     # Set read parameters
     $self->read_split_size( $self->opts->{"seq-split-size"} ); 
     $self->nprocs( $self->opts->{"nprocs"} ); #this overrides read_split_size
@@ -383,8 +387,14 @@ sub set_params{
 	$db_prefix_basename = $db_prefix_basename. "_" . $subset_name; 
     }
     $self->search_db_name( "basename", $db_prefix_basename );
-    my $blastdb_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
+    my $blastdb_name;
+    if( $self->remote ){
+	$blastdb_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
 	($self->nr()?'nr_':'') . $self->search_db_split_size( "blast");
+    } else { #local job, so no search db splits
+	$blastdb_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
+	($self->nr()?'nr':'');
+    }
     $self->search_db_name( "blast", $blastdb_name );
     if( ( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ) && 
 	( ( !$self->build_search_db("blast") ) && ( ! -d $self->ffdb . "/BLASTdbs/" . $blastdb_name ) ) ){
@@ -395,7 +405,12 @@ sub set_params{
 	    );
     }
     $self->search_db_name_suffix( $self->{"opts"}->{"db_suffix"} );
-    my $hmmdb_name = "${db_prefix_basename}_" . $self->search_db_split_size( "hmm" );
+    my $hmmdb_name;
+    if( $self->remote ){
+	$hmmdb_name = "${db_prefix_basename}_" . $self->search_db_split_size( "hmm" );
+    } else { #local job, so no search db splits
+	$hmmdb_name = $db_prefix_basename;
+    }
     $self->search_db_name( "hmm", $hmmdb_name );
     if( ( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan")  ) && 
 	( !$self->build_search_db("hmm") ) && 
@@ -416,7 +431,6 @@ sub set_params{
     }
     
     # Set remote compute associated variables
-    $self->remote( $self->opts->{"remote"} );
     if( $self->remote ){
 	$self->stage( $self->opts->{"stage"} );
 	$self->remote_user( $self->opts->{"ruser"} );

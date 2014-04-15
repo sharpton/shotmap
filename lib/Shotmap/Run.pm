@@ -535,12 +535,11 @@ sub split_orfs_local{
     my $nprocs   = $self->nprocs();
     (-d $input) or die "Unexpectedly, the input directory <$input> was NOT FOUND! Check to see if this directory really exists.";
     (-d $output) or die "Unexpectedly, the output directory <$output> was NOT FOUND! Check to see if this directory really exists.";
-    my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($input) . "split_"; 
+    my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($input) . "split_";  
     if( !defined( $inbasename ) ){
 	die( "Couldn't obtain a raw file input basename to input into ${splitscript}!");
     }
     my $outbasename = $inbasename;
-    $outbasename =~ s/\_orf\_/\_orf\_split\_/; # change "/raw/" to "/orf/"                                                                                                                      
     if( !defined( $outbasename) ){
 	die( "Couldn't obtain a raw file output basename to input into ${splitscript}!");
     }
@@ -569,7 +568,7 @@ sub get_file_basename_from_dir($$){
     if(!defined($inbasename)) { #let's set some vars, but we won't process until we've looped over the entire directory                                                                      
 	foreach my $file( @infiles ){
 	    next if ($file =~ m/^\./ ); # Skip any files starting with a dot, including the special ones: "." and ".."
-	    ($file =~ m/(.*)split\_*/) or die "Can't grab the new basename from the file <$file>!";
+	    ($file =~ m/^(.*?)split\_*/) or die "Can't grab the new basename from the file <$file>!";
 	    $inbasename  = $1;
 	}
     }
@@ -580,7 +579,7 @@ sub get_file_basename_from_dir($$){
 }
 
 sub spawn_local_threads($$$){
-    my( $self, $cmd, $type ) = @_;
+    my( $self, $cmd, $type, $outfile ) = @_; #we use outfile to check if we need to rerun anything
     #for more on forks, see http://www.resoo.org/docs/perl/perl_tutorial/lesson12.html
     my $pid = $$;
     my $parent = 0;
@@ -594,13 +593,20 @@ sub spawn_local_threads($$$){
 	$parent   = $pid; # which has a parent called $pid
 	$pid      = $$;   # and which will have a process ID of its very own
 	@children = ();   # the child doesn't want this baggage from the parent
+	if( defined( $outfile ) ){
+	    if( -e $outfile && !($self->force_search) ){
+		warn( "I found results at $outfile. I will not overwrite them without the --forcesearch option!\n");
+		next;
+	    }	    
+	}
 	exec($cmd) or die ("Couldn't exec $cmd: $!");
 	if( $type eq "translate" ){
 	    last TRANSLATEFORK;      # and we don't want the child making babies either
 	} elsif( $type eq "split_orfs" ){
 	    last SPLITFORK;
-	}
-	
+	} elsif( $type eq "search" ){
+	    last SEARCHFORK;
+	}	
     } else{
 	push( @children, $newpid );
     }
@@ -856,10 +862,11 @@ sub _parse_famid_from_ffdb_seqid {
     return $famid;
 }
 
+#NOTE: If running a local process, then the split size isn't used, and
+#single large db is created.
 sub build_search_db{
     my $self        = shift;
     my $db_name     = shift; #name of db to use, if build, new db will be named this. check for dups
-    my $split_size  = shift; #integer - how many hmms per split?
     my $force       = shift; #0/1 - force overwrite of old DB during compression.
     my $type        = shift; #blast/hmm
     my $reps_only   = shift; #0/1 - should we only use representative sequences in our sequence DB
@@ -868,13 +875,28 @@ sub build_search_db{
     my $ffdb        = $self->ffdb();
     my $ref_ffdb    = $self->ref_ffdb();
 
+    #get some db properties
     #where is the hmmdb going to go? each hmmdb has its own dir
     my $raw_db_path = undef;
+    my $split_size  = undef; #only used if a remote process
     my $length      = 0;
-    if ($type eq "hmm")   { $raw_db_path = $self->search_db_path("hmm"); }
-    if ($type eq "blast") { $raw_db_path = $self->search_db_path("blast"); }
-
-    warn "Building $type DB $db_name, placing $split_size per split\n";
+    if ($type eq "hmm")   { 
+	$raw_db_path = $self->search_db_path("hmm"); 
+	if( $self->remote ){
+	    $split_size = $self->search_db_split_size("hmm")
+	}
+    }
+    if ($type eq "blast") { 
+	$raw_db_path = $self->search_db_path("blast"); 
+	if( $self->remote ){
+	    $split_size = $self->search_db_split_size("blast")
+	}
+    }
+    if( $self->remote ){
+	warn "Building $type DB $db_name, placing $split_size per split\n";
+    } else {
+	warn "Bulding $type DB $db_name, since a local process, this will be a single file\n";
+    }
 
     #Have you built this DB already?
 
@@ -940,16 +962,31 @@ sub build_search_db{
 	    push( @split, $family_db_file );
 	    $count++;
 	    #if we've hit our split size, process the split
-	    if($count >= $split_size || $family eq $families[-1]) {
-		$n_proc++; 	    #build the DB
-		my $split_db_path;
-		if( $type eq "hmm" ){
-		    $split_db_path = Shotmap::Run::cat_db_split($db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
-		} 
-		gzip_file($split_db_path); # We want DBs to be gzipped.
-		unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
-		@split = (); # clear this out
-		$count = 0; # clear this too
+	    if( $self->remote ){
+		if($count >= $split_size || $family eq $families[-1]) {
+		    $n_proc++; 	    #build the DB
+		    my $split_db_path;
+		    if( $type eq "hmm" ){
+			$split_db_path = Shotmap::Run::cat_db_split($db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
+		    } 
+		    gzip_file($split_db_path); # We want DBs to be gzipped.
+		    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
+		    @split = (); # clear this out
+		    $count = 0; # clear this too
+		}
+	    } else {
+		#this is a local procedure and we only want a single, large db
+		if( $family eq $families[-1] ) {
+                    $n_proc++;      #build the DB                                                                                                                                                                                 
+                    my $split_db_path;
+                    if( $type eq "hmm" ){
+                        $split_db_path = Shotmap::Run::cat_db_split($db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
+                    }
+                    gzip_file($split_db_path); # We want DBs to be gzipped.                                                                                                                                                       
+                    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy                                                                                                                       
+                    @split = (); # clear this out                                                                                                                                                                                 
+                    $count = 0; # clear this too   
+		}	    
 	    }
 	} elsif( $type eq "blast" ) {
 #	    my $path = "$ref_ffdb/seqs/${family}.fa.gz";
@@ -1034,22 +1071,39 @@ sub build_search_db{
 		    $seq = '';
 		    $seq_len = 0;		
 		}
-		#we've hit our desired size (or at the end). Process the split
-		if( ( scalar( keys( %$seqs ) ) >= $split_size ) || ( $family eq $families[-1] && eof )) {
-		    foreach my $id( keys( %$seqs ) ){
-			print $tmp $id;
-			print $tmp $seqs->{$id};
+		if( $self->remote ){
+		    #we've hit our desired size (or at the end). Process the split		    
+		    if( ( scalar( keys( %$seqs ) ) >= $split_size ) || ( $family eq $families[-1] && eof )) {
+			foreach my $id( keys( %$seqs ) ){
+			    print $tmp $id;
+			    print $tmp $seqs->{$id};
+			}
+			close $tmp;
+			$n_proc++; 	    #build the db split number
+			my $split_db_path = "${db_path_with_name}_${n_proc}.fa";
+			move( $tmp_path, $split_db_path );		    
+			gzip_file($split_db_path); # We want DBs to be gzipped.
+			unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
+			$seqs = {};
+			unless( $family eq $families[-1] && eof ){
+			    open( TMP, ">${db_path_with_name}.tmp" ) || die "Can't open ${db_path_with_name}.tmp for write: $!\n";
+			    $tmp = *TMP;	    
+			}
 		    }
-		    close $tmp;
-		    $n_proc++; 	    #build the db split number
-		    my $split_db_path = "${db_path_with_name}_${n_proc}.fa";
-		    move( $tmp_path, $split_db_path );		    
-		    gzip_file($split_db_path); # We want DBs to be gzipped.
-		    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
-		    $seqs = {};
-		    unless( $family eq $families[-1] && eof ){
-			open( TMP, ">${db_path_with_name}.tmp" ) || die "Can't open ${db_path_with_name}.tmp for write: $!\n";
-			$tmp = *TMP;	    
+		} else {
+		    #is a local process and we want a single, large db
+		    if( $family eq $families[-1] && eof ) {
+			foreach my $id( keys( %$seqs ) ){
+			    print $tmp $id;
+			    print $tmp $seqs->{$id};
+			}
+			close $tmp;
+			$n_proc++; 	    #build the db split number
+			my $split_db_path = "${db_path_with_name}_${n_proc}.fa";
+			move( $tmp_path, $split_db_path );		    
+			#gzip_file($split_db_path); # We want DBs to be gzipped.
+			#unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
+			$seqs = {};
 		    }
 		}
 	    }
@@ -1081,6 +1135,45 @@ sub build_search_db{
     close LEN;
 
     print STDERR "Build Search DB: $type DB was successfully built and compressed.\n";
+}
+
+sub format_search_db{ #local process only
+    my( $self, $type ) = @_;
+    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "_1.fa"; #only ever 1 for local search
+    my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
+    unless( -e $db_file ){ #if uncompressed version exists, go with it
+	if( -e "${db_file}.gz" ){
+	    $compressed = 1;
+	}
+    }
+    if( $compressed ){
+	gunzip "${db_file}.gz" => $db_file or die "gunzip failed: $GunzipError\n";
+    }
+    my $cmd;
+    if( $type eq "rapsearch" ){
+	my $db_suffix = $self->search_db_name_suffix;
+	$cmd = "prerapsearch -d ${db_file} -n ${db_file}.${db_suffix}"; # > /dev/null 2>&1";
+    }
+    warn( $cmd );
+    my $results = IPC::System::Simple::capture( $cmd );    
+    (0 == $EXITVAL) or die("Error executing $cmd: $results\n");
+    return $results
+}
+
+sub get_db_filepath_prefix{
+    my( $self, $type ) = @_;
+    #GET DB VARS
+    my ( $db_name, $db_dir, $db_filestem );
+    if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
+	$db_name        = $self->search_db_name("blast");
+	$db_dir         = File::Spec->catdir($self->ffdb(), $BLASTDB_DIR, $db_name);
+    }
+    if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
+	$db_name        = $self->search_db_name("hmm");
+	$db_dir         = File::Spec->catdir($self->ffdb(), $HMMDB_DIR, $db_name);
+    }
+    $db_filestem = File::Spec->catfile( $db_dir, $db_name ); #only ever 1 for local search
+    return $db_filestem;
 }
 
 sub _get_family_length{
@@ -1554,6 +1647,60 @@ sub run_search_remote {
     my $results     = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), $remote_cmd, $verbose);
     (0 == $EXITVAL) or warn("Execution of command <$remote_cmd> returned non-zero exit code $EXITVAL. The remote reponse was: $results.");
     return $results;
+}
+
+sub run_search{
+    my( $self, $sample_id, $type, $waittime, $verbose ) = @_;
+    ($type eq "rapsearch" ) || die "Invalid type passed in! The invalid type was: \"$type\".";    
+    my $nprocs   = $self->nprocs();
+    #GET IN/OUT VARS
+    my $orfs_dir   = File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs");
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "${type}", "${type}"); #file stem that we add to below
+    my $master_out_dir  = File::Spec->catdir(  $self->get_sample_path($sample_id), "search_results", ${type});
+    (-d $orfs_dir)       or die "Unexpectedly, the input directory <$orfs_dir> was NOT FOUND! Check to see if this directory really exists.";
+    (-d $master_out_dir) or die "Unexpectedly, the output directory <$master_out_dir> was NOT FOUND! Check to see if this directory really exists.";
+    my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($orfs_dir) . "split_"; 
+    if( !defined( $inbasename ) ){
+	die( "Couldn't obtain a raw file input basename to input from $orfs_dir!");
+    }
+    #GET DB VARS
+    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "_1.fa"; #only ever 1 for local search
+    my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
+    unless( -e $db_file ){ #if uncompressed version exists, go with it
+	if( -e "${db_file}.gz" ){
+	    $compressed = 1;
+	}
+    }
+    if( $compressed ){
+	gunzip "${db_file}.gz" => $db_file or die "gunzip failed: $GunzipError\n";
+    }
+    #RUN THE SEARCH
+    SEARCHFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	my $cmd;
+	my $log_file = $log_file_prefix . "_${i}.log";
+	my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
+	#create output directory
+	my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
+	File::Path::make_path($outdir);
+	#PICK UP HERE
+	my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
+	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
+	if( $type eq "rapsearch" ){	
+	    my $suffix = $self->search_db_name_suffix;
+	    $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1 &";
+	    print "$cmd\n";
+	}
+	#ADD ADDITIONAL METHODS HERE
+	
+        #SPAWN THREADS
+	$self->Shotmap::Run::spawn_local_threads( $cmd, "search", $outfile );
+    }
+    warn( "Finished ${type}. Proceeding");
+    return $self;
+    if( $compressed ){
+	gzip_file( $db_file );    
+    }
+    return $self;
 }
 
 sub parse_results_remote {

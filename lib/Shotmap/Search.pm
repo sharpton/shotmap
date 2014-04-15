@@ -35,7 +35,7 @@ sub build_search_db{
 		 "You might considering running --use_blast, --use_last, and/or --use_rapsearch");
 	}
 	$self->Shotmap::Notify::printBanner("BUILDING SEQUENCE DATABASE");
-	$self->Shotmap::Run::build_search_db( $self->search_db_name("blast"), $self->search_db_split_size("blast"), $self->force_build_search_db, "blast", $self->reps, $self->nr );
+	$self->Shotmap::Run::build_search_db( $self->search_db_name("blast"), $self->force_build_search_db, "blast", $self->reps, $self->nr );
     }
     
     #may not need to build the search database, but let's see if we need to load the database info into mysql....
@@ -180,16 +180,17 @@ sub run_search{
 	}  
     } else {
 	$self->Shotmap::Notify::printBanner("RUNNING LOCAL SEARCH");
-	foreach my $sample_id(@{ $self->get_sample_ids() }){
-            #my $sample_path = $local_ffdb . "/projects/" . $self->get_project_id() . "/" . $sample_id . "/";
-	    my %hmmdbs = %{ $self->Shotmap::DB::get_hmmdbs($hmmdb_name) };
-	    warn "Running hmmscan for sample ID ${sample_id}...";
-	    foreach my $hmmdb(keys(%hmmdbs)) {
-		my $results_full_path = "search_results/${sample_id}_v_${hmmdb}.hsc";
-		#run with tblast output format (e.g., --domtblout)
-		$self->Shotmap::Run::run_hmmscan("orfs.fa", $hmmdbs{$hmmdb}, $results_full_path, 1);
-	    }
-	}
+	foreach my $sample_id (@{$self->get_sample_ids()}){
+	    my $in_dir   = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "orfs");
+	    my $out_dir  = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "searchresults");
+	    $self->Shotmap::Notify::notify("Running search, using $in_dir..." );
+	    #force search is called from environment in spawn_local_threads
+	    ($use_hmmscan)   && $self->Shotmap::Run::run_search($sample_id, "hmmscan",    $waittime, $verbose);
+	    ($use_hmmsearch) && $self->Shotmap::Run::run_search($sample_id, "hmmsearch",  $waittime, $verbose);
+	    ($use_blast)     && $self->Shotmap::Run::run_search($sample_id, "blast",      $waittime, $verbose);
+	    ($use_last)      && $self->Shotmap::Run::run_search($sample_id, "last",       $waittime, $verbose);
+	    ($use_rapsearch) && $self->Shotmap::Run::run_search($sample_id, "rapsearch",  $waittime, $verbose);
+	}	
     }
     return $self;
 }
@@ -256,5 +257,18 @@ sub stage_search_db{
     return $self;
 }
 
+sub format_search_db{
+    my( $self ) = @_;
+    if( $self->use_search_alg("rapsearch") ){
+	#First see if we need to do this
+	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( "rapsearch" ) . "_1.fa"; #only ever 1 for local search
+	my $fmt_db  = "${db_file}." . $self->search_db_name_suffix;
+	unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do
+	    $self->Shotmap::Run::format_search_db( "rapsearch" );
+	}
+    } else {
+        die( "Local execution is not currently configured for anything but rapsearch in Shotmap::Search::format_search_db" );
+    }
+}
 
 1;

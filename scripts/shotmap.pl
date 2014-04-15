@@ -76,7 +76,11 @@ $pipe->Shotmap::Reads::load_project();
 # Build search database and load into DB
  BUILDSEARCHDB: $pipe->Shotmap::Search::build_search_db();
 # Stage search database on remote server
- REMOTESTAGE: $pipe->Shotmap::Search::stage_search_db();
+if( $pipe->remote ){ 
+REMOTESTAGE: $pipe->Shotmap::Search::stage_search_db(); 
+} else { 
+LOCALSTAGE: $pipe->Shotmap::Search::format_search_db();
+}
 # Build search script
  BUILDSEARCHSCRIPT: $pipe->Shotmap::Search::build_search_script();
 # Execute search
