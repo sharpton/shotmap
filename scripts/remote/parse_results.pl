@@ -122,12 +122,14 @@ while(<RES>){
 	$famid = $tid;
     }	    
     #depending on parse_type, do we need to retain this result?
-    if( $parse_type eq 'best_hit' ){
-	next unless $hitmap->{$qid}->{"topscore"} < $score;
-    } elsif( $parse_type eq 'best_per_fam' ){
-	next unless $hitmap->{$qid}->{$famid}->{"topscore"} < $score;
-    } elsif( $parse_type eq 'all' ){
-	#do nothing
+    if( defined( $hitmap->{$qid}->{"topscore"} ) ){
+	if( $parse_type eq 'best_hit' ){
+	    next unless $hitmap->{$qid}->{"topscore"} < $score;	
+	} elsif( $parse_type eq 'best_per_fam' ){
+	    next unless $hitmap->{$qid}->{$famid}->{"topscore"} < $score;
+	} elsif( $parse_type eq 'all' ){
+	    #do nothing
+	}
     }
     #calculate coverage from query perspective
     if( !defined( $qlen ) ){

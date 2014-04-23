@@ -175,7 +175,7 @@ sub parse_results{
 	if( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ){
 	    $blast_splits = $self->Shotmap::DB::get_number_db_splits("blast");
 	}
-	foreach my $sample_id(@{ $self->get_sample_ids() }) { #wite this method
+	foreach my $sample_id(@{ $self->get_sample_ids() }) {
 	    ($self->use_search_alg("hmmscan"))   && $self->Shotmap::Run::parse_results_remote($sample_id, "hmmscan",   $hmm_splits,   $waittime, $verbose, $force_search);
 	    ($self->use_search_alg("hmmsearch")) && $self->Shotmap::Run::parse_results_remote($sample_id, "hmmsearch", $hmm_splits,   $waittime, $verbose, $force_search);
 	    ($self->use_search_alg("blast"))     && $self->Shotmap::Run::parse_results_remote($sample_id, "blast",     $blast_splits, $waittime, $verbose, $force_search);
@@ -184,13 +184,17 @@ sub parse_results{
 	    print "Progress report: finished ${sample_id} on " . `date` . "";
 	}  
     } else {
-	$self->Shotmap::Notify::printBanner("PARSING LOCAL SEARCH RESULTS"); #NOT CODED YET
+	$self->Shotmap::Notify::printBanner("PARSING LOCAL SEARCH RESULTS"); 
+	#force search is called from environment in spawn_local_threads
 	foreach my $sample_id(@{ $self->get_sample_ids() }){
-
+	    ($self->use_search_alg("hmmscan"))   && $self->Shotmap::Run::parse_results( $sample_id, "hmmscan",   $waittime, $verbose );
+	    ($self->use_search_alg("hmmsearch")) && $self->Shotmap::Run::parse_results( $sample_id, "hmmsearch", $waittime, $verbose );
+	    ($self->use_search_alg("blast"))     && $self->Shotmap::Run::parse_results( $sample_id, "blast",     $waittime, $verbose );
+	    ($self->use_search_alg("last"))      && $self->Shotmap::Run::parse_results( $sample_id, "last",      $waittime, $verbose );
+	    ($self->use_search_alg("rapsearch")) && $self->Shotmap::Run::parse_results( $sample_id, "rapsearch", $waittime, $verbose );
 	}
     }
     return $self;
 }
-
 
 1;

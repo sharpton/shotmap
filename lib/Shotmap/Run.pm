@@ -594,11 +594,16 @@ sub spawn_local_threads($$$){
 	$pid      = $$;   # and which will have a process ID of its very own
 	@children = ();   # the child doesn't want this baggage from the parent
 	if( defined( $outfile ) ){
-	    if( -e $outfile && !($self->force_search) ){
+	    if( $type eq "search" && -e $outfile && !($self->force_search) ){
 		warn( "I found results at $outfile. I will not overwrite them without the --forcesearch option!\n");
 		next;
 	    }	    
+	    if( $type eq "parse" && -e $outfile && !($self->force_parse) ){
+		warn( "I found results at $outfile. I will not overwrite them without the --forceparse option!\n");
+		next;
+	    }	    
 	}
+	open STDERR, ">&=", \*STDOUT or print "$0: dup: $!";
 	exec($cmd) or die ("Couldn't exec $cmd: $!");
 	if( $type eq "translate" ){
 	    last TRANSLATEFORK;      # and we don't want the child making babies either
@@ -606,6 +611,8 @@ sub spawn_local_threads($$$){
 	    last SPLITFORK;
 	} elsif( $type eq "search" ){
 	    last SEARCHFORK;
+	} elsif( $type eq "parse" ){
+	    last PARSEFORK;
 	}	
     } else{
 	push( @children, $newpid );
@@ -1703,6 +1710,62 @@ sub run_search{
     return $self;
 }
 
+sub parse_results {
+    my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
+    ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
+	die "Invalid type passed in! The invalid type was: \"$type\".";
+    my $nprocs       = $self->nprocs();
+    my $trans_method = $self->trans_method;
+    my $proj_dir     = $self->remote_project_path;
+    my $scripts_dir  = $self->remote_scripts_dir;
+    my $t_score      = $self->parse_score;
+    my $t_coverage   = $self->parse_coverage;
+    my $t_evalue     = $self->parse_evalue;
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}"); #file stem that we add to below
+    my $script_file  = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
+    my $orfbasename  = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
+    PARSEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	#set some loop specific variables
+	my $log_file = $log_file_prefix . "_${i}.log";	
+	my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
+	my $infile   = File::Spec->catfile( $self->get_sample_path($sample_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
+	if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
+	    $infile = $infile . ".m8";
+	}
+	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
+	my $cmd  = "perl $script_file "
+	    . "--results-tab=$infile "
+	    . "--orfs-file=$query_orfs_file "
+	    . "--sample-id=$sample_id "
+	    . "--algo=$type "
+	    . "--trans-method=$trans_method "
+	    . "--parse-type=best_hit "
+	    ;	
+	if( defined( $t_score ) ){
+	    $cmd .= " --score=$t_score ";
+	} else {
+	    $cmd .= " --score=NULL ";
+	}
+	if( defined( $t_evalue ) ){
+	    $cmd .= " --evalue=$t_evalue ";
+	} else { 
+	    $cmd .= " --evalue=NULL ";
+	}
+	if( defined( $t_coverage ) ){
+	    $cmd .= " --coverage=$t_coverage ";
+	} else {
+	    $cmd .= " --coverage=NULL ";
+	}
+	if( $type eq "rapsearch" ){	
+	    $cmd .= " > $log_file &"; #Not dumping STDERR to STDOUT for some reason, so this is off.
+	    print "$cmd\n";
+	}	
+        #SPAWN THREADS
+	$self->Shotmap::Run::spawn_local_threads( $cmd, "parse", "${infile}.mysqld" );
+    }
+    return $self;
+}
+
 sub parse_results_remote {
     my ($self, $sample_id, $type, $nsplits, $waitTimeInSeconds, $verbose, $forceparse) = @_;
     ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
@@ -2086,8 +2149,15 @@ sub calculate_diversity{
     File::Path::make_path($outdir);
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table = "/mnt/data/home/sharpton/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4_KO/1/output/sample_metadata.tab";
-#    my $metadata_table = $self->Shotmap::Run::get_project_metadata();    
+    #does one already exist? if so, use it (this allows some additional customization, but is a bit hacky)
+    my $metadata_table;
+    my $potential = $outdir . "sample_metadata.tab";
+    if( -e $potential ){
+	warn( "Using the metadata table located at $potential. If you prefer I use a different table, please first delete this file\n");
+	$metadata_table = $potential;
+    } else {       
+	$metadata_table = $self->Shotmap::Run::get_project_metadata();    
+    }
 
     my $abund_map   = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
 
