@@ -91,7 +91,6 @@ if( $pipe->remote ){
 if( $pipe->remote ){
  GETRESULTS: $pipe->Shotmap::Results::grab_results();
 }
-die;
 # Load results into DB
  LOADRESULTS: $pipe->Shotmap::Results::load_results();
 # Classify reads into families
