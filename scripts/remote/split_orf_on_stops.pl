@@ -65,6 +65,9 @@ sub process_seq{
 	}
     } else{
 	#no stops (no asterisks??), but still want consistant format
+	if( length( $sequence <= $seq_len_min ) ){
+	    next;
+	}
 	my $id = "${header}_${count}"; # looks like we have the original header line plus a count
 	print $out "$id\n$sequence\n";       
     }
