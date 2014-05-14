@@ -1,14 +1,8 @@
 ###note: need a similar function that just plots functional data for each sample, not in a comparative context
 
-require(vegan)
-require(ggplot2)
-require(reshape2)
-require(multtest)
-
 ###NOTE: you may need to update bioconductor for multtest. Open R and do the following
 ### > source("http://bioconductor.org/biocLite.R")
 ### > biocLite("multtest")
-
 
 options(error=traceback)
 options(error=recover)
@@ -19,6 +13,25 @@ family.stem       <- Args[5]  #required
 #compare.stem     <- Args[6]  #required
 metadata.tab      <- Args[6]  #required
 test.type         <- Args[7]  #optional, is auto set below if NA
+verbose           <- Args[8]
+
+if( is.na( verbose ) ){
+    verbose = 0
+} else {
+    verbose = 1
+}
+
+if( verbose ) {
+    require(vegan)
+    require(ggplot2)
+    require(reshape2)
+    require(multtest)
+} else {
+    msg.trap <- capture.output( suppressMessages( library( vegan ) ) )
+    msg.trap <- capture.output( suppressMessages( library( ggplot2 ) ) )
+    msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
+    msg.trap <- capture.output( suppressMessages( library( multtest ) ) )
+}
 
 ###For testing purposes only
 #samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
@@ -106,11 +119,15 @@ for( a in 1:length( meta.names ) ){
     y.samps   <- subset( meta, meta[,meta.field] == type.y )$SAMPLE.ID
     if( is.na(test.type) ){ #if user defines it above, skip this step
       test.type <- "wilcoxon.test"
-      if( length(x.samps) <= 3 & length(y.samps) <= 3 ){
-        print( paste( "There aren't enough samples in each type of the field <", meta.field, "> to have the power to ",
-                     "detect significant differences using a Wilcoxon Test. We'll implement a t-test instead. Note that ",
-                     "this *assumes* that the samples in each type are normally distributed!", sep="") )
-        test.type = "t.test"
+      if( length(x.samps) <= 3 | length(y.samps) <= 3 ){
+#        print( paste( "There aren't enough samples in each type of the field <", meta.field, "> to have the power to ",
+#                     "detect significant differences using a Wilcoxon Test. We'll implement a t-test instead. Note that ",
+#                     "this *assumes* that the samples in each type are normally distributed!", sep="") )
+#        test.type = "t.test"
+         print( paste( "You have fewer than three samples for one of the fields in <", meta.field, ">, so we don't have ",
+                      "enough data to identify significant differences. I will skip.", sep="") )
+         next;
+                     
       }
     }
     print( paste("...preparing ", test.type, " tests...", sep=""))

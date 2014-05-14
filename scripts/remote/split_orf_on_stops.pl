@@ -49,7 +49,6 @@ while( <IN> ){
 close IN;
 close OUT;
 
-
 sub process_seq{
     my( $header, $sequence, $seq_len_min, $out) = @_;
     my $count = 1;
@@ -65,10 +64,9 @@ sub process_seq{
 	}
     } else{
 	#no stops (no asterisks??), but still want consistant format
-	if( length( $sequence <= $seq_len_min ) ){
-	    next;
+	unless( length( $sequence > $seq_len_min ) ){
+	    my $id = "${header}_${count}"; # looks like we have the original header line plus a count
+	    print $out "$id\n$sequence\n";       
 	}
-	my $id = "${header}_${count}"; # looks like we have the original header line plus a count
-	print $out "$id\n$sequence\n";       
     }
 }

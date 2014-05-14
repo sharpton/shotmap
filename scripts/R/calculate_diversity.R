@@ -1,9 +1,5 @@
 # Invoke %  R  --slave  --args  class.id  outdir  out.file.stem  metadata.tab <  calculate_diversity.R
 
-require(vegan)
-require(ggplot2)
-require(reshape2)
-
 options(error=traceback)
 options(error=recover)
 
@@ -12,6 +8,24 @@ samp.abund.map    <- Args[4]
 sample.stem       <- Args[5]
 compare.stem      <- Args[6]
 metadata.tab      <- Args[7]
+verbose           <- Args[8]
+
+
+if( is.na( verbose ) ){
+    verbose = 0
+} else {
+    verbose = 1
+}
+
+if( verbose ) {
+    require(vegan)
+    require(ggplot2)
+    require(reshape2)
+} else {
+    msg.trap <- capture.output( suppressMessages( library( vegan ) ) )
+    msg.trap <- capture.output( suppressMessages( library( ggplot2 ) ) )
+    msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
+}
 
 #For testing purposes only
 #samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
@@ -54,19 +68,23 @@ autodetect <- function( val.list ) {
     type = "continuous"
   } 
   if( is.null( type ) ){
-    print( paste("Could not autodetect value types for", val.list, sep=" ") );
-    exit();
+      print( paste("Could not autodetect value types for", val.list, sep=" ") );
+      exit();
   }
   return( type )
 }
 
 ####get the metadata
-print( "Grabbing metadata..." )
+if( verbose  ){
+    print( "Grabbing metadata..." )
+}
 meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
 meta.names <- colnames( meta )
 
 ###get family abundances by samples
-print( "Grabbing family abundance data..." )
+if( verbose ){
+    print( "Grabbing family abundance data..." )
+}
 abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
 abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
 samples    <- rownames(abund.map)
@@ -76,15 +94,19 @@ famids     <- colnames(abund.map)
 ###get family relative abundances by samples
 ### we need this in case we calc abundance as family coverage, where
 ### normalization is a function of total target length
-print( "Grabbing relative abundance data..." )
+if( verbose ){
+    print( "Grabbing relative abundance data..." )
+}
 ra.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND" ) #could try to do all work in .df object, enables ggplot
 
 ###calculate various types of diversity
-print( "Calculating Shannon Entropy..." )
+if( verbose ){
+    print( "Calculating Shannon Entropy..." )
+}
 shannon    <- diversity(abund.map)
-print( "Calculating Richness..." )
+if( verbose ) { print( "Calculating Richness..." ) }
 richness   <- specnumber(abund.map)
-print( "Calculating Good's Coverage..." )
+if( verbose ) {print( "Calculating Good's Coverage..." )}
 goods      <- goods.coverage(abund.map)
 
 div.map    <- cbind( shannon, richness, goods )
@@ -93,7 +115,7 @@ print( paste( "Producing diversity map file here: ", div.file, sep="") )
 write.table( div.map, file = div.file )
 
 ###Make per-Sample Rank Abundance Plots
-print( "Plotting rank abundance curves..." )
+if( verbose ){ print( "Plotting rank abundance curves..." ) }
 for( i in 1:dim(abund.map)[1] ){
   samp           <- rownames(abund.map)[i]
   data           <- abund.map[samp,]
@@ -189,47 +211,47 @@ if( dim(abund.map)[2] > topN ){
 
 ###Plot all log-corrected sample relative abundances in single image
 if( print.log ){
-  print( "Plotting log-space rank abundance curve..." )
-  file <- paste( sample.stem, "_all_samples_RA_log.pdf", sep="" )
-  pdf( file )
-  for( i in 1:dim(abund.map)[1] ){
-    samp           <- rownames(abund.map)[i]
-    data           <- abund.map[samp,]
-    ra.data        <- ra.map[samp,]
-    names(data)    <- c( "ABUNDANCE" )
-    names(ra.data) <- c( "RELATIVE_ABUNDANCE" )  
-    if( i == 1 ){
-      plot( 1:length(sort(ra.data )), rev(sort( log( ra.data) ) ), type="l",
-           xlab = "Family Rank",
-           ylab = "Relative Abundance",
-           main = paste( "Relative Abundance Distributions", sep="" )
-           )
-    } else{
-      lines( 1:length(sort(ra.data)), rev(sort( log( ra.data) ) ) )
-    }
-  }
-  dev.off()
-  ##topN
-  if( dim(abund.map)[2] > topN ){
-    file <- paste( sample.stem, "_samples_RA_log_top", topN, ".pdf", sep="" )
-    pdf(file)
+    if( verbose ){ print( "Plotting log-space rank abundance curve..." ) }
+    file <- paste( sample.stem, "_all_samples_RA_log.pdf", sep="" )
+    pdf( file )
     for( i in 1:dim(abund.map)[1] ){
-      samp           <- rownames(abund.map)[i]
-      data           <- abund.map[samp,]
-      ra.data        <- ra.map[samp,]
-      sorted         <- sort( ra.data, decreasing = TRUE )
-      if( i == 1 ){
-        plot( 1:topN, sorted[1:topN], type="l",
-             xlab = "Family Rank",
-             ylab = "Relative Abundance",
-             main = paste( "Relative Abundance Distributions for top ", topN, " families", sep="" )
-             )
-      } else{
-        lines( 1:topN, sorted[1:topN] )
-      }
+        samp           <- rownames(abund.map)[i]
+        data           <- abund.map[samp,]
+        ra.data        <- ra.map[samp,]
+        names(data)    <- c( "ABUNDANCE" )
+        names(ra.data) <- c( "RELATIVE_ABUNDANCE" )  
+        if( i == 1 ){
+            plot( 1:length(sort(ra.data )), rev(sort( log( ra.data) ) ), type="l",
+                 xlab = "Family Rank",
+                 ylab = "Relative Abundance",
+                 main = paste( "Relative Abundance Distributions", sep="" )
+                 )
+        } else{
+            lines( 1:length(sort(ra.data)), rev(sort( log( ra.data) ) ) )
+        }
     }
     dev.off()
-  }
+    ##topN
+    if( dim(abund.map)[2] > topN ){
+        file <- paste( sample.stem, "_samples_RA_log_top", topN, ".pdf", sep="" )
+        pdf(file)
+        for( i in 1:dim(abund.map)[1] ){
+            samp           <- rownames(abund.map)[i]
+            data           <- abund.map[samp,]
+            ra.data        <- ra.map[samp,]
+            sorted         <- sort( ra.data, decreasing = TRUE )
+            if( i == 1 ){
+                plot( 1:topN, sorted[1:topN], type="l",
+                     xlab = "Family Rank",
+                     ylab = "Relative Abundance",
+                     main = paste( "Relative Abundance Distributions for top ", topN, " families", sep="" )
+                     )
+            } else{
+                lines( 1:topN, sorted[1:topN] )
+            }
+        }
+        dev.off()
+    }
 }
 
 ###Plot per sample diversity statistics
@@ -239,7 +261,7 @@ colnames(tmp.map) <- c( "SAMPLE.ID", colnames(div.map) )
 tmp.map$SAMPLE.ORDERED <- factor( tmp.map$SAMPLE.ID, sort( tmp.map$SAMPLE.ID) )
 div.map <- tmp.map
 
-print( "Plotting diversity statistics" )
+if( verbose ) { print( "Plotting diversity statistics" ) }
 for( b in 1:length( colnames(div.map) ) ){
   div.type <- colnames(div.map)[b]
   if( div.type == "SAMPLE.ID" | div.type == "SAMPLE.ORDERED" ){
@@ -260,7 +282,7 @@ for( b in 1:length( colnames(div.map) ) ){
         xlab( "Sample ID" ) +
           ylab( ylabel )
   file <- paste( sample.stem, "-", div.type, ".pdf", sep="" )
-  print(file)
+  if( verbose ) { print(file) }
   ggsave( filename = file, plot = last_plot() )
 }
 
@@ -278,7 +300,7 @@ if( is.null( meta ) ){
   meta.div   <- merge( div.map, meta, by = "SAMPLE.ID" )
  ##print out meta.div so users can do custom plotting
   out.tab <- paste(sample.stem, "-diversity-metadata-table.tab", sep="")
-  print( paste( "Writing metadata by diversity table. Using this for custom plotting: ", out.tab, sep="") )
+  print( paste( "Writing metadata by diversity table. Using this for custom plotting: ", out.tab, sep="") ) 
   write.table( meta.div, file=out.tab )
 ###Compare diversity statistics between metadata groups
 ##differences in diversity across distinct types of metadata classes
@@ -298,7 +320,7 @@ if( is.null( meta ) ){
             xlab( meta.type ) +
               ylab( div.type )
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-boxes.pdf", sep="" )
-      print(file)
+      if( verbose ){ print(file) }
       ggsave( filename = file, plot = last_plot() )
     }
   }
@@ -320,7 +342,7 @@ if( is.null( meta ) ){
             xlab( meta.type ) +
               ylab( div.type )
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-scatter.pdf", sep="" )
-      print(file)
+      if( verbose ){ print(file) }
       ggsave( filename = file, plot = last_plot() )
     }
   }
@@ -350,3 +372,4 @@ if( is.null( meta ) ){
     }
   }
 }
+

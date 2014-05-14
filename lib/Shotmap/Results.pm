@@ -90,12 +90,19 @@ sub classify_reads{
 		print "Rarefying to " . $self->postrarefy_samples . " reads per sample\n";
 	    }
 	    print "Calculating abundances and building classification map...\n";  
-	    my $dbh  = $self->Shotmap::DB::build_dbh();
-	    my $result_set = $self->Shotmap::Run::classify_reads( $sample_id, $class_id, $dbh );
-	    #build_classification_maps_by_sample is now integrated into calculate_abundances
+	    #The MySQL Way: worked well until we hit HiSeq sample depths. Now off by default
+	    #my $dbh  = $self->Shotmap::DB::build_dbh();
+	    #my $result_set = $self->Shotmap::Run::classify_reads( $sample_id, $class_id, $dbh );
+	    ##build_classification_maps_by_sample is now integrated into calculate_abundances
 	    #$self->Shotmap::Run::build_classification_maps_by_sample($sample_id, $class_id, $result_set, $dbh ); 
-	    $self->Shotmap::Run::calculate_abundances( $sample_id, $class_id, $self->abundance_type, $self->normalization_type, $result_set, $dbh );
-	    $self->Shotmap::DB::disconnect_dbh( $dbh );	
+	    #$self->Shotmap::Run::calculate_abundances( $sample_id, $class_id, $self->abundance_type, $self->normalization_type, $result_set, $dbh );
+	    #$self->Shotmap::DB::disconnect_dbh( $dbh );	
+	    
+	    #flat file classification and abundances
+	    my $class_map = $self->Shotmap::Run::classify_reads_flatfile( $sample_id, $class_id, $algo );
+	    #an added benefit: we can calculate abundances in a seperate routine....may move this to another step at later date
+	    my $abundance_parameter_id = $self->Shotmap::DB::get_abundance_parameter_id( $self->abundance_type, $self->normalization_type )->abundance_parameter_id();
+	    $self->Shotmap::Run::calculate_abundances_flatfile( $sample_id, $class_id, $abundance_parameter_id, $class_map );
 	}
     }
     return $self;

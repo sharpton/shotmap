@@ -1,11 +1,5 @@
 # Invoke %  R  --slave  --args  class.id  outdir  out.file.stem  metadata.tab <  calculate_diversity.R
 
-require(reshape2)
-require(ggplot2)
-require(grid) #needed for PCbiplot's call to arrow()
-library(vegan)
-library(fpc)
-
 options(error=traceback)
 options(error=recover)
 
@@ -13,6 +7,29 @@ Args              <- commandArgs()
 samp.abund.map    <- Args[4]
 file.stem         <- Args[5]
 metadata.tab      <- Args[6]
+verbose           <- Args[7]
+
+if( is.na( verbose ) ){
+    verbose = 0
+} else {
+    verbose = 1
+}
+
+if( verbose ) {
+    require(vegan)
+    require(ggplot2)
+    require(reshape2)
+    require(fpc)
+    require(grid) #needed for PCbiplot's call to arrow()
+} else {
+    msg.trap <- capture.output( suppressMessages( library( vegan ) ) )
+    msg.trap <- capture.output( suppressMessages( library( ggplot2 ) ) )
+    msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
+    msg.trap <- capture.output( suppressMessages( library( fpc ) ) )
+    msg.trap <- capture.output( suppressMessages( library( grid ) ) )
+}
+
+
 method            <- "pca" #not currently used, but reserved for later
 to.scale          <- 1
 to.center         <- 1
@@ -111,21 +128,25 @@ distmeth = "euclidean"
 print( paste( "Looking for evidence of clusters in PCA space using: ", distmeth ," " , n.factors, " components", sep=""))
 d         <-vegdist(pca$x[,1:n.factors], method=distmeth)
 ##print the distance matrix
-dist.file <- paste( file.stem, "-sample_distance_matrix-", plotstem, "-pca_euclidean.pdf", sep="" )
+dist.file <- paste( file.stem, "-sample_distance_matrix-", plotstem, "-pca_euclidean.dist", sep="" )
 print( paste( "Write sample distance matrix to ", dist.file, sep="" ) )
 write.matrix( d, dist.file )
-##cluster and look for support
-pamk.best <- pamk(d)
-##print results
-sil.plot  <- paste( file.stem, "-pam_clusters-pca_euclidean-silhouettes.pdf" )
-print( paste( "Printing silhouette plot to ", sil.plot, sep="") )
-pdf( file = sil.plot )
-plot(pam(d, pamk.best$nc))
-dev.off()
-sil.file  <- paste( file.stem, "pam_clusters-pca_euclidean-data.tab" )
-pam.dat   <- pamk.best$pamobject #push into this var in case we want to do anything else in future
-print(paste( "Writing cluster support data to ", sil.file, sep="" ) )
-write.table( pam.dat$silinfo$widths, sil.file )
+if( length(colnames(d)) < 3 ){
+    print( paste( "You don't have enough samples to conduct PAM clustering. Skiping this step." ) )
+} else {
+    ##cluster and look for support
+    pamk.best <- pamk(d)
+    ##print results
+    sil.plot  <- paste( file.stem, "-pam_clusters-pca_euclidean-silhouettes.pdf" )
+    print( paste( "Printing silhouette plot to ", sil.plot, sep="") )
+    pdf( file = sil.plot )
+    plot(pam(d, pamk.best$nc))
+    dev.off()
+    sil.file  <- paste( file.stem, "pam_clusters-pca_euclidean-data.tab" )
+    pam.dat   <- pamk.best$pamobject #push into this var in case we want to do anything else in future
+    print(paste( "Writing cluster support data to ", sil.file, sep="" ) )
+    write.table( pam.dat$silinfo$widths, sil.file )
+}
 
 ###Print a table of the loadings on the data
 loads <- pca$rotation

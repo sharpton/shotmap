@@ -999,6 +999,7 @@ sub classify_orfs_by_sample{
 	if( defined( $class_params->evalue_threshold ) ){
 	    $sql .= " AND evalue <= " . $class_params->evalue_threshold . " ";
 	}
+
 	if( defined( $class_params->score_threshold ) ){
 	    $sql .= " AND score >= " . $class_params->score_threshold . " ";
 	}

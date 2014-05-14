@@ -36,6 +36,7 @@ use DBIx::Class::ResultClass::HashRefInflator;
 use Benchmark;
 use File::Spec;
 use List::Util qw( shuffle );
+use Math::Random qw( :all );
 
 # ServerAliveInterval : in SECONDS
 # ServerAliveCountMax : number of times to keep the connection alive
@@ -732,68 +733,71 @@ sub parse_and_load_search_results_bulk{
     my $orf_split_filename  = shift; # just the file name of the split, NOT the full path
     my $class_id            = shift; #the classification_id
     my $algo                = shift;
-    my $tophits_per_fam     = 0; #maybe we flush this out in future
-    my $tophits_only        = 1;
+    my $top_type            = "best_hit"; #or best_in_fam
 
     ($orf_split_filename !~ /\//) or die "The orf split FILENAME had a slash in it (it was \"$orf_split_filename\"). But this is only allowed to be a FILENAME, not a directory! Fix this programming error.\n";
 
     #remember, each orf_split has its own search_results sub directory
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo, $orf_split_filename);
     my $query_seqs     = File::Spec->catfile($self->get_sample_path($sample_id), "orfs", $orf_split_filename);
-    
+    my $output_file    = $search_results . ".mysqld.splitcat";    
     print "Grabbing results for sample ${sample_id} from ${search_results}\n";
     #open search results, get all results for this split
-    opendir( RES, $search_results ) || die "Can't open $search_results for read in classify_reads: $!\n";
+    $self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, $orf_split_filename, $top_type );
+    #Optionally load the data into the searchresults table
+    unless( $self->is_slim ){
+	print "Loading results for sample ${sample_id} into database\n";
+	if( 1 ){ #we REQUIRE this type lof loading now
+	    my $tmp    = "/tmp/" . $sample_id . ".sql";	    
+	    my $table  = "searchresults";
+	    my $nrows  = 10000;
+	    my @fields = ( "orf_alt_id", "read_alt_id", "sample_id", "target_id", "famid", "score", "evalue", "orf_coverage", "aln_length", "classification_id" );
+	    my $fks    = { "sample_id"         => $sample_id, 
+			   "classification_id" => $class_id,
+	    };	   #do we need this? seems safer, and easier to insert, remove samples/classifications from table this way, but also a little slower with extra key check. those tables are small.
+	    $self->Shotmap::DB::bulk_import( $table, $output_file, $tmp, $nrows, $fks, \@fields );    
+	}
+    }
+    #clean up
+#    close $fh;
+#    unlink( $split_results_cat );
+    return $self;
+}
+
+sub parse_mysqld_results_from_dir{
+    my ( $self, $results_dir, $output_file, $file_string_to_match, $top_type ) = @_; #top_type is "best_hit" or "best_in_fam"
+    opendir( RES, $results_dir ) || die "Can't open $results_dir for read in parse_and_load_search_results_bulk: $!\n";
     my @result_files = readdir( RES );
     closedir( RES );
-    my $split_results_cat = $search_results . ".mysqld.splitcat";
     my $orf_tophits = {};
     foreach my $result_file( @result_files ){
 	next if( $result_file !~ m/\.mysqld/ ); #we only want to load the mysql data tables that we produced earlier
-	if(not( $result_file =~ m/$orf_split_filename/ )) {
-	    warn "Skipped the file $result_file, as it did not match the name: $orf_split_filename.";
+	if(not( $result_file =~ m/$file_string_to_match/ )) {
+	    warn "Skipped the file $result_file, as it did not match the name: $file_string_to_match.";
 	    next; ## skip it!
 	}
 	#we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
 	#only if we want expanded search result ouput. Probably rare
-	if( $tophits_per_fam ){
-	    $orf_tophits = find_orf_fam_tophit( "${search_results}/${result_file}", $orf_tophits );
-	} elsif( $tophits_only ){
+	if( $top_type eq "best_in_fam" ){
+	    $orf_tophits = find_orf_fam_tophit( "${results_dir}/${result_file}", $orf_tophits );
+	} elsif( $top_type eq "best_hit" ){
 	    #we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
-	    $orf_tophits = find_orf_tophit( "${search_results}/${result_file}", $orf_tophits );
+	    $orf_tophits = find_orf_tophit( "${results_dir}/${result_file}", $orf_tophits );
 	}
-	
-#	File::Cat::cat( "${search_results}/${result_file}", $fh ); # From the docs: "Copies data from EXPR to FILEHANDLE, or returns false if an error occurred. EXPR can be either an open readable filehandle or a filename to use as input."	
     }
     my $fh;
-    open( $fh, ">$split_results_cat" ) || die "Can't open $split_results_cat for write: $!\n";
+    open( $fh, ">$output_file" ) || die "Can't open $output_file for write: $!\n";
 
     foreach my $orf( keys( %$orf_tophits ) ){      
-	if( $tophits_per_fam ){
+	if( $top_type eq "best_in_fam" ){
 	    foreach my $fam( keys( %{ $orf_tophits->{$orf} } ) ){
 		print $fh $orf_tophits->{$orf}->{$fam}->{'row'} . "\n";
 	    }
-	} elsif( $tophits_only ){
+	} elsif( $top_type eq "best_hit" ){
 	    print $fh $orf_tophits->{$orf}->{'row'} . "\n";
 	}
     }
     close $fh;
-#    if( $self->is_slim && $self->bulk_load ){
-    print "Loading results for sample ${sample_id} into database\n";
-    if( 1 ){ #we REQUIRE this type lof loading now
-	my $tmp    = "/tmp/" . $sample_id . ".sql";	    
-	my $table  = "searchresults";
-	my $nrows  = 10000;
-	my @fields = ( "orf_alt_id", "read_alt_id", "sample_id", "target_id", "famid", "score", "evalue", "orf_coverage", "aln_length", "classification_id" );
-	my $fks    = { "sample_id"         => $sample_id, 
-		       "classification_id" => $class_id,
-	};	   #do we need this? seems safer, and easier to insert, remove samples/classifications from table this way, but also a little slower with extra key check. those tables are small.
-	$self->Shotmap::DB::bulk_import( $table, $split_results_cat, $tmp, $nrows, $fks, \@fields );    
-    }
-    #clean up
-    close $fh;
-#    unlink( $split_results_cat );
-    return $self;
 }
 
 sub find_orf_tophit{ #for each orf to family mapping, find the top hit
@@ -1858,8 +1862,8 @@ sub get_remote_search_results {
 }
 
 sub classify_reads{
-    my( $self, $sample_id, $class_id, $dbh) = @_;
-
+    my( $self, $sample_id, $class_id, $dbh ) = @_;
+    #mysql based classification - works well for nonlarge data, but very slow at hiseq depths. Off by default
     $self->Shotmap::DB::classify_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
     #now get the classified results for this sample, store in results hash
     my $members_rs = $self->Shotmap::DB::get_classified_orfs_by_sample( $sample_id, $class_id, $dbh, $self->postrarefy_samples() );
@@ -1868,10 +1872,26 @@ sub classify_reads{
     $nrows    = $members_rs->rows();
     print "MySQL return $nrows rows for the above query.\n";
     if( $nrows == 0 ){
-	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
-	next;
+    	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
+    	next;
     }
     return $members_rs;
+
+}
+
+sub classify_reads_flatfile{
+    my( $self, $sample_id, $class_id, $algo ) = @_;
+    print "Classifying reads from flatfile for sample ${sample_id}\n";
+    my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo);
+    my $output_file    = $search_results . "/classmap_cid_" . $class_id . ".tab";
+    my $top_type = "best_hit"; #or best_in_fam
+    $self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type );
+    #only if the user wants a full database
+    unless( $self->is_slim ){ 
+        #have yet to write this function...
+	$self->DB::load_classifications_from_file( $output_file );
+    }
+    return $output_file;
 }
 
 sub build_classification_maps_by_sample{
@@ -2012,6 +2032,202 @@ sub calculate_abundances{
     return $self;
 }
 
+sub calculate_abundances_flatfile{
+    my ( $self, $sample_id, $class_id, $abundance_parameter_id, $class_map ) = @_;
+    my $norm_type  = $self->normalization_type;
+    my $abund_type = $self->abundance_type; 
+    #do rarefaction here
+    my $rare_type = "read"; #could be orf, class_orf, or class_read in theory
+    my $rare_ids = (); #hashref
+    my $seed_string; #if rarefing
+    
+    #for testing purposes only
+    #$self->postrarefy_samples(5);
+
+    if( defined( $self->postrarefy_samples ) ){
+	#randomly grab sequence identifiers and build $rare_ids->{$seq_id}
+	( $rare_ids, $seed_string ) = $self->Shotmap::Run::get_post_rarefied_reads_flatfile( $sample_id, $rare_type );
+    }
+
+    my $read_count;
+    if(!defined( $self->postrarefy_samples() ) ){
+	print( "Calculating classification results using all reads loaded into the database\n" );
+	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
+        #flat file alternative here: 
+	#$read_count = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
+    } else{
+	$read_count = $self->postrarefy_samples();
+    }    
+    #
+    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
+    if( defined( $self->postrarefy_samples ) ){
+	#my @samples   = keys( %$post_rare_reads );
+	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
+	my $rare_size = $self->postrarefy_samples;
+	$output .= "_Rare_${rare_size}";
+    }
+    $output .= ".tab";
+    print "Building a classification map for sample ${sample_id}. Will dump results to ${output}\n";
+    open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
+    print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
+
+    my $abundances = {}; #maps families to abundances
+    open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
+    while(<MAP>){
+	chomp $_;
+	my ( $orf_alt_id, $read_alt_id, $sample, $target_id, $famid, $score, $evalue, $coverage, $aln_length ) = split( "\,", $_ );
+	print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
+	my ( $target_length, $family_length );
+	if( $norm_type eq 'target_length' ){
+	    $target_length = $self->Shotmap::DB::get_target_length( $target_id );
+	} elsif( $norm_type eq 'family_length' ){
+	    $family_length = $self->Shotmap::DB::get_family_length( $famid );
+	}
+	if( $abund_type eq 'binary' ){
+	    my $raw;
+	    if( $norm_type eq 'none' ){
+		$raw = 1;
+	    } elsif( $norm_type eq 'target_length' ){
+		$raw = 1 / $target_length;
+	    } elsif( $norm_type eq 'family_length' ){
+		$raw = 1 / $family_length;
+	    } else{
+		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
+	    }			    
+	    $abundances->{$famid}->{"raw"} += $raw;
+	    $abundances->{"total"}++; #we want RPKM like abundances here, so we don't carry the length of the gene/family in the total 		
+	    
+	} elsif( $abund_type eq 'coverage' ){ #number of bases in read that match the family
+	    my $coverage;
+	    #have to accumulate coverage totals for normalization as we loop
+	    if( $norm_type eq "none" ){
+		$coverage = $aln_length;
+	    } elsif( $norm_type eq "target_length" ){
+		$coverage = $aln_length / $target_length;
+	    } elsif( $norm_type eq "family_length" ){
+		$coverage = $aln_length / $family_length;
+	    } else{
+		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
+	    }
+	    $abundances->{$famid}->{"raw"} += $coverage;
+	    $abundances->{"total"} += $coverage;
+	} else{
+	    die( "You are trying to calculate a type of abundance that I'm not aware of. Reveived <${abund_type}>. Exiting\n" );		
+	}	   
+    }
+    
+    #now that all of the classified reads are processed, calculate relative abundances
+    print "Inserting Abundance Data\n";
+    my $total = $abundances->{"total"};
+    foreach my $famid( keys( %{ $abundances } ) ){
+	next if( $famid eq "total" );
+	my $raw = $abundances->{$famid}->{"raw"};
+	my $ra  = $raw / $total;
+	#now, insert the data into mysql.
+	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
+    }
+    return $self;
+}
+
+sub get_post_rarefied_reads_flatfile{
+    my ( $self, $sample_id, $rare_type ) = @_;
+    my $size = $self->postrarefy_samples;
+    my $rare_ids = (); #hashref
+    my $seed_string;
+    if( $rare_type eq "read" ){
+	#get number of metareads
+	my $metareads_dir = $self->get_sample_path($sample_id) . "/raw/";
+	my $max = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
+	my ( $draws, $seed_string ) = $self->Shotmap::Run::generate_random_samples( $size, $max, $seed_string );
+	$rare_ids = $self->Shotmap::Run::sample_objects_in_files( $metareads_dir, $rare_type, $draws );
+    }
+    return ( $rare_ids, $seed_string )
+}
+
+sub generate_random_samples{
+    my( $self, $size, $max, $seed_string ) = @_;
+    #random sample $size elements from 0..$max
+    my @seed = ();
+    if( defined( $seed_string ) ){
+	@seed = split( "\_", $seed_string );
+    } else {
+	@seed  = random_get_seed();
+	$seed_string = $seed[0] . "_" . $seed[1];
+    }
+    random_set_seed( @seed ); #may want to optionally take a user defined seed_string at a later date.
+    my $draws = ();
+    for( 1..$size ){
+	my $draw = random_uniform_integer( 1, 1, $max );
+	redo if( exists( $draws->{$draw} ) );
+	$draws->{$draw}++;
+    }    
+    return ( $draws, $seed_string );
+}
+
+sub count_objects_in_files{
+    my( $self, $input, $type ) = @_;
+    my $count = 0;
+    if( $type eq "read" ){
+	if( -d $input ){
+	    opendir( DIR, $input ) || die "Can't opendir on $input: $!\n";
+	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
+	    closedir( DIR );
+	    foreach my $file( @files ){
+		next unless( $file =~ m/\.fa$/ );
+		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
+		while(<FILE>){
+		    if( $_ =~ m/^>/ ){
+			$count++;
+		    }
+		}
+		close( FILE );
+	    }
+	}
+    }
+    return $count;
+}
+
+sub sample_objects_in_files{
+    my( $self, $input, $type, $draws ) = @_; #draws is a hashref
+    #draws points to rows in our file (or ordered files) that we should draw from
+    my $id_hash = (); #a hashref
+    my $count   = 1;
+    if( $type eq "read" ){
+	if( -d $input ){
+	    opendir( DIR, $input ) || die "Can't opendir on $input: $!\n";
+	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
+	    closedir( DIR );
+	    foreach my $file( @files ){
+		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
+		print Dumper "${input}/$file";
+		while(<FILE>){
+		    if( $_ =~ m/^>/ ){
+			if( defined( $draws->{$count} ) ){
+			    my $id = _get_header_part_before_whitespace( $_ );
+			    $id =~ s/\>//;
+			    $id_hash->{$id}++;
+			}
+			$count++;
+		    }
+		}
+		close( FILE );
+	    }
+	}
+    }
+    return $id_hash;
+}
+
+sub _get_header_part_before_whitespace($) {
+    my ($header) = @_;
+    if($header =~ m/^(.*?)\s/){
+	return($1); # looks like we only want... the part BEFORE the space?
+    } else {
+	return $header; # unmodified header is just fine, thank you
+    }
+}
+
+
+#this is inefficient for large data. Should no longer be used.
 sub get_post_rarefied_reads{
     my( $self, $sample_id, $read_number, $is_slim, $post_rare_reads ) = @_;
     if( !defined( $post_rare_reads ) ){
@@ -2052,9 +2268,10 @@ sub build_intersample_abundance_map{
     my( $self, $class_id, $abund_param_id ) = @_;
     #dump family abundance data for each sample id to flat file
     my $outdir     = File::Spec->catdir( 
-	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output" 
+	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abund_param_id}"
 	);
     #my $abundances = $self->Shotmap::DB::get_sample_abundances( $sample_id, $class_id, $abund_param_id );
+    File::Path::make_path($outdir);
     my $sample_abund_out  = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
     my $max_rows          = 10000;
@@ -2185,8 +2402,8 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
-    #$cmd               = "R --vanilla --args ${abund_map} ${family_abundance_prefix} ${intrafamily_prefix} ${metadata_table} < ${script}";
+    $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
+    print $cmd . "\n";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #ORDINATE SAMPLES BY FAMILY RELATIVE ABUNDANCE (e.g. PCA Coordinates)
@@ -2196,7 +2413,8 @@ sub calculate_diversity{
     File::Path::make_path( $outdir . "/${ordin_path_stem}/" );
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
     $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
-    $cmd                 = "R --vanilla --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
+    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
+    print $cmd . "\n";
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }
 
