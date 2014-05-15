@@ -51,6 +51,8 @@ if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
 
 my $hitmap = {};
 
+print "hello\n";
+
 open( RES, "$results_tab" ) || die "can't open $results_tab for read: $!\n";    
 my $output = $results_tab . ".mysqld";
 open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";

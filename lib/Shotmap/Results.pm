@@ -158,7 +158,7 @@ sub load_results{
 	    }
 	}
     } else{
-	$self->Shotmap::Notify::printBanner("PARSING RESULTS LOCALLY");
+	#$self->Shotmap::Notify::printBanner("LOADING RESULTS LOCALLY");
 	#this block is deprecated...
 	foreach my $sample_id(@{ $self->get_sample_ids() }){
 	    

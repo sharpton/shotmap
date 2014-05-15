@@ -37,6 +37,7 @@ use Benchmark;
 use File::Spec;
 use List::Util qw( shuffle );
 use Math::Random qw( :all );
+use Parallel::ForkManager;
 
 # ServerAliveInterval : in SECONDS
 # ServerAliveCountMax : number of times to keep the connection alive
@@ -265,6 +266,7 @@ sub load_samples{
 	    print $row . "\n";
 	    my @cols = split( "\t", $row );
 	    my $samp_alt_id = $cols[0];
+	    $samp_alt_id =~ s/\.fa$//; #want alt_id in this file to match that in the database.
 	    my $metadata_string;
 	    for( my $i=1; $i < scalar(@cols); $i++){
 		my $key   = $colnames[$i];
@@ -512,18 +514,44 @@ sub translate_reads {
     if( !defined( $outbasename) ){
 	die( "Couldn't obtain a raw file output basename to input into ${method}!");
     }
-    TRANSLATEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+    my( $parent, $ra_children );
+    my @children = ();
+    my $pm = Parallel::ForkManager->new($nprocs);
+    for( my $i=1; $i<=$nprocs; $i++ ){
+	my $pid = $pm->start and next;
+	#do some work here
 	my $cmd;
-	if( $method eq 'transeq' || $method eq 'transeq_split' ){	
-	    my $infile   = "${input}/${inbasename}${i}.fa";
-	    my $outfile  = "${output}/${outbasename}${i}.fa";
-	    $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
-	    print "$cmd\n";
-	}
-	#ADD ADDITIONAL METHODS HERE
-	
-        #SPAWN THREADS
-	$self->Shotmap::Run::spawn_local_threads( $cmd, "translate" );
+        if( $method eq 'transeq' || $method eq 'transeq_split' ){
+            my $infile   = "${input}/${inbasename}${i}.fa";
+            my $outfile  = "${output}/${outbasename}${i}.fa";
+            $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
+            print "$cmd\n";
+        }
+	#ADD ADDITIONAL METHODS
+	#execute
+	system( $cmd );
+	$pm->finish; # Terminates the child process
+
+    }
+    $pm->wait_all_children;
+    #old code, no longer using, replaced with Parallel::Fork
+    if( 0 ){
+      TRANSLATEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	  my $cmd;
+	  if( $method eq 'transeq' || $method eq 'transeq_split' ){	
+	      my $infile   = "${input}/${inbasename}${i}.fa";
+	      my $outfile  = "${output}/${outbasename}${i}.fa";
+	      $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
+	      print "$cmd\n";
+	  }
+	  #ADD ADDITIONAL METHODS HERE
+	  
+	  #SPAWN THREADS
+	  ( $parent, $ra_children ) = $self->Shotmap::Run::spawn_local_threads( $cmd, "translate", \@children );
+	  print "parent = $parent\n";
+	  @children = @{ $ra_children };
+        }
+	$self->Shotmap::Run::destroy_spawned_threads( $parent, \@children );
     }
     warn( "Finished ${method}. Proceeding");
     return $self;
@@ -545,13 +573,28 @@ sub split_orfs_local{
 	die( "Couldn't obtain a raw file output basename to input into ${splitscript}!");
     }
     warn( "About to split orfs...");
-    SPLITFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+    my $pm = Parallel::ForkManager->new($nprocs);
+    for( my $i=1; $i<=$nprocs; $i++ ){
+        my $pid = $pm->start and next;
+	#do some work here
 	my $cmd;
 	my $infile   = "${input}/${inbasename}${i}.fa";
 	my $outfile  = "${output}/${outbasename}${i}.fa";
-	$cmd      = "perl $splitscript -l $length_cutoff -i $infile -o $outfile > /dev/null 2>&1";
-	#SPAWN THREADS
-	$self->Shotmap::Run::spawn_local_threads( $cmd, "split_orfs" );
+	$cmd      = "perl $splitscript -l $length_cutoff -i $infile -o $outfile > /dev/null 2>&1";	
+        system( $cmd );
+        $pm->finish; # Terminates the child process                                                                                                                                                                                          
+    }
+    $pm->wait_all_children;
+    #old code, now obsolete
+    if( 0 ){
+      SPLITFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	  my $cmd;
+	  my $infile   = "${input}/${inbasename}${i}.fa";
+	  my $outfile  = "${output}/${outbasename}${i}.fa";
+	  $cmd      = "perl $splitscript -l $length_cutoff -i $infile -o $outfile > /dev/null 2>&1";
+	  #SPAWN THREADS
+	  $self->Shotmap::Run::spawn_local_threads( $cmd, "split_orfs" );
+      }
     }
     warn( "Finished splitting orfs. Proceeding");
     return $self;
@@ -579,13 +622,15 @@ sub get_file_basename_from_dir($$){
     return $inbasename;
 }
 
+#This and destroy_spawned_threads are close to working, but not quite right: parent doesn't seem to 
+#appropriately wait for child processes. 
 sub spawn_local_threads($$$){
-    my( $self, $cmd, $type, $outfile ) = @_; #we use outfile to check if we need to rerun anything
+    my( $self, $cmd, $type, $ra_children, $outfile ) = @_; #we use outfile to check if we need to rerun anything
     #for more on forks, see http://www.resoo.org/docs/perl/perl_tutorial/lesson12.html
     my $pid = $$;
     my $parent = 0;
-    my @children = ();
-
+    my @children = @{ $ra_children };
+    
     my $newpid  = fork();
     if( !defined( $newpid ) ){ #this shouldn't happen...
 	die "fork didn't work: $!\n";
@@ -605,7 +650,10 @@ sub spawn_local_threads($$$){
 	    }	    
 	}
 	open STDERR, ">&=", \*STDOUT or print "$0: dup: $!";
+	print $cmd . "\n";
 	exec($cmd) or die ("Couldn't exec $cmd: $!");
+	sleep(10);
+	exit( 0 );
 	if( $type eq "translate" ){
 	    last TRANSLATEFORK;      # and we don't want the child making babies either
 	} elsif( $type eq "split_orfs" ){
@@ -618,7 +666,16 @@ sub spawn_local_threads($$$){
     } else{
 	push( @children, $newpid );
     }
-    if( $parent ){ # if I have a parent, i.e. if I'm the child process
+    return ( $parent, \@children );
+}
+
+sub destroy_spawned_threads{ 
+    my ( $self, $pid, $ra_children ) = @_;
+    my @children = @{ $ra_children };
+    
+    print Dumper $pid;
+    if( $pid == 0 ){ # if I have a parent, i.e. if I'm the child process
+	print "Hello!\n";
 	#could optionally do something here
 	exit( 0 );
     } else {
@@ -626,8 +683,7 @@ sub spawn_local_threads($$$){
 	while ( my $child = shift @children ) {
 	    print "Parent waiting for thread with pid $child to die\n";
 	    my $reaped = waitpid( $child, 0 );
-	    unless ( $reaped == $child )
-	    {
+	    unless ( $reaped == $child ){
 		print "Something went wrong with our child $child: $?\n";
 	    }
 	}
@@ -765,12 +821,28 @@ sub parse_and_load_search_results_bulk{
 }
 
 sub parse_mysqld_results_from_dir{
-    my ( $self, $results_dir, $output_file, $file_string_to_match, $top_type ) = @_; #top_type is "best_hit" or "best_in_fam"
+    my ( $self, $results_dir, $output_file, $file_string_to_match, $top_type, $recurse ) = @_; #top_type is "best_hit" or "best_in_fam"
     opendir( RES, $results_dir ) || die "Can't open $results_dir for read in parse_and_load_search_results_bulk: $!\n";
     my @result_files = readdir( RES );
     closedir( RES );
     my $orf_tophits = {};
-    foreach my $result_file( @result_files ){
+    PARSELOOP: foreach my $result_file( @result_files ){
+	print "$result_file\n";
+	#we need to enable recurision here (single level) for local runs so that we can get to the parse search results       
+	if( defined( $recurse) && -d "${results_dir}/${result_file}" ){ 
+	    opendir( RECURSE, "${results_dir}/${result_file}" ) || die "Can't open ${results_dir}/${result_file} for readdir: $!\n";
+	    my @recurse_files = readdir RECURSE;
+	    closedir RECURSE;
+	    foreach my $recurse_file( @recurse_files ){
+		next if ( $recurse_file !~ m/\.mysqld/ );
+		if( $top_type eq "best_in_fam" ){
+		    $orf_tophits = find_orf_fam_tophit( "${results_dir}/${result_file}/${recurse_file}", $orf_tophits );
+		} elsif( $top_type eq "best_hit" ){
+		    #we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
+		    $orf_tophits = find_orf_tophit( "${results_dir}/${result_file}/${recurse_file}", $orf_tophits );
+		}
+	    }
+	}
 	next if( $result_file !~ m/\.mysqld/ ); #we only want to load the mysql data tables that we produced earlier
 	if(not( $result_file =~ m/$file_string_to_match/ )) {
 	    warn "Skipped the file $result_file, as it did not match the name: $file_string_to_match.";
@@ -1666,7 +1738,7 @@ sub run_search{
     my $nprocs   = $self->nprocs();
     #GET IN/OUT VARS
     my $orfs_dir   = File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs");
-    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "${type}", "${type}"); #file stem that we add to below
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "${type}", "${type}_${sample_id}"); #file stem that we add to below
     my $master_out_dir  = File::Spec->catdir(  $self->get_sample_path($sample_id), "search_results", ${type});
     (-d $orfs_dir)       or die "Unexpectedly, the input directory <$orfs_dir> was NOT FOUND! Check to see if this directory really exists.";
     (-d $master_out_dir) or die "Unexpectedly, the output directory <$master_out_dir> was NOT FOUND! Check to see if this directory really exists.";
@@ -1686,25 +1758,52 @@ sub run_search{
 	gunzip "${db_file}.gz" => $db_file or die "gunzip failed: $GunzipError\n";
     }
     #RUN THE SEARCH
-    SEARCHFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+    my $pm = Parallel::ForkManager->new($nprocs);
+    for( my $i=1; $i<=$nprocs; $i++ ){
+        my $pid = $pm->start and next;
+        #do some work here                                                                                                                                                                                                                   
 	my $cmd;
-	my $log_file = $log_file_prefix . "_${i}.log";
+        my $log_file = $log_file_prefix . "_${i}.log";
 	my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
 	#create output directory
 	my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
 	File::Path::make_path($outdir);
-	#PICK UP HERE
 	my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
 	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
-	if( $type eq "rapsearch" ){	
-	    my $suffix = $self->search_db_name_suffix;
-	    $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1 &";
-	    print "$cmd\n";
-	}
-	#ADD ADDITIONAL METHODS HERE
-	
-        #SPAWN THREADS
-	$self->Shotmap::Run::spawn_local_threads( $cmd, "search", $outfile );
+        if( $type eq "rapsearch" ){
+            my $suffix = $self->search_db_name_suffix;
+            $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+            print "$cmd\n";
+        }
+        #ADD ADDITIONAL METHODS HERE    
+        
+	#execute
+	system( $cmd );
+        $pm->finish; 
+    }
+    $pm->wait_all_children;
+    #following is now obsolete:
+    if( 0 ){
+      SEARCHFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	  my $cmd;
+	  my $log_file = $log_file_prefix . "_${i}.log";
+	  my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
+	  #create output directory
+	  my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
+	  File::Path::make_path($outdir);
+	  #PICK UP HERE
+	  my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
+	  my $outfile     = File::Spec->catfile( $outdir, $outbasename );
+	  if( $type eq "rapsearch" ){	
+	      my $suffix = $self->search_db_name_suffix;
+	      $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1 &";
+	      print "$cmd\n";
+	  }
+	  #ADD ADDITIONAL METHODS HERE
+	  
+	  #SPAWN THREADS
+	  $self->Shotmap::Run::spawn_local_threads( $cmd, "search", $outfile );
+      }
     }
     warn( "Finished ${type}. Proceeding");
     return $self;
@@ -1720,15 +1819,18 @@ sub parse_results {
 	die "Invalid type passed in! The invalid type was: \"$type\".";
     my $nprocs       = $self->nprocs();
     my $trans_method = $self->trans_method;
-    my $proj_dir     = $self->remote_project_path;
-    my $scripts_dir  = $self->remote_scripts_dir;
+    my $proj_dir     = $self->project_path;
+    my $scripts_dir  = $self->local_scripts_dir;
     my $t_score      = $self->parse_score;
     my $t_coverage   = $self->parse_coverage;
     my $t_evalue     = $self->parse_evalue;
-    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}"); #file stem that we add to below
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
     my $script_file  = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
     my $orfbasename  = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
-    PARSEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+    my $pm = Parallel::ForkManager->new($nprocs);
+    for( my $i=1; $i<=$nprocs; $i++ ){
+        my $pid = $pm->start and next;
+        #do some work here                                                                                                                                                                                                                   
 	#set some loop specific variables
 	my $log_file = $log_file_prefix . "_${i}.log";	
 	my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
@@ -1761,11 +1863,55 @@ sub parse_results {
 	    $cmd .= " --coverage=NULL ";
 	}
 	if( $type eq "rapsearch" ){	
-	    $cmd .= " > $log_file &"; #Not dumping STDERR to STDOUT for some reason, so this is off.
+	    $cmd .= " > $log_file"; 
 	    print "$cmd\n";
-	}	
-        #SPAWN THREADS
-	$self->Shotmap::Run::spawn_local_threads( $cmd, "parse", "${infile}.mysqld" );
+	}
+	#execute
+	system( $cmd );
+        $pm->finish; 
+    }
+    $pm->wait_all_children;
+    #following is now obsolete
+    if( 0 ){
+      PARSEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
+	  #set some loop specific variables
+	  my $log_file = $log_file_prefix . "_${i}.log";	
+	  my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
+	  my $infile   = File::Spec->catfile( $self->get_sample_path($sample_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
+	  if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
+	      $infile = $infile . ".m8";
+	  }
+	  my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
+	  my $cmd  = "perl $script_file "
+	      . "--results-tab=$infile "
+	      . "--orfs-file=$query_orfs_file "
+	      . "--sample-id=$sample_id "
+	      . "--algo=$type "
+	      . "--trans-method=$trans_method "
+	      . "--parse-type=best_hit "
+	      ;	
+	  if( defined( $t_score ) ){
+	      $cmd .= " --score=$t_score ";
+	  } else {
+	      $cmd .= " --score=NULL ";
+	  }
+	  if( defined( $t_evalue ) ){
+	      $cmd .= " --evalue=$t_evalue ";
+	  } else { 
+	      $cmd .= " --evalue=NULL ";
+	  }
+	  if( defined( $t_coverage ) ){
+	      $cmd .= " --coverage=$t_coverage ";
+	  } else {
+	      $cmd .= " --coverage=NULL ";
+	  }
+	  if( $type eq "rapsearch" ){	
+	      $cmd .= " > $log_file"; #Not dumping STDERR to STDOUT for some reason, so this is off.
+	      print "$cmd\n";
+	  }	
+	  #SPAWN THREADS
+	  $self->Shotmap::Run::spawn_local_threads( $cmd, "parse", "${infile}.mysqld" );
+      }
     }
     return $self;
 }
@@ -1885,7 +2031,13 @@ sub classify_reads_flatfile{
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo);
     my $output_file    = $search_results . "/classmap_cid_" . $class_id . ".tab";
     my $top_type = "best_hit"; #or best_in_fam
-    $self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type );
+    #if remote, use splitcat files in search_results/algo dir
+    if( $self->remote ){
+	$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type );
+    } else {
+    #if local, use the raw mysqld file in each search_results/algo/orf_split/ dir
+	$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type, "recurse" );
+    }
     #only if the user wants a full database
     unless( $self->is_slim ){ 
         #have yet to write this function...
