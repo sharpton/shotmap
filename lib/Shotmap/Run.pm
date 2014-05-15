@@ -1697,7 +1697,7 @@ sub run_search_remote {
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $db_name);
 	if ($type eq "last" )     { $remote_script_path  = $self->remote_script_path("last");  } # LAST
 	if ($type eq "blast")     { $remote_script_path  = $self->remote_script_path("blast"); } # BLAST
-	if ($type eq "rapsearch") { $remote_script_path  = $self->remote_script_path("rapsearch"); } # BLAST
+	if ($type eq "rapsearch") { $remote_script_path  = $self->remote_script_path("rapsearch"); } # RAPSEARCH
     }
     if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
 	$db_name               = $self->search_db_name("hmm");
