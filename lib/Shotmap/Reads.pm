@@ -23,13 +23,12 @@ sub load_project{
     my $is_remote   = $self->remote();
     my $dryRun      = $self->dryrun();
     my $project_dir = $self->project_dir();
-    print $project_dir . "\n";
     #LOAD PROJECT, SAMPLES, METAREADS
     #Grab the samples associated with the project
     $self->Shotmap::Notify::printBanner("LOADING PROJECT");
+    $self->Shotmap::Notify::print_verbose( "Project directory: $project_dir\n" );
     #Partitioned samples project
-    #get the samples associated with project. a project description can be left in DESCRIPT.txt
-    
+    #get the samples associated with project. a project description can be left in DESCRIPT.txt    
     if (!$dryRun) { $self->Shotmap::Run::get_partitioned_samples($project_dir); }
     else { $self->Shotmap::Notify::dryNotify("Skipped getting the partitioned samples for $project_dir."); }
     
@@ -55,19 +54,28 @@ sub load_project{
 	    $self->Shotmap::Notify::dryNotify("Skipping the REMOTE loading of the project.");
 	}
 	#hmmscan
-	$self->remote_script_path( "hmmscan",      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
+	if( $self->search_method eq "hmmscan" ){
+	    $self->remote_script_path( "hmmscan",      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
+	}
 	#hmmsearch
-	$self->remote_script_path( "hmmsearch",    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
+	if( $self->search_method eq "hmmsearch" ){
+	    $self->remote_script_path( "hmmsearch",    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
+	}
 	#blast
-	$self->remote_script_path( "blast",        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
-	$self->remote_script_path( "formatdb",     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
+	if( $self->search_method eq "blast" ){
+	    $self->remote_script_path( "blast",        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
+	    $self->remote_script_path( "formatdb",     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
+	}
 	#last
-	$self->remote_script_path( "last",         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
-	$self->remote_script_path( "lastdb",       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
+	if( $self->search_method eq "last" ){
+	    $self->remote_script_path( "last",         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
+	    $self->remote_script_path( "lastdb",       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
+	}
 	#rapsearch
-	$self->remote_script_path( "rapsearch",    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
-	$self->remote_script_path( "prerapsearch", File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
-	
+	if( $self->search_method eq "rapsearch" ){
+	    $self->remote_script_path( "rapsearch",    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
+	    $self->remote_script_path( "prerapsearch", File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
+	}      
 	$self->remote_project_log_dir( File::Spec->catdir( $self->remote_project_path(), "logs") );
     }
 }

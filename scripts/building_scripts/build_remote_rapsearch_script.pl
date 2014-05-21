@@ -83,13 +83,14 @@ if ($use_array){
 		    "INT_TASK_ID=\${SGE_TASK_ID}",
 		    "fi",
 		    "\n" );
-    print OUT "DB=${db_name_stem}_\${INT_TASK_ID}.fa.${db_suffix}\n";
+    #print OUT "DB=${db_name_stem}_\${INT_TASK_ID}.fa.${db_suffix}\n";
+    print OUT "DB=${db_name_stem}_\${INT_TASK_ID}.fa\n";
     #query_batch_1.fa-seed_seqs_ALL_fci4_6.fa_split_1-last.tab
     print OUT "OUTPUT=\${OUTSTEM}_" . "\${INT_TASK_ID}" . ".tab\n";
 
 } else {
     print OUT "DB=\$6\n";
-    print OUT "DB=\${DB}.${db_suffix}\n";
+    #print OUT "DB=\${DB}.${db_suffix}\n";
     print OUT "OUTPUT=\$OUTSTEM\n";
     #print OUT "SPLIT_REPOC_STRING=\$7\n"; Can't have an array-based reprocess job if not use_array. But, this might be a useful var at some point
 }
@@ -141,15 +142,17 @@ if( $use_scratch ){
     #Copy files over to the node's scratch dir
     print OUT join( "\n",
 		    "echo \"Copying dbfiles to scratch\"            >> ${RAP_ALL} 2>&1",
-		    "cp -f \${DBPATH}/\${DB}*.gz /scratch/              >> ${RAP_ALL} 2>&1",
-		    "gunzip /scratch/\${DB}*.gz                      >> ${RAP_ALL} 2>&1",
+		    "cp -f \${DBPATH}/\${DB}* /scratch/              >> ${RAP_ALL} 2>&1",
+		    "ls /scratch/\${DB}* >> ${RAP_ALL} 2>&1",
+		    #"cp -f \${DBPATH}/\${DB}*.gz /scratch/              >> ${RAP_ALL} 2>&1",
+		    #"gunzip /scratch/\${DB}*.gz                      >> ${RAP_ALL} 2>&1",
 		    "echo \"Copying input file to scratch\"         >> ${RAP_ALL} 2>&1",
 		    "cp -f \${INPATH}/\${INPUT} /scratch/\${INPUT}     >> ${RAP_ALL} 2>&1",
 		    "\n");
     #RUN
     print OUT "date                                                                                   >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just the statistics, so -b 0
-    print OUT "echo \"rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
     print OUT "rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB} -o /scratch/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                    >> ${RAP_ALL} 2>&1\n";
     #CLEANUP
@@ -167,7 +170,7 @@ if( $use_scratch ){
     print( "Not using scratch\n" );
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just statistics, so -b 0
-    print OUT "echo \"rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
     print OUT "rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB} -o \${OUTPATH}/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #CLEANUP

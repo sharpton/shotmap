@@ -17,47 +17,43 @@ use File::Basename;
 
 sub build_search_db{
     my( $self ) = @_;
-    
-    if ($self->build_search_db("hmm")){
-	if (!$self->use_search_alg("hmmscan") && !$self->use_search_alg("hmmsearch")) {
-	    warn("WARNING: It seems that you want to build an hmm database, but you aren't invoking hmmscan or hmmsearch. " .
-		 "While I will continue, you should check your settings to make certain you aren't making a mistake."
+    my $search_type = $self->search_type;
+    my $search_method = $self->search_method;
+    #NOTE: These warning should NEVER be needed given the precautions we take in Load.pm (search method defines type of database to build!)
+    #hmm
+    if ($self->build_search_db($search_type)){
+	if ( $search_method ne "hmmsearch" && $search_method ne "hmmscan" ){
+	    $self->Shotmap::Notify::warn("It seems that you want to build an hmm database, but you aren't invoking hmmscan or hmmsearch. " .
+					 "While I will continue, you should check your settings to make certain you aren't making a mistake."
 		);
 	}
 	$self->Shotmap::Notify::printBanner("BUILDING HMM DATABASE");
-	$self->Shotmap::Run::build_search_db( $self->search_db_name("hmm"), $self->search_db_split_size("hmm"), $self->force_build_search_db, "hmm");
+	$self->Shotmap::Run::build_search_db( $self->search_db_name( $search_type ), $self->search_db_split_size( $search_type ), $self->force_build_search_db, $search_type );
     }
-
-    if ($self->build_search_db("blast")) {
-	if (!$self->use_search_alg("blast") && !$self->use_search_alg("last") && !$self->use_search_alg("rapsearch")) {
-	    warn("It seems that you want to build a sequence database, but you aren't invoking pairwise sequence search algorithgm. " .
-		 "While I will continue, you should check your settings to make certain you aren't making a mistake. " . 
-		 "You might considering running --use_blast, --use_last, and/or --use_rapsearch");
+    #blast-like
+    if ($self->build_search_db($search_type)) {
+	if ( $search_method ne "blast" && $search_method ne "last" && $search_method ne "rapsearch" ){
+	    $self->Shotmap::Notify::warn("It seems that you want to build a sequence database, but you aren't invoking pairwise sequence search algorithgm. " .
+					 "While I will continue, you should check your settings to make certain you aren't making a mistake. "
+		);
 	}
 	$self->Shotmap::Notify::printBanner("BUILDING SEQUENCE DATABASE");
-	$self->Shotmap::Run::build_search_db( $self->search_db_name("blast"), $self->force_build_search_db, "blast", $self->reps, $self->nr );
+	$self->Shotmap::Run::build_search_db( $self->search_db_name( $search_type ), $self->force_build_search_db, $search_type, $self->reps, $self->nr );
     }
     
     #may not need to build the search database, but let's see if we need to load the database info into mysql....
     $self->Shotmap::Notify::printBanner("LOADING FAMILY DATA"); #could run a check to see if this is necessary, the loadings could be sped up as well....
-    if( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch")) {
-	if( ! $self->Shotmap::Run::check_family_loadings( "blast", $self->db_name ) ){
-	    $self->Shotmap::Run::load_families( "blast", $self->db_name );
-	}
-	if( ! $self->Shotmap::Run::check_familymember_loadings( "blast", $self->db_name ) ){
-	    $self->Shotmap::Run::load_family_members( "blast", $self->db_name );
-	}
-    }
-    if( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan") ){
-	if( ! $self->Shotmap::Run::check_family_loadings( "hmm", $self->db_name ) ){
-	    $self->Shotmap::Run::load_families( "hmm", $self->db_name );
-	}
-    }
 
+    if( ! $self->Shotmap::Run::check_family_loadings( $search_type, $self->db_name ) ){
+	$self->Shotmap::Run::load_families( $search_type, $self->db_name );
+    }
+    if( ! $self->Shotmap::Run::check_familymember_loadings( $search_type, $self->db_name ) ){
+	$self->Shotmap::Run::load_family_members( $search_type, $self->db_name );
+    }    
     #still need to build this
     if( defined( $self->family_annotations ) ){ #points to file that contains annotations for families
 	if( ! -e $self->family_annotations ){
-	    warn "The path to the family annotations that you specified does not seem to exist! You pointed me to <" . $self->family_annotations . ">\n";
+	    die "The path to the family annotations that you specified does not seem to exist! You pointed me to <" . $self->family_annotations . ">\n";
 	} else {
 	    $self->Shotmap::DB::load_annotations( $self->family_annotations );
 	}
@@ -74,73 +70,46 @@ sub build_search_script{
     my $localScriptDir = $self->local_scripts_dir();
     my $dbname         = $self->db_name;
     my $use_scratch    = $self->scratch;
-    my $use_blast      = $self->use_search_alg("blast");
-    my $use_last       = $self->use_search_alg("last");
-    my $use_rapsearch  = $self->use_search_alg("rapsearch");
-    my $use_hmmsearch  = $self->use_search_alg("hmmsearch");
-    my $use_hmmscan    = $self->use_search_alg("hmmscan");
-    my $hmmdb_name     = $self->search_db_name("hmm");
-    my $blastdb_name   = $self->search_db_name("blast");
+    my $search_method  = $self->search_method;
+    my $search_type    = $self->search_type;
+    my $db_name        = $self->search_db_name($search_type);
 
     if ($is_remote) {
 	my $project_path = $self->remote_project_path();
-	if ($use_hmmscan){
-	    $self->Shotmap::Notify::printBanner("BUILDING REMOTE HMMSCAN SCRIPT");
-	    my $h_script       = "$local_ffdb/projects/$dbname/$projID/run_hmmscan.sh";
-	    my $n_hmm_searches = $self->Shotmap::DB::get_number_hmmdb_scans( $self->search_db_split_size("hmm") );
-	    my $nsplits        = $self->Shotmap::DB::get_number_db_splits("hmm"); #do we still need this?
-	    print "number of hmm searches: $n_hmm_searches\n";
-	    print "number of hmm splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_hmmscan_script.pl -z $n_hmm_searches " .
-						     "-o $h_script -n $nsplits --name $hmmdb_name -p $project_path -s $use_scratch");
-	    $self->Shotmap::Run::transfer_file($h_script, $self->remote_connection() . ":" . $self->remote_script_path("hmmscan"));
+	$self->Shotmap::Notify::printBanner("BUILDING REMOTE $search_method SCRIPT");
+	my $search_script       = "$local_ffdb/projects/$dbname/$projID/run_${search_method}.sh";
+	$self->Shotmap::Notify::print_verbose( "Search script will be here: ${search_script}" );
+	if( $search_type eq "hmm" ){
+	    my $n_hmm_searches = $self->Shotmap::DB::get_number_hmmdb_scans( $self->search_db_split_size($search_type) );
+	    my $nsplits        = $self->Shotmap::DB::get_number_db_splits( $search_type ); #do we still need this?
+	    $self->Shotmap::Notify::print( "Total number HMMs: $n_hmm_searches\n" );
+	    $self->Shotmap::Notify::print( "Number of search database partitions: $nsplits" );
+	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_${search_method}_script.pl -z $n_hmm_searches " .
+						     "-o $search_script -n $nsplits --name $db_name -p $project_path -s $use_scratch");
+	    if( ! -e $search_script ){
+		die "Can't locate your search script, which should be here: $search_script\n";
+	    }
+	    $self->Shotmap::Run::transfer_file($search_script, $self->remote_connection() . ":" . $self->remote_script_path($search_method) );
 	}
-	if ($use_hmmsearch){
-	    $self->Shotmap::Notify::printBanner("BUILDING REMOTE HMMSEARCH SCRIPT");
-	    my $h_script   = "$local_ffdb/projects/$dbname/$projID/run_hmmsearch.sh";
-	    #my $n_hmm_searches  = $self->Shotmap::DB::get_number_hmmdb_scans($hmm_db_split_size);
-	    my $n_sequences = $self->Shotmap::DB::get_number_sequences( $self->read_split_size );
-	    my $nsplits     = $self->Shotmap::DB::get_number_db_splits("hmm");
-	    print "number of searches: $n_sequences\n";
-	    print "number of hmmdb splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_hmmsearch_script.pl -z $n_sequences -o $h_script " .
-						     "-n $nsplits --name $hmmdb_name -p $project_path -s $use_scratch");
-	    Shotmap::Run::transfer_file($h_script, $self->remote_connection() . ":" . $self->remote_script_path("hmmsearch"));
-	}
-	if ($use_blast){
-	    $self->Shotmap::Notify::printBanner("BUILDING REMOTE BLAST SCRIPT");
-	    my $b_script   = "$local_ffdb/projects/$dbname/$projID/run_blast.sh";
-	    my $db_length  = $self->Shotmap::DB::get_blast_db_length($blastdb_name);
-	    my $nsplits    = $self->Shotmap::DB::get_number_db_splits("blast");
-	    print "database length is $db_length\n";
-	    print "number of blast db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_blast_script.pl -z $db_length " . 
-						     "-o $b_script -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
-	    Shotmap::Run::transfer_file($b_script, $self->remote_connection() . ":" . $self->remote_script_path("blast"));
-	}
-	if ($use_last){
-	    $self->Shotmap::Notify::printBanner("BUILDING REMOTE LAST SCRIPT");
-	    #we use the blast script code as a template given the similarity between the methods, so there are some common var names between the block here and above
-	    my $last_local     = "$local_ffdb/projects/$dbname/$projID/run_last.sh";
-	    my $db_length    = $self->Shotmap::DB::get_blast_db_length($blastdb_name);
-	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
-	    print "database length is $db_length\n";
-	    print "number of last db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_last_script.pl -z $db_length " . 
-						     "-o $last_local -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
-	    Shotmap::Run::transfer_file($last_local, $self->remote_connection() . ":" . $self->remote_script_path("last"));
-	}
-	if ($use_rapsearch){
-	    $self->Shotmap::Notify::printBanner("BUILDING REMOTE RAPSEARCH SCRIPT");
-	    #we use the blast scrip code as a template given the similarity between the methods, so there are some common var names between the block here and above
-	    my $rap_local    = "$local_ffdb/projects/$dbname/$projID/run_rapsearch.sh";
-	    my $db_length    = $self->Shotmap::DB::get_blast_db_length($blastdb_name);
-	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
-	    print "database length is $db_length\n";
-	    print "number of rapsearch db splits: $nsplits\n";
-	    Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_rapsearch_script.pl -z $db_length " .
-						     "-o $rap_local -n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
-	    $self->Shotmap::Run::transfer_file($rap_local, $self->remote_connection() . ":" . $self->remote_script_path("rapsearch"));
+	if( $search_type eq "blast" ){
+	    my $db_length  = $self->Shotmap::DB::get_blast_db_length($db_name);
+	    my $nsplits    = $self->Shotmap::DB::get_number_db_splits($search_type);
+	    $self->Shotmap::Notify::print( "Search database size: $db_length\n" );
+	    $self->Shotmap::Notify::print( "Number of search database partitions: $nsplits\n" );
+	    if( $search_method eq "rapsearch" ){
+		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_${search_method}_script.pl -z $db_length " . 
+							 "-o $search_script -n $nsplits --name $db_name -p $project_path -s $use_scratch " .
+							 "--suf " . $self->search_db_name_suffix );
+	    }
+	    else{
+		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_${search_method}_script.pl -z $db_length " . 
+							 "-o $search_script -n $nsplits --name $db_name -p $project_path -s $use_scratch");
+	    }
+	    if( ! -e $search_script ){
+		die "Can't locate your search script, which should be here: $search_script\n";
+	    }
+	    $self->Shotmap::Notify::print_verbose( "Will place the search script on the remote server here: " . $self->remote_script_path($search_method) );
+	    $self->Shotmap::Run::transfer_file($search_script, $self->remote_connection() . ":" . $self->remote_script_path($search_method) );
 	}
     }
     return $self;
@@ -151,45 +120,27 @@ sub run_search{
 
     my $is_remote      = $self->remote;
     my $waittime       = $self->wait;
-    my $use_blast      = $self->use_search_alg("blast");
-    my $use_last       = $self->use_search_alg("last");
-    my $use_rapsearch  = $self->use_search_alg("rapsearch");
-    my $use_hmmsearch  = $self->use_search_alg("hmmsearch");
-    my $use_hmmscan    = $self->use_search_alg("hmmscan");
-    my $hmmdb_name     = $self->search_db_name("hmm");
-    my $blastdb_name   = $self->search_db_name("blast");
+    my $search_method  = $self->search_method;
+    my $search_type    = $self->search_type;
+    my $db_name        = $self->search_db_name($search_type);
     my $verbose        = $self->verbose;
     my $force_search   = $self->force_search;
 
     if ($is_remote){
 	$self->Shotmap::Notify::printBanner("RUNNING REMOTE SEARCH");
-	my( $hmm_splits, $blast_splits );
-	if( $use_hmmscan || $use_hmmsearch ){
-	    $hmm_splits   = $self->Shotmap::DB::get_number_db_splits("hmm");
-	}
-	if( $use_blast || $use_last || $use_rapsearch ){
-	    $blast_splits = $self->Shotmap::DB::get_number_db_splits("blast");
-	}
+	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
 	foreach my $sample_id(@{ $self->get_sample_ids() }) {
-	    ($use_hmmscan)   && $self->Shotmap::Run::run_search_remote($sample_id, "hmmscan",   $hmm_splits,   $waittime, $verbose, $force_search);
-	    ($use_hmmsearch) && $self->Shotmap::Run::run_search_remote($sample_id, "hmmsearch", $hmm_splits,   $waittime, $verbose, $force_search);
-	    ($use_blast)     && $self->Shotmap::Run::run_search_remote($sample_id, "blast",     $blast_splits, $waittime, $verbose, $force_search);
-	    ($use_last)      && $self->Shotmap::Run::run_search_remote($sample_id, "last",      $blast_splits, $waittime, $verbose, $force_search);
-	    ($use_rapsearch) && $self->Shotmap::Run::run_search_remote($sample_id, "rapsearch", $blast_splits, $waittime, $verbose, $force_search);
-	    print "Progress report: finished ${sample_id} on " . `date` . "";
+	    $self->Shotmap::Run::run_search_remote($sample_id, $search_method,   $db_splits,   $waittime, $verbose, $force_search);
+	    $self->Shotmap::Notify::print( "Progress report: $search_method for sample ${sample_id} completed on " . `date` );
 	}  
     } else {
 	$self->Shotmap::Notify::printBanner("RUNNING LOCAL SEARCH");
 	foreach my $sample_id (@{$self->get_sample_ids()}){
 	    my $in_dir   = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "orfs");
 	    my $out_dir  = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "searchresults");
-	    $self->Shotmap::Notify::notify("Running search, using $in_dir..." );
+	    $self->Shotmap::Notify::notify("Running search for sample ID $sample_id" );
 	    #force search is called from environment in spawn_local_threads
-	    ($use_hmmscan)   && $self->Shotmap::Run::run_search($sample_id, "hmmscan",    $waittime, $verbose);
-	    ($use_hmmsearch) && $self->Shotmap::Run::run_search($sample_id, "hmmsearch",  $waittime, $verbose);
-	    ($use_blast)     && $self->Shotmap::Run::run_search($sample_id, "blast",      $waittime, $verbose);
-	    ($use_last)      && $self->Shotmap::Run::run_search($sample_id, "last",       $waittime, $verbose);
-	    ($use_rapsearch) && $self->Shotmap::Run::run_search($sample_id, "rapsearch",  $waittime, $verbose);
+	    $self->Shotmap::Run::run_search($sample_id, $search_method,    $waittime, $verbose);
 	}	
     }
     return $self;
@@ -259,12 +210,13 @@ sub stage_search_db{
 
 sub format_search_db{
     my( $self ) = @_;
-    if( $self->use_search_alg("rapsearch") ){
+    my $search_method = $self->search_method;
+    if( $search_method eq "rapsearch" ){
 	#First see if we need to do this
-	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( "rapsearch" ) . "_1.fa"; #only ever 1 for local search
+	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $search_method ) . "_1.fa"; #only ever 1 for local search
 	my $fmt_db  = "${db_file}." . $self->search_db_name_suffix;
 	unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do
-	    $self->Shotmap::Run::format_search_db( "rapsearch" );
+	    $self->Shotmap::Run::format_search_db( $search_method );
 	}
     } else {
         die( "Local execution is not currently configured for anything but rapsearch in Shotmap::Search::format_search_db" );

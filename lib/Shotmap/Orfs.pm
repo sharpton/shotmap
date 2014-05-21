@@ -47,7 +47,7 @@ sub load_orfs{
 			my $read_alt_id = Shotmap::Run::parse_orf_id($orf_alt_id, $self->trans_method );
 			if (!$dryRun) { $self->Shotmap::Run::load_orf($orf_alt_id, $read_alt_id, $sample_id); }
 			else { $self->Shotmap::Notify::dryNotify(); }
-			print "Added " . ($orfCount++) . " orfs to the DB...\n";
+			$self->Shotmap::Notify::print_verbose( "Added " . ($orfCount++) . " orfs to the DB...\n" );
 		    }
 		}
 		
@@ -80,12 +80,14 @@ sub translate_reads{
 		} else {
 		   $orfs_output_dir =  File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
 		}
-		$self->Shotmap::Notify::notify("Translating reads for sample ID $sampleID from $raw_reads_dir -> $orfs_output_dir...");
+		$self->Shotmap::Notify::notify("Translating reads for sample ID $sampleID\n");
+		$self->Shotmap::Notify::print_verbose( "$raw_reads_dir -> $orfs_output_dir\n");
 		$self->Shotmap::Run::translate_reads($raw_reads_dir, $orfs_output_dir, $waittime); #make this function work...
 		if( $should_split_orfs ){
 		    my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
-		    $self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID from $orfs_output_dir -> $split_out...");
-		    $self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out); #build this function....
+		    $self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID");
+		    $self->Shotmap::Notify::print_verbose( "$orfs_output_dir -> $split_out");
+		    $self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out);
 		}
 	    }
 	}

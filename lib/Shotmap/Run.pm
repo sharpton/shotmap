@@ -224,14 +224,14 @@ sub get_partitioned_samples{
 	}	
     }
     if( !defined( $self->project_desc() ) ){
-	warn( "You didn't provide a project description file, which is optional. " .
+	$self->Shotmap::Notify::warn( "You didn't provide a project description file, which is optional. " .
 	      "Note that you can describe your project in the database via a project_description.txt file. See manual for more informaiton\n" );
     }
     if( !defined( $self->sample_metadata() ) ){
-	warn( "You didn't provide a sample metadata file, which is optional. " . 
+	$self->Shotmap::Notify::warn( "You didn't provide a sample metadata file, which is optional. " . 
 	      "Note that you can describe your samples in the database via a sample_metadata.tab file. See manual for more informaiton\n" );
     }
-    warn("Adding samples to analysis object at path <$path>.");
+    $self->Shotmap::Notify::print_verbose("Adding samples to analysis object at path <$path>.");
     $self->set_samples( \%samples );
     #return $self;
 }
@@ -247,7 +247,7 @@ sub load_project{
     $self->Shotmap::Run::load_samples();
     $self->Shotmap::DB::build_project_ffdb();
     $self->Shotmap::DB::build_sample_ffdb(); #this also splits the sample file
-    warn("Project with PID " . $proj->project_id() . ", with files found at <$path>, was successfully loaded!\n");
+    $self->Shotmap::Notify::print_verbose("Project with PID " . $proj->project_id() . ", with files found at <$path>, was successfully loaded!\n");
 }
 
 sub load_samples{
@@ -255,7 +255,7 @@ sub load_samples{
     my %samples = %{$self->get_sample_hashref()}; # de-reference the hash reference
     my $numSamples = scalar( keys(%samples) );
     my $plural = ($numSamples == 1) ? '' : 's'; # pluralize 'samples'
-    $self->Shotmap::Notify::notify("Run.pm: load_samples: Processing $numSamples sample${plural} associated with project PID #" . $self->project_id() . " ");
+    $self->Shotmap::Notify::notify("Processing $numSamples sample${plural} associated with project PID #" . $self->project_id() . " ");
     my $metadata = {};
     #if it exists, grab each sample's metadata
     if( defined( $self->sample_metadata ) ){
@@ -263,7 +263,6 @@ sub load_samples{
 	my $header = shift( @rows );
 	my @colnames = split( "\t", $header );
 	foreach my $row( @rows ){ #all rows except the header
-	    print $row . "\n";
 	    my @cols = split( "\t", $row );
 	    my $samp_alt_id = $cols[0];
 	    $samp_alt_id =~ s/\.fa$//; #want alt_id in this file to match that in the database.
@@ -277,7 +276,7 @@ sub load_samples{
 		    $metadata_string = join( ",", $metadata_string, $key . "=" . $value );
 		}
 	    }
-	    print "$metadata_string\n";
+	    $self->Shotmap::Notify::print_verbose( "Obtained metadata: $metadata_string\n" );
 	    $metadata->{$samp_alt_id} = $metadata_string;       
 	}
     }
@@ -364,6 +363,7 @@ sub load_samples{
     }
     $self->set_samples(\%samples);
     $self->Shotmap::Notify::notify("Successfully loaded $numSamples sample$plural associated with the project PID #" . $self->project_id() . " ");
+    return $self;
 }
 
 sub load_families{
@@ -525,7 +525,7 @@ sub translate_reads {
             my $infile   = "${input}/${inbasename}${i}.fa";
             my $outfile  = "${output}/${outbasename}${i}.fa";
             $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
-            print "$cmd\n";
+            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
 	#ADD ADDITIONAL METHODS
 	#execute
@@ -533,6 +533,7 @@ sub translate_reads {
 	$pm->finish; # Terminates the child process
 
     }
+    $self->Shotmap::Notify::print( "\tWaiting for all local jobs to finish...\n" );
     $pm->wait_all_children;
     #old code, no longer using, replaced with Parallel::Fork
     if( 0 ){
@@ -542,18 +543,17 @@ sub translate_reads {
 	      my $infile   = "${input}/${inbasename}${i}.fa";
 	      my $outfile  = "${output}/${outbasename}${i}.fa";
 	      $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
-	      print "$cmd\n";
+	      $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	  }
 	  #ADD ADDITIONAL METHODS HERE
 	  
 	  #SPAWN THREADS
 	  ( $parent, $ra_children ) = $self->Shotmap::Run::spawn_local_threads( $cmd, "translate", \@children );
-	  print "parent = $parent\n";
 	  @children = @{ $ra_children };
         }
 	$self->Shotmap::Run::destroy_spawned_threads( $parent, \@children );
     }
-    warn( "Finished ${method}. Proceeding");
+    $self->Shotmap::Notify::print( "\t...${method} has finished. Proceeding");
     return $self;
 }
 
@@ -572,7 +572,6 @@ sub split_orfs_local{
     if( !defined( $outbasename) ){
 	die( "Couldn't obtain a raw file output basename to input into ${splitscript}!");
     }
-    warn( "About to split orfs...");
     my $pm = Parallel::ForkManager->new($nprocs);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
@@ -584,6 +583,7 @@ sub split_orfs_local{
         system( $cmd );
         $pm->finish; # Terminates the child process                                                                                                                                                                                          
     }
+    $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish...\n" );
     $pm->wait_all_children;
     #old code, now obsolete
     if( 0 ){
@@ -596,7 +596,7 @@ sub split_orfs_local{
 	  $self->Shotmap::Run::spawn_local_threads( $cmd, "split_orfs" );
       }
     }
-    warn( "Finished splitting orfs. Proceeding");
+    $self->Shotmap::Notify::print( "\t...finished splitting orfs. Proceeding\n");
     return $self;
 
 }
@@ -673,7 +673,6 @@ sub destroy_spawned_threads{
     my ( $self, $pid, $ra_children ) = @_;
     my @children = @{ $ra_children };
     
-    print Dumper $pid;
     if( $pid == 0 ){ # if I have a parent, i.e. if I'm the child process
 	print "Hello!\n";
 	#could optionally do something here
@@ -797,12 +796,12 @@ sub parse_and_load_search_results_bulk{
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo, $orf_split_filename);
     my $query_seqs     = File::Spec->catfile($self->get_sample_path($sample_id), "orfs", $orf_split_filename);
     my $output_file    = $search_results . ".mysqld.splitcat";    
-    print "Grabbing results for sample ${sample_id} from ${search_results}\n";
+    $self->Shotmap::Notify::print( "Grabbing results for sample ${sample_id} from ${search_results}\n");
     #open search results, get all results for this split
     $self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, $orf_split_filename, $top_type );
     #Optionally load the data into the searchresults table
     unless( $self->is_slim ){
-	print "Loading results for sample ${sample_id} into database\n";
+	$self->Shotmap::Notify::print( "Loading results for sample ${sample_id} into database\n");
 	if( 1 ){ #we REQUIRE this type lof loading now
 	    my $tmp    = "/tmp/" . $sample_id . ".sql";	    
 	    my $table  = "searchresults";
@@ -827,7 +826,6 @@ sub parse_mysqld_results_from_dir{
     closedir( RES );
     my $orf_tophits = {};
     PARSELOOP: foreach my $result_file( @result_files ){
-	print "$result_file\n";
 	#we need to enable recurision here (single level) for local runs so that we can get to the parse search results       
 	if( defined( $recurse) && -d "${results_dir}/${result_file}" ){ 
 	    opendir( RECURSE, "${results_dir}/${result_file}" ) || die "Can't open ${results_dir}/${result_file} for readdir: $!\n";
@@ -1089,7 +1087,7 @@ sub build_search_db{
 			if( -e $reps_seq_path ){
 			    #we add the .gz extension in the gzip command inside grab_seqs_from_lookup_list
 			    if(! -e "${reps_seq_path}.gz" ){
-				print "Building reps sequence file for $family\n";
+				$self->Shotmap::Notify::print_verbose( "Building reps sequence file for $family\n" );
 				_grab_seqs_from_lookup_list( $reps_list_path, $family_db_file, $reps_seq_path );
 				(-e "${reps_seq_path}.gz") or 
 				    die("The gzipped file STILL doesn't exist, even after we tried to make it. Error grabbing " .
@@ -1310,7 +1308,7 @@ sub _get_family_path_from_dir{
 	#print "Looking in $path\n";
 	if( $path =~ m/hmms_full$/ ){
 	    if( $type eq "hmm" ){ #find hmms and build the db		
-		print "Grabbing family paths from $path\n";
+		print( "Grabbing family paths from $path\n" );
 		opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
 		my @files = readdir( SUBDIR );
 		closedir SUBDIR;
@@ -1325,7 +1323,7 @@ sub _get_family_path_from_dir{
 	}
 	elsif( $path =~ m/seqs/ ){ #then this dir contains seqs that we want to process
 	    if( $type eq "blast" ){ #find the seqs and build the db
-		print "Grabbing family paths from $path\n";
+		print( "Grabbing family paths from $path\n" );
 		opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
 		my @files = readdir( SUBDIR );
 		closedir SUBDIR;
@@ -1684,27 +1682,15 @@ sub format_remote_blast_dbs{
 
 sub run_search_remote {
     my ($self, $sample_id, $type, $nsplits, $waitTimeInSeconds, $verbose, $forcesearch) = @_;
-    ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
-	die "Invalid type passed in! The invalid type was: \"$type\".";
+    my $search_type   = $self->search_type;
+    my $search_method = $self->search_method;
     ( $nsplits > 0 ) || die "Didn't get a properly formatted count for the number of search DB splits! I got $nsplits.";
     my $remote_orf_dir             = File::Spec->catdir(  $self->remote_sample_path($sample_id), "orfs");
     my $log_file_prefix            = File::Spec->catfile( $self->remote_project_log_dir(),       "${type}_handler");
     my $remote_results_output_dir  = File::Spec->catdir(  $self->remote_sample_path($sample_id), "search_results", ${type});
-    my ($remote_script_path, $db_name, $remote_db_dir);
-
-    if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
-	$db_name               = $self->search_db_name("blast");
-	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $db_name);
-	if ($type eq "last" )     { $remote_script_path  = $self->remote_script_path("last");  } # LAST
-	if ($type eq "blast")     { $remote_script_path  = $self->remote_script_path("blast"); } # BLAST
-	if ($type eq "rapsearch") { $remote_script_path  = $self->remote_script_path("rapsearch"); } # RAPSEARCH
-    }
-    if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
-	$db_name               = $self->search_db_name("hmm");
-	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $HMMDB_DIR, $db_name);
-	if ($type eq "hmmsearch") { $remote_script_path = $self->remote_script_path("hmmsearch"); } # HMM *SEARCH*
-	if ($type eq "hmmscan")   { $remote_script_path = $self->remote_script_path("hmmscan");   } # HMM *SCAN*
-    }
+    my $db_name                    = $self->search_db_name( $search_type );
+    my $remote_db_dir              = $self->remote_search_db; 
+    my $remote_script_path         = $self->remote_script_path( $search_method );
 
     # Transfer the required scripts, such as "run_remote_search_handler.pl", to the remote server. For some reason, these don't get sent over otherwise!
     my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "run_remote_search_handler.pl")); # just one file for now
@@ -1728,7 +1714,7 @@ sub run_search_remote {
 	. "\'"; # single quotes bracket this command for whatever reason
 
     my $results     = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), $remote_cmd, $verbose);
-    (0 == $EXITVAL) or warn("Execution of command <$remote_cmd> returned non-zero exit code $EXITVAL. The remote reponse was: $results.");
+    (0 == $EXITVAL) or $self->Shotmap::Notify::warn("Execution of command <$remote_cmd> returned non-zero exit code $EXITVAL. The remote reponse was: $results.");
     return $results;
 }
 
@@ -1773,7 +1759,7 @@ sub run_search{
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
             $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-            print "$cmd\n";
+            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
         #ADD ADDITIONAL METHODS HERE    
         
@@ -1781,6 +1767,7 @@ sub run_search{
 	system( $cmd );
         $pm->finish; 
     }
+    $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish...\n" );
     $pm->wait_all_children;
     #following is now obsolete:
     if( 0 ){
@@ -1805,7 +1792,7 @@ sub run_search{
 	  $self->Shotmap::Run::spawn_local_threads( $cmd, "search", $outfile );
       }
     }
-    warn( "Finished ${type}. Proceeding");
+    $self->Shotmap::Notify::print( "\t...$type finished. Proceeding\n" );
     return $self;
     if( $compressed ){
 	gzip_file( $db_file );    
@@ -1815,8 +1802,6 @@ sub run_search{
 
 sub parse_results {
     my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
-    ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
-	die "Invalid type passed in! The invalid type was: \"$type\".";
     my $nprocs       = $self->nprocs();
     my $trans_method = $self->trans_method;
     my $proj_dir     = $self->project_path;
@@ -1825,9 +1810,10 @@ sub parse_results {
     my $t_coverage   = $self->parse_coverage;
     my $t_evalue     = $self->parse_evalue;
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
-    my $script_file  = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
-    my $orfbasename  = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
+    my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
+    my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
     my $pm = Parallel::ForkManager->new($nprocs);
+    
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
         #do some work here                                                                                                                                                                                                                   
@@ -1864,13 +1850,15 @@ sub parse_results {
 	}
 	if( $type eq "rapsearch" ){	
 	    $cmd .= " > $log_file"; 
-	    print "$cmd\n";
+	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	}
 	#execute
 	system( $cmd );
         $pm->finish; 
     }
+    $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish..." );
     $pm->wait_all_children;
+    $self->Shotmap::Notify::print( "\t...search results are parsed. Proceeding." );
     #following is now obsolete
     if( 0 ){
       PARSEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
@@ -1907,7 +1895,7 @@ sub parse_results {
 	  }
 	  if( $type eq "rapsearch" ){	
 	      $cmd .= " > $log_file"; #Not dumping STDERR to STDOUT for some reason, so this is off.
-	      print "$cmd\n";
+	      $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	  }	
 	  #SPAWN THREADS
 	  $self->Shotmap::Run::spawn_local_threads( $cmd, "parse", "${infile}.mysqld" );
@@ -1998,7 +1986,7 @@ sub get_remote_search_results {
 	my $local_search_res_dir  = File::Spec->catdir($self->get_sample_path($sample_id), "search_results", $type, $in_orfs);
 #	Shotmap::Run::transfer_file_into_directory($remoteFile, "$local_search_res_dir/");
 	if( $self->small_transfer ){ #only grab mysqld files
-	    print "You have --small-transfer set, so I'm only grabbing the .mysqld files from the remote server.\n";
+	    $self->Shotmap::Notify::print( "You have --small-transfer set, so I'm only grabbing the .mysqld files from the remote server.\n" );
 	    File::Path::make_path( $local_search_res_dir );
 	    $self->Shotmap::Run::transfer_file_into_directory("$remote_results_output_dir/*.mysqld", "$local_search_res_dir/");	    
 	} else { #grab everything
@@ -2016,7 +2004,7 @@ sub classify_reads{
     #did mysql return any results for this query?
     my $nrows = 0;
     $nrows    = $members_rs->rows();
-    print "MySQL return $nrows rows for the above query.\n";
+    $self->Shotmap::print_verbose( "MySQL return $nrows rows for the above query.\n" );
     if( $nrows == 0 ){
     	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
     	next;
@@ -2027,7 +2015,7 @@ sub classify_reads{
 
 sub classify_reads_flatfile{
     my( $self, $sample_id, $class_id, $algo ) = @_;
-    print "Classifying reads from flatfile for sample ${sample_id}\n";
+    $self->Shotmap::Notify::notify( "Classifying reads from flatfile for sample ID ${sample_id}\n" );
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo);
     my $output_file    = $search_results . "/classmap_cid_" . $class_id . ".tab";
     my $top_type = "best_hit"; #or best_in_fam
@@ -2043,6 +2031,7 @@ sub classify_reads_flatfile{
         #have yet to write this function...
 	$self->DB::load_classifications_from_file( $output_file );
     }
+    $self->Shotmap::Notify::print( "\t...classification complete" );
     return $output_file;
 }
 
@@ -2058,13 +2047,13 @@ sub build_classification_maps_by_sample{
 	$output .= "_Rare_${rare_size}";
     }
     $output .= ".tab";
-    print "Building a classification map for sample ${sample_id}. Will dump results to ${output}\n";
+    $self->Shotmap::Notify::notify( "Building a classification map for sample ID ${sample_id}" ); 
     open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
     print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
     #how many reads should we count for relative abundance analysis?
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
-	print( "Calculating classification results using all reads loaded into the database\n" );
+	$self->Shotmap::Notify::print_verbose( "Calculating classification results using all reads loaded into the database\n" );
 #	$read_count = @{ $self->Shotmap::DB::get_read_ids_from_ffdb( $sample_id ) }; #need this for relative abundance calculations
 	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count();
     } else{
@@ -2074,7 +2063,7 @@ sub build_classification_maps_by_sample{
     my $must_pass = 0; #how many reads get dropped from SQL result set because not sampled in rarefaction stage. Should not be used any longer.
     while( my $rows = $members_rs->fetchall_arrayref( {}, $max_rows ) ){
 	foreach my $row( @$rows ){
-	    my $orf_alt_id = $row->{"orf_alt_id"};		
+	    my $orf_alt_id = $ row->{"orf_alt_id"};		
 	    my $famid       = $row->{"famid"};
 	    my $read_alt_id = $row->{"read_alt_id"};
 	    my $target_id   = $row->{"target_id"};
@@ -2082,6 +2071,7 @@ sub build_classification_maps_by_sample{
 	    print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
 	}
     }
+    $self->Shotmap::Notify::print("\tResults are here: ${output}\n" );
     close OUT;
 }
 
@@ -2098,13 +2088,13 @@ sub calculate_abundances{
 	$output .= "_Rare_${rare_size}";
     }
     $output .= ".tab";
-    print "Building a classification map for sample ${sample_id}. Will dump results to ${output}\n";
+    $self->Shotmap::Notify::print( "\t...Building a classification map");
     open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
     print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
     #how many reads should we count for relative abundance analysis?
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
-	print( "Calculating classification results using all reads loaded into the database\n" );
+	$self->Shotmap::Notify::print_verbose( "Calculating classification results using all reads loaded into the database\n" );
 #	$read_count = @{ $self->Shotmap::DB::get_read_ids_from_ffdb( $sample_id ) }; #need this for relative abundance calculations
 	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count();
     } else{
@@ -2113,7 +2103,7 @@ sub calculate_abundances{
     #did mysql return any results for this query?
     my $nrows = 0;
     $nrows    = $members_rs->rows();
-    print "MySQL return $nrows rows for the above query.\n";
+    $self->Shotmap::Notify::print_verbose( "MySQL return $nrows rows for the above query.\n" );
     if( $nrows == 0 ){
 	warn "Since we returned no rows for this classification query, you might want to check the stringency of your classification parameters.\n";
 	next;
@@ -2172,7 +2162,10 @@ sub calculate_abundances{
 	}
     }
     #now that all of the classified reads are processed, calculate relative abundances
-    print "Inserting Abundance Data\n";
+    $self->Shotmap::Notify::print( "...classification map results: $output" );
+    #now that all of the classified reads are processed, calculate relative abundances
+    $self->Shotmap::Notify::notify( "Calculating abundance for sample ID $sample_id" );
+    $self->Shotmap::Notify::print_verbose( "Inserting Abundance Data\n" );
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
@@ -2181,6 +2174,7 @@ sub calculate_abundances{
 	#now, insert the data into mysql.
 	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
     }
+    $self->Shotmap::Notify::print( "\t...abundance calculation complete. Proceeding." );
     return $self;
 }
 
@@ -2203,7 +2197,7 @@ sub calculate_abundances_flatfile{
 
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
-	print( "Calculating classification results using all reads loaded into the database\n" );
+	$self->Shotmap::Notify::print_verbose( "\tCalculating abundances using all reads" );
 	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
         #flat file alternative here: 
 	#$read_count = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
@@ -2219,7 +2213,7 @@ sub calculate_abundances_flatfile{
 	$output .= "_Rare_${rare_size}";
     }
     $output .= ".tab";
-    print "Building a classification map for sample ${sample_id}. Will dump results to ${output}\n";
+    $self->Shotmap::Notify::print( "\tBuilding a classification map..."); 
     open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
     print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
 
@@ -2228,6 +2222,11 @@ sub calculate_abundances_flatfile{
     while(<MAP>){
 	chomp $_;
 	my ( $orf_alt_id, $read_alt_id, $sample, $target_id, $famid, $score, $evalue, $coverage, $aln_length ) = split( "\,", $_ );
+	if( defined( $self->postrarefy_samples ) ){
+	    if( $rare_type eq "read" ){
+		next unless defined( $rare_ids->{$read_alt_id} );
+	    }
+	}
 	print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
 	my ( $target_length, $family_length );
 	if( $norm_type eq 'target_length' ){
@@ -2267,17 +2266,49 @@ sub calculate_abundances_flatfile{
 	    die( "You are trying to calculate a type of abundance that I'm not aware of. Reveived <${abund_type}>. Exiting\n" );		
 	}	   
     }
-    
+    $self->Shotmap::Notify::print( "\t...classification map results: $output" );
     #now that all of the classified reads are processed, calculate relative abundances
-    print "Inserting Abundance Data\n";
+    $self->Shotmap::Notify::notify( "Calculating abundance for sample ID $sample_id" );
+    if( $self->database() ){   
+	#now, insert the data into mysql.
+	$self->Shotmap::Notify::print_verbose( "Inserting Abundance Data\n" );
+	$self->Shotmap::Run::insert_abundance_hash_into_database( $sample_id, $class_id, $abundance_parameter_id, $abundances );
+    }
+    $self->Shotmap::Run::build_sample_abundance_map_flatfile( $sample_id, $class_id, $abundance_parameter_id, $abundances );
+    $self->Shotmap::Notify::print( "\t...abundance calculation complete. Proceeding." );
+    return $self;
+}
+
+sub insert_abundance_hash_into_database{
+    my ( $self, $sample_id, $class_id, $abund_param_id, $abundances ) = @_;
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
 	my $raw = $abundances->{$famid}->{"raw"};
 	my $ra  = $raw / $total;
-	#now, insert the data into mysql.
-	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
+	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abund_param_id, $class_id );
     }
+    return $self;
+}
+
+sub build_sample_abundance_map_flatfile{
+    my( $self, $sample_id, $class_id, $abund_param_id, $abundances ) = @_;
+    #dump family abundance data for each sample id to flat file
+    my $outdir     = File::Spec->catdir( 
+	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abund_param_id}"
+	);
+    File::Path::make_path($outdir);
+    my $output = $outdir . "/Abundance_Map_sample_${sample_id}_cid_${class_id}_aid_${abund_param_id}.tab";
+    open( ABUND, ">$output"  ) || die "Can't open $output for write: $!\n";
+    print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "ABUNDANCE", "REL.ABUND", "\n" );
+    my $total = $abundances->{"total"};
+    foreach my $famid( keys( %{ $abundances } ) ){
+	next if( $famid eq "total" );
+	my $raw = $abundances->{$famid}->{"raw"};
+	my $ra  = $raw / $total;
+	print ABUND join( "\t", $sample_id, $famid, $raw, $ra, "\n" );
+    }
+    close ABUND;
     return $self;
 }
 
@@ -2351,7 +2382,6 @@ sub sample_objects_in_files{
 	    closedir( DIR );
 	    foreach my $file( @files ){
 		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
-		print Dumper "${input}/$file";
 		while(<FILE>){
 		    if( $_ =~ m/^>/ ){
 			if( defined( $draws->{$count} ) ){
@@ -2449,6 +2479,61 @@ sub build_intersample_abundance_map{
     return $self;
 }
 
+sub build_intersample_abundance_map_flatfile{
+    my( $self, $class_id, $abund_param_id ) = @_;
+    #dump family abundance data for each sample id to flat file
+    my $param_str  = "cid_${class_id}_aid_${abund_param_id}";
+    my $outdir     = File::Spec->catdir( 
+	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", $param_str
+	);
+    if( ! -d $outdir ){
+	die( "I couldn't locate sample flatfile abundance tables in ${outdir}. Are you sure they were built?" );
+    }
+    my $sample_abund_out  = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
+    print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "ABUNDANCE", "REL.ABUND", "\n" );
+    opendir( OUTDIR, $outdir ) || die "Can't open $outdir for opendir: $!\n";
+    my @files = readdir( OUTDIR );
+    closedir OUTDIR;
+    #first, we go through all sample abund maps to see what the total unique fams are
+    my $fams = (); #hashref
+    foreach my $file( @files ){
+	next unless( $file =~ m/$param_str/ );
+	open( FILE, "${outdir}/${file}" ) || die "Can't open ${outdir}/${file} for read: $!\n";
+	while( <FILE> ){
+	    next if(  $_ =~ m/^SAMPLE\.ID/ );
+	    my @data = split( "\t", $_ );
+	    my $fam  = $data[1];
+	    $fams->{$fam}++;
+	}
+	close FILE;
+    }
+    #now print out the data from each abund map, adding missing families where necessary
+    foreach my $file( @files ){
+	next unless( $file =~ m/$param_str/ );
+	next unless( $file =~ m/sample/ ); #we only want sample, not intersample, files
+	open( FILE, "${outdir}/${file}" ) || die "Can't open ${outdir}/${file} for read: $!\n";
+	my $has_fam = (); #hashref
+	my $sample_id;
+	while( <FILE> ){
+	    next if(  $_ =~ m/^SAMPLE\.ID/ );
+	    print ABUND $_;
+	    my @data = split( "\t", $_ );
+	    $sample_id = $data[0] unless defined $sample_id;
+	    my $fam    = $data[1];
+	    $has_fam->{$fam}++;
+	}
+	close FILE;
+	foreach my $fam( keys( %$fams ) ){
+	    next if( defined( $has_fam->{$fam} ) );
+	    print ABUND join( "\t", $sample_id, $fam, 0, 0, "\n" );
+	}
+
+    }
+    close ABUND;
+    return $self;
+}
+
 sub delete_prior_project{
     my $self = shift;
     foreach my $sample_alt_id( keys ( %{$self->get_sample_hashref() } ) ){
@@ -2464,18 +2549,18 @@ sub check_prior_analyses{
     foreach my $sample_alt_id( keys ( %{$self->get_sample_hashref() } ) ){
 	my $sample = $self->Shotmap::DB::get_sample_by_alt_id( $sample_alt_id );
 	if( defined( $sample ) ){
-	    warn( "The sample $sample_alt_id already exists in the database under sample_id " . $sample->sample_id() . "!\n" );
+	    $self->Shotmap::Notify::warn( "The sample $sample_alt_id already exists in the database under sample_id=" . $sample->sample_id() . "!\n" ) unless $reload;
 	    if( $reload ){
-		warn( "Since you specified --reload, I am deleting prior versions of this sample from the database" );
+		$self->Shotmap::Notify::warn( "Since you specified --reload, I am deleting prior versions of sample_id=" . $sample->sample_id() . " from the database\n" );
 		$self->Shotmap::DB::delete_sample( $sample->sample_id() );
 	    } else {
 		print STDERR ("*" x 80 . "\n");
 		print STDERR ("Before proceeding, you must either remove this sample from your project or delete the sample's prior data from the database. You can do this as follows:\n");
 		print STDERR (" Option A: Rerun your mcr_handler.pl command, but add the --reload option\n" );
 		print STDERR (" Option B: Use MySQL to remove the old data, as follows:\n" );
-		print STDERR ("   1. Go to your database server (probably " . $self->get_db_hostname() . ")\n");
-		print STDERR ("   2. Log into mysql with this command: mysql -u YOURNAME -p   <--- YOURNAME is probably \"" . $self->get_username() . "\"\n");
-		print STDERR ("   3. Type these commands in mysql: use ***THE DATABASE***;   <--- THE DATABASE is probably " . $self->get_db_name() . "\n");
+		print STDERR ("   1. Go to your database server (probably " . $self->db_host() . ")\n");
+		print STDERR ("   2. Log into mysql with this command: mysql -u YOURNAME -p   <--- YOURNAME is probably \"" . $self->db_user() . "\"\n");
+		print STDERR ("   3. Type these commands in mysql: use ***THE DATABASE***;   <--- THE DATABASE is probably " . $self->db_name() . "\n");
 		print STDERR ("   4.                        mysql: select * from samples;    <--- just to look at the projects.\n");
 		print STDERR ("   5.                        mysql: delete from samples where sample_id=" . $sample->sample_id . ";    <-- actually deletes this project.\n");
 		print STDERR ("   6. Then you can log out of mysql and hopefully re-run this script successfully!\n");
@@ -2483,11 +2568,11 @@ sub check_prior_analyses{
 		print STDERR ("   8. Try connecting to mysql, then typing 'select * from samples;' . You should see an OLD project ID (but with the same textual name as this one) that may be preventing you from running another analysis. Delete that id ('delete from samples where sample_id=the_bad_id;'");
 		my $mrcCleanCommand = (qq{perl \$Shotmap_LOCAL/scripts/mrc_clean_project.pl} 
 				       . qq{ --pid=} . $sample->project_id
-				       . qq{ --dbuser=} . $self->get_username()
+				       . qq{ --dbuser=} . $self->db_user()
 				       . qq{ --dbpass=} . "PUT_YOUR_PASSWORD_HERE"
-				       . qq{ --dbhost=} . $self->get_db_hostname()
+				       . qq{ --dbhost=} . $self->db_hostname()
 				       . qq{ --ffdb=}   . $self->ffdb()
-				       . qq{ --dbname=} . $self->get_db_name()
+				       . qq{ --dbname=} . $self->db_name()
 				       . qq{ --schema=} . $self->{"schema_name"});
 		print STDERR (" Option C: Run mrc_cleand_project.pl as follows:\n" );
 		print STDERR ("$mrcCleanCommand\n");
@@ -2555,7 +2640,7 @@ sub calculate_diversity{
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
     $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
-    print $cmd . "\n";
+    $self->Shotmap::Notify::print_verbose( $cmd . "\n" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #ORDINATE SAMPLES BY FAMILY RELATIVE ABUNDANCE (e.g. PCA Coordinates)
@@ -2566,7 +2651,7 @@ sub calculate_diversity{
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
     $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
     $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
-    print $cmd . "\n";
+    $self->Shotmap::Notify::print_verbose( print $cmd . "\n" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }
 

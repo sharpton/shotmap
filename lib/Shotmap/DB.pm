@@ -235,7 +235,7 @@ sub get_classified_orfs_by_sample{
 	    "WHERE b.sample_id = ${sample_id} and classification_id = ${class_id}";
 	#can add rarefaction based on orfs or classified orfs below, if desired
     }
-    print "$sql\n";
+    $self->Shotmap::Notify::print_verbose( "$sql\n" );
     my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
     $sth->execute();
     return $sth;
@@ -378,7 +378,7 @@ sub get_sample_abundances_for_all_classed_fams{
     my $sql = "SELECT a.famid, b.sample_id, b.abundance, b.relative_abundance FROM " .
 	"(SELECT DISTINCT famid FROM abundances) a LEFT OUTER JOIN abundances b ON a.famid = b.famid AND b.sample_id = ${sample_id} " .
 	"AND b.classification_id = ${class_id} AND b.abundance_parameter_id = ${abund_param_id} ";
-    print $sql . "\n";
+    $self->Shotmap::Notify::print_verbose( $sql . "\n" );
     my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
     $sth->execute();
     return $sth;
@@ -450,7 +450,7 @@ sub create_multi_metareads{
     my $self          = shift;
     my $sample_id     = shift;
     my $ra_read_names = shift;
-    print "Bulk loading reads from sample $sample_id\n";
+    $self->Shotmap::Notify::print_verbose( "Bulk loading reads from sample $sample_id\n" );
     my @read_names    = @{ $ra_read_names };
     my $sql_insert    = 'INSERT INTO metareads ( sample_id, read_alt_id ) values ';
     my $placeholders  = '(?,?)';
@@ -651,7 +651,10 @@ sub delete_unsplit_orfs{
     my $samples    = $self->get_sample_ids();
     foreach my $sample( @$samples ){
 	my $path = $self->get_sample_path( $sample ) . "/unsplit_orfs/";
-	print "File::Path::rmtree($path)";
+	if( -d $path ){
+	    $self->Shotmap::Notify::print( "Deleting $path\n" );
+	    File::Path::rmtree($path);
+	}
     }
 }
 
@@ -665,7 +668,7 @@ sub delete_sample_subpath{
     foreach my $sample( @$samples ){
 	my $path = $self->get_sample_path( $sample ) . $subpath;
 	if( -d $path ){
-	    print "Deleting ${path}\n";
+	    $self->Shotmap::Notify::print( "Deleting ${path}\n" );
 	    File::Path::rmtree($path);
 	}
     }
@@ -816,21 +819,32 @@ sub build_sample_ffdb{
     my $projDir = $self->project_dir; # no trailing slashes please!
     my $outDir  = "$projDir/output";
     my $logDir  = "$projDir/logs";
-    my $hmmscanlogs      = "$logDir/hmmscan";
-    my $hmmsearchlogs    = "$logDir/hmmsearch";
-    my $blastlogs        = "$logDir/blast";
-    my $lastlogs         = "$logDir/last";
-    my $rapsearchlogs    = "$logDir/rapsearch";
-    my $formatdblogs     = "$logDir/formatdb";
-    my $lastdblogs       = "$logDir/lastdb";
-    my $prerapsearchlogs = "$logDir/prerapsearch";
+    my $searchlogs = "$logDir/" . $self->search_method;
+    #my $hmmscanlogs      = "$logDir/hmmscan";
+    #my $hmmsearchlogs    = "$logDir/hmmsearch";
+    #my $blastlogs        = "$logDir/blast";
+    #my $lastlogs         = "$logDir/last";
+    #my $rapsearchlogs    = "$logDir/rapsearch";
+    my $formatdblogs;
+    if( $self->search_method eq "rapsearch" ){
+	$formatdblogs = "$logDir/prerapsearch";
+    }
+    if( $self->search_method eq "blast" ){
+	$formatdblogs = "$logDir/formatdb";
+    }
+    if( $self->search_method eq "last" ){
+	$formatdblogs = "$logDir/lastdb";
+    }   
+    #my $formatdblogs     = "$logDir/formatdb";
+    #my $lastdblogs       = "$logDir/lastdb";
+    #my $prerapsearchlogs = "$logDir/prerapsearch";
     my $transeqlogs      = "$logDir/transeq";
     my $parselogs        = "$logDir/parse_results";
 
-    my @paths = ( $outDir, $logDir, $hmmscanlogs, $hmmsearchlogs, $blastlogs, 
-		  $formatdblogs, $lastlogs, $lastdblogs, $rapsearchlogs,
-		  $prerapsearchlogs, $transeqlogs, $parselogs );
-
+    my @paths = ( $outDir, $logDir, $searchlogs, $transeqlogs, $parselogs );
+    if( defined( $formatdblogs ) ){
+	push( @paths, $formatdblogs );
+    }
     foreach my $path (@paths) {
 	File::Path::make_path($path);
     }
@@ -842,11 +856,13 @@ sub build_sample_ffdb{
 	my $search_res      = "$sampDir/search_results";
 	my $unsplit_orfs    = "$sampDir/unsplit_orfs"; #not always used, always created in case used in alternative run
 
-	my $hmmscan_results   = "$search_res/hmmscan";
-	my $hmmsearch_results = "$search_res/hmmsearch";
-	my $blast_results     = "$search_res/blast";
-	my $last_results      = "$search_res/last";
-	my $rapsearch_results = "$search_res/rapsearch";
+	my $results_dir     = $search_res . "/" . $self->search_method;
+
+	#my $hmmscan_results   = "$search_res/hmmscan";
+	#my $hmmsearch_results = "$search_res/hmmsearch";
+	#my $blast_results     = "$search_res/blast";
+	#my $last_results      = "$search_res/last";
+	#my $rapsearch_results = "$search_res/rapsearch";
 
 	if (-d $raw_sample_dir) {
 	    warn("The directory \"$raw_sample_dir\" already existed!");
@@ -854,7 +870,8 @@ sub build_sample_ffdb{
 	    else { die("Since the data already exists in $raw_sample_dir , we will not overwrite it! Unless you specify the flag --clobber to brutally clobber those directories anyway. NOT RECOMMENDED unless you know what you're doing."); }
 	}
 
-	foreach my $dirToMake ($sampDir, $search_res, $hmmscan_results, $hmmsearch_results, $blast_results, $last_results, $rapsearch_results, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
+	foreach my $dirToMake ($sampDir, $search_res, $results_dir, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
+	#foreach my $dirToMake ($sampDir, $search_res, $hmmscan_results, $hmmsearch_results, $blast_results, $last_results, $rapsearch_results, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
 	    File::Path::make_path($dirToMake); # <-- make_path ALREADY dies on "severe" errors, so no need to check for them. See http://search.cpan.org/~dland/File-Path-2.09/Path.pm#ERROR_HANDLING
 	}
 	my $nameprefix = "${sampleName}_raw_split_"; # the "base name" here.
@@ -882,7 +899,7 @@ sub split_sequence_file{
     my $splitout = $split_dir . "/" . $outname;
     open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
     push( @output_names, $outname );
-    print "Will dump to split $splitout\n";
+    $self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
     my $seq_ct   = 0;
     my $header   = ();
     my $sequence = ();
@@ -916,7 +933,7 @@ sub split_sequence_file{
 	    unless( eof ){
 		open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
 		push( @output_names, $outname );
-		print "Will dump to split $splitout\n";
+		$self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
 		$seq_ct = 0;
 	    }
 	}
@@ -1036,7 +1053,7 @@ sub classify_orfs_by_sample{
 	    die( "There seems to be a best_type in your database that I don't know about. We parsed <${best_type}> from the method string <{$class_method}> using class_id $class_id\n" );
 	}
     }
-    print "$sql\n";
+    $self->Shotmap::Notify::print_verbose( "$sql\n" );
     my $sth = $dbh->prepare($sql) || die "SQL Error: $DBI::errstr\n";
     $sth->execute();
     return $sth;
@@ -1108,7 +1125,7 @@ sub bulk_import{
 	    }
 	}
 	close SEQS;
-	print $inserts . " records inserted\n";
+	$self->Shotmap::Notify::print_verbose( $inserts . " records inserted\n" );
     }	
     if( $table eq "orfs" ){
 	my $sample_id = $fks->{"sample_id"};
@@ -1143,7 +1160,7 @@ sub bulk_import{
 	    }
 	}
 	close SEQS;
-	print $inserts . " records inserted\n";
+	$self->Shotmap::Notify::print( $inserts . " records inserted\n" );
     }    
     if( $table eq "familymembers_slim" ){
 	#here, $file is actually the hit_map hashref from 
@@ -1179,7 +1196,7 @@ sub bulk_import{
 	my $class_id = $fks->{"classification_id"};
 	open( TAB, "$file" ) || die "Can't open $file for read in Shotmap::DB::bulk_import\n";
 	my $run = 0;
-	print "Loading data from $file\n";
+	$self->Shotmap::Notify::print_verbose( "Loading data from $file\n" );
 	while( <TAB> ){
 	    chomp $_;
 	    my $row   = $_ . "," . $class_id;
@@ -1206,7 +1223,7 @@ sub bulk_import{
 	    }
 	}
 	close TAB;
-	print $inserts . " records inserted.\n";
+	$self->Shotmap::Notify::print_verbose( $inserts . " records inserted.\n" );
     }	
     if( $table eq "families" || $table eq "familymembers" ){ #THE TABLE DATA IS ASSEMBLED ELSEWHERE, WE SIMPLY OPTIMIZE DB PINGS WITH THIS ROUTINE
 	my $count    = 0;
@@ -1215,7 +1232,7 @@ sub bulk_import{
 	my $searchdb_id  = $fks->{"searchdb_id"};
 	open( TAB, "$file" ) || die "Can't open $file for read in Shotmap::DB::bulk_import\n";
 	my $run = 0;
-	print "Loading data from $file\n";
+	$self->Shotmap::Notify::print_verbose( "Loading data from $file\n" );
 	while( <TAB> ){
 	    chomp $_;
 	    my $row   = $_ . "," . $searchdb_id;
@@ -1242,7 +1259,7 @@ sub bulk_import{
 	    }
 	}
 	close TAB;
-	print $inserts . " records inserted.\n";
+	$self->Shotmap::Notify::print_verbose( $inserts . " records inserted.\n" );
     }	
 
     #disconnect

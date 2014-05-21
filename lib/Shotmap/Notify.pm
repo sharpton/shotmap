@@ -112,7 +112,7 @@ sub printBanner($$) {
     chomp($dateStr); # remote always-there newline from the `date` command
     my $stringWithDate = $string . " ($dateStr)";
     my $pad  = "#" x (length($stringWithDate) + 4); # add four to account for extra # and whitespce on either side of string
-    print STDERR $self->Shotmap::Notify::safeColor("$pad\n" . "# " . $stringWithDate . " #\n" . "$pad\n", "cyan on_blue");
+    print STDERR $self->Shotmap::Notify::safeColor("$pad\n" . "# " . $stringWithDate . " #\n" . "$pad\n", "green on_black");
 }
 
 sub check_env_var{
@@ -133,6 +133,35 @@ sub warn_ssh_keys{
     if (!(-s $likely_location_of_ssh_public_key)) {
 	print "WARNING: I notice that you do not have an SSH public key (expected to be found in <$likely_location_of_ssh_public_key>), which means you most likely do not have passphrase-less ssh set up with the remote machine (<" . $self->remote_host . ">).\n";
     }
+    return $self;
+}
+
+sub warn{
+    my( $self, $string ) = @_;
+    if( $string !~ m/\n$/ ){
+	$string = $string . "\n";
+    }
+    print STDERR ($self->Shotmap::Notify::safeColor("[WARNING]: $string", "magenta on_black"));
+    return $self;
+}
+
+sub print_verbose{
+    my ( $self, $string ) = @_;
+    if( $string !~ m/\n$/ ){
+	$string = $string . "\n";
+    }
+    if( $self->verbose ){
+	print STDERR $string;
+    }
+    return $self;
+}
+
+sub print{
+    my ( $self, $string ) = @_;
+    if( $string !~ m/\n$/ ){
+	$string = $string . "\n";
+    }
+    print STDERR $string;
     return $self;
 }
 
@@ -279,33 +308,17 @@ REFERENCE SEARCH DATABASE ARGUMENTS:
     The prefix string that defines the name of the search database(s) (sequence and HMM) that shotmap will build.
     The use of additional arguments (see below) may result in additional strings being concattenated to this prefix.
 
---hdb (optional, default is to not build a database)
-    Should we build a hmm db for a search using HMMER tools?
-
---hmmsplit=INTEGER (required if using --hdb, no default)
-    Sets the number of hmms to put in each of the partitions of the HMM search database built by Shotmap. Only used
-    when building the HMM search db (i.e., --hdb)
-
---bdb (optional, default is to not build a database)
-    Should we build a protein sequence database for a search using blast-like tools (e.g., blast, last, rapsearch)?
-    Also requires setting either --use_blast, --use_last, or --use_rapsearch so that shotmap knows how to format
-    the database files (e.d., formatdb, lastdb, prerapsearch)
-
---blastsplit=INTEGER (required if using --bdb, no default)
-    Sets the number of protein sequences to put in each of the partitions of the protein sequence search database 
-    built by Shotmap. Only used when building the protein sequence search db (i.e., --bdb)
-
 --nr (Optional, set off by default)
     When building a protein sequence (blast-like) search database, collapses identical sequences found within
     the same family (i.e., build a non-redundant database).
 
---db_suffix=STRING (required if using --bdb and --userapsearch, default "rsdb")
+--db_suffix=STRING (required if using --build-refdb and --search-method=rapsearch, default "rsdb")
     When building a protein sequence (blast-like) database, appends this string to the end of binary formatted
     database files.
 
     Currently only used by RAPsearch.
 
---forcedb
+--force-refdb
     Force database to be built. Overwrites a previously built search database with the same name and settings!
 
 REMOTE COMPUTATIONAL CLUSTER ARGUMENTS:
@@ -356,23 +369,27 @@ TRANSLATION/GENE CALLING METHODS:
 
 SEARCH METHOD ARGUMENTS (One or more MUST be set):
 
---use_hmmsearch (optional, default=DISABLED)
+--use_hmmsearch (optional, default=DISABLED) *OBSOLETE (see --search-method)*
+
     Tells shotmap to compare metagenomic reads into families using hmmsearch (HMMER)
     
---use_hmmscan (optional, default=DISABLED)
+--use_hmmscan (optional, default=DISABLED) *OBSOLETE (see --search-method)*
     Tells shotmap to compare metagenomic reads into families using hmmscan (HMMER)
 
---use_blast (optional, default=DISABLED)
+--use_blast (optional, default=DISABLED) *OBSOLETE (see --search-method)*
     Tells shotmap to compare metagenomic reads into families using blast.  Also tells Shotmap to configure the search database
     for blast using formatdb
 
---use_last (optional, default=DISABLED)
+--use_last (optional, default=DISABLED) *OBSOLETE (see --search-method)*
     Tells shotmap to compare metagenomic reads into families using last.  Also tells Shotmap to configure the search database
     for last using lastdb
 
---use_rapsearch (optional, default=DISABLED)
+--use_rapsearch (optional, default=DISABLED) *OBSOLETE (see --search-method)*
     Tells shotmap to compare metagenomic reads into families using RAPsearch. Also tells Shotmap to configure the search database
     for rapsearch using prerapsearch
+
+--search-method (required)
+    Tells shotmap to use a particular search algorithm. Pick from hmmsearch, hmmscan, blast, last, rapsearch.
 
 --forcesearch (optional, default=DISABLED)
     Forces shotmap to research all orfs against all families. This will overwrite previous search results! Note that this 

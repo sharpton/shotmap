@@ -74,6 +74,7 @@ sub new{
     $self->{"xfer_size"}          = 0; #threshold used in some data transfer processes
     $self->{"opts"}               = undef; #hashref that stores runtime options
     $self->{"verbose"}            = 0;
+    $self->{"database"}           = 0; #should a relational database be used to manage the data?
     bless($self);
     return $self;
 }
@@ -167,7 +168,13 @@ sub project_id{
     return $self->{"project_id"};
 }
 
-
+sub database{
+    my ($self, $set_db) = @_;
+    if( defined( $set_db ) ){
+	$self->{"database"} = $set_db;
+    }
+    return $self->{"database"};       
+}
 
 
 =head2 set_samples
@@ -417,6 +424,14 @@ sub use_search_alg{
 	$self->{"search"}->{$alg} = $value;
     }
     return $self->{"search"}->{$alg};
+}
+
+sub search_method{
+    my ( $self, $method ) = @_;
+    if( defined( $method ) ){
+	$self->{"search_method"} = $method;
+    }
+    return $self->{"search_method"};
 }
 
 sub local_scripts_dir{
@@ -701,9 +716,9 @@ sub read_split_size{
 sub remote_script_path{
     my( $self, $type, $value ) = @_;
     if( defined( $value ) ){
-	$self->{"type"} = $value;
+	$self->{"rscriptpath"}->{$type} = $value;
     }
-    return $self->{"type"};
+    return $self->{"rscriptpath"}->{$type};
 }
 
 sub family_annotations{
@@ -722,6 +737,22 @@ sub remote_project_log_dir{
     }
     $self->{"r_project_logs"};
 }
+
+sub remote_search_db{
+    my $self = shift;
+    my $type = $self->search_type;
+    (defined($type)) or die( "You didn't specify the type of db that you want the path of\n" );
+    (defined($self->remote_ffdb())) or die("remote ffdb was not defined!");
+    (defined($self->search_db_name($type))) or die("db ${type} is not defined!");
+    if( $type eq "hmm" ){
+	return($self->remote_ffdb() . "/HMMdbs/" . $self->search_db_name( $type ));
+    }
+    if( $type eq "blast" ){
+	return($self->remote_ffdb() . "/BLASTdbs/" . $self->search_db_name( $type ));
+    }
+
+}
+
 
 sub verbose{
     my( $self, $value ) = @_; #value is binary 1/0
@@ -816,6 +847,14 @@ sub build_remote_script_dir {
     ( defined($rscripts) ) || die "The remote scripts directory was not defined, so we cannot create it!\n";
     my $connection = $self->remote_connection();
     Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rscripts"          , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
+}
+
+sub search_type{  #blast or hmm based on algo name
+    my( $self, $type ) = @_;
+    if( defined( $type ) ){
+	$self->{"search_type"} = $type;
+    }
+    return $self->{"search_type"};
 }
 
 1;

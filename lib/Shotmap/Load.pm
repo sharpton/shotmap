@@ -22,9 +22,9 @@ sub check_vars{
 	 (defined($self->opts->{"rhost"}))      or $self->Shotmap::Notify::dieWithUsageError("--rhost (remote computational cluster primary note) must be specified since you set --remote. Example --rhost='main.cluster.youruniversity.edu')!");
 	 (defined($self->opts->{"ruser"}))          or $self->Shotmap::Notify::dieWithUsageError("--ruser (remote computational cluster username) must be specified since you set --remote. Example username: --ruser='someguy'!");
 	 (defined($self->opts->{"rdir"})) or $self->Shotmap::Notify::dieWithUsageError("--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/shotmap). This is mandatory!");
-	 (defined($self->opts->{"remoteExePath"})) or warn("Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.");
+	 (defined($self->opts->{"remoteExePath"})) or $self->Shotmap::Notify::warn("Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.\n");
     } else {
-	warn( "You did not specify that a remote procedure should be run, so shotmap will run on your local compute server..." );
+	$self->Shotmap::Notify::warn( "You did not invoke --remote, so shotmap will run locally\n" );
 	(defined($self->opts->{"nprocs"})) or $self->Shotmap::Notify::dieWithUsageError( "You did not specify the number of processors that shotmap should use on your local compute server. Rerun by specifying --nprocs or run a remote job" );
     }
     (!$self->opts->{"dryrun"}) or $self->Shotmap::Notify::dieWithUsageError("Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies.");
@@ -39,12 +39,19 @@ sub check_vars{
     if( defined( $self->opts->{"conf-file"} ) ){
 	( -e $self->opts->{"conf-file"} ) or $self->Shotmap::Notify::dieWithUsageError("You have specified a password file by using the --conf-file option, but I cannot find that file. You entered <" . $self->opts->{"conf-file"} . ">");
      }
-     ($self->opts->{"use_hmmsearch"} || $self->opts->{"use_hmmscan"} || 
+    my $algo_list = "hmmsearch, hmmscan, blast, last, rapsearch";
+     if ($self->opts->{"use_hmmsearch"} || $self->opts->{"use_hmmscan"} || 
       $self->opts->{"use_blast"}     || $self->opts->{"use_last"}    || 
-      $self->opts->{"use_rapsearch"} ) or 
-      $self->Shotmap::Notify::dieWithUsageError( "You must specify a search algorithm. Example --use_rapsearch!");
-     
-     if( $self->opts->{"use_rapsearch"} && !defined( $self->opts->{"db_suffix"} ) ){  
+	 $self->opts->{"use_rapsearch"} ){
+	 $self->Shotmap::Notify::dieWithUsageError( "The --use_<algorithm> is now obsolete. Please specify a search algorithm with --search-method=<algorithm>. Pick from " . $algo_list );
+     }
+    ( defined( $self->opts->{"search-method"} ) ) ||
+      $self->Shotmap::Notify::dieWithUsageError( "You must specify a search algorithm with --search-method. Select from " . $algo_list );
+      my $algo = $self->opts->{"search-method"};
+      ( $algo eq "hmmsearch" || $algo eq "hmmscan" || $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ) ||
+      $self->Shotmap::notify::dieWithUsageError( "You did not select a --search-method that I know how to use. You gave " .
+						 $self->opts->{"search-method"} . ". Please select from " . $algo_list );
+     if( $self->opts->{"use_rapsearch"} && !defined( $self->opts->{"db-suffix"} ) ){  
 	 $self->Shotmap::Notify::dieWithUsageError( "You must specify a database name suffix for indexing when running rapsearch!" ); 
      }
      
@@ -76,19 +83,20 @@ sub check_vars{
 	$self->Shotmap::Notify::dieWithUsageError("You are using --forcedb but not telling me that you want to restage the database on the remote server <" . $self->opts->{"rhost"} . ">. Disambiguate by using --stage");
      }
     
-    unless( defined( $self->opts->{"pid"} ) ){ (-d $self->opts->{"projdir"}) or $self->Shotmap::Notify::dieWithUsageError("You must provide a properly structured project directory! Sadly, the specified directory <" . $self->opts->{"projdir"} . "> did not appear to exist, so we cannot continue!\n") };
+    unless( defined( $self->opts->{"pid"} ) ){ (-d $self->opts->{"rawdata"}) or $self->Shotmap::Notify::dieWithUsageError("You must provide a properly structured raw data (--rawdata) directory! Sadly, the specified directory <" . $self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n") };
     
     if (!defined($self->opts->{"dbname"})) {
 	$self->Shotmap::Notify::dieWithUsageError("Note: --dbname=NAME was not specified on the command line, so I don't know which mysql database to talk to. Exiting\n");
     }    
     if (!defined($self->opts->{"dbschema"})) {
-	my $schema_name = "ShotDB::Schema";
-	warn("Note: --dbschema=SCHEMA was not specified on the command line, so we are using the default schema name, which is \"$schema_name\".");
+	my $schema_name = "Shotmap::Schema";
+	$self->Shotmap::Notify::warn("Note: --dbschema=SCHEMA was not specified on the command line, so we are using the default schema name, which is \"$schema_name\".\n");
     }
-    (defined($self->opts->{"searchdb-prefix"})) or $self->Shotmap::Notify::dieWithUsageError( "Note: db_prefix_basename (search database basename/prefix) was not specified on the command line (--searchdb-prefix=PREFIX)." );
+    (defined($self->opts->{"searchdb-name"})) or $self->Shotmap::Notify::dieWithUsageError( "Note: You must name your search database using the --searchdb-name option. Exiting\n" );
 
-    (defined($self->opts->{"blastsplit"})) or  $self->Shotmap::Notify::dieWithUsageError( "Note: blast_db_split_size (total number of sequence database files) was not specified on the command line (--blastsplit=INTEGER)");
-    (defined($self->opts->{"hmmsplit"})) or  $self->Shotmap::Notify::dieWithUsageError( "Note: hmm_db_split_size (total number of hmm database files) was not specified on the command line (--hmmsplit=INTEGER)");
+    if( $self->remote ){ #local runs don't split the search database
+	(defined($self->opts->{"searchdb-split-size"})) or  $self->Shotmap::Notify::dieWithUsageError( "You must specify the partition size for the search database that Shotmap will build with the --searchdb-split-size option. Exiting\n");
+    }
 
     (defined($self->opts->{"normalization-type"})) or  $self->Shotmap::Notify::dieWithUsageError( "You must provide a proper abundance normalization type on the command line (--normalization-type)");
     (defined($self->opts->{"abundance-type"}))     or  $self->Shotmap::Notify::dieWithUsageError( "You must provide a proper abundance type on the command line (--abundance-type)");
@@ -132,17 +140,25 @@ sub get_options{
     my $self = shift;
     my @args = @_;
 
-    my( $conf_file,            $local_ffdb,           $local_reference_ffdb, $project_dir,         $input_pid,
+    my( $conf_file,            $local_ffdb,            $local_reference_ffdb, $raw_data,         $input_pid,
 	$goto,                 $db_username,           $db_pass,              $db_hostname,         $dbname,
-	$schema_name,          $db_prefix_basename,    $hmm_db_split_size,    $blast_db_split_size, $family_subset_list,  
+	$schema_name,          $db_prefix_basename,    $search_db_split_size,
+	#the following options are now obsolete
+	$hmm_db_split_size,    $blast_db_split_size, 
+	$family_subset_list,  
 	$reps_only,            $nr_db,                 $db_suffix,            $is_remote,           $remote_hostname,
 	$remote_user,          $remoteDir,             $remoteExePath,        $use_scratch,         $waittime,
 	$multi,                $mult_row_insert_count, $bulk,                 $bulk_insert_count,   $slim,
+	#the use_* methods are now obsolete
 	$use_hmmscan,          $use_hmmsearch,         $use_blast,            $use_last,            $use_rapsearch,
+	#use this in its place
+	$search_method,
 	$nseqs_per_samp_split, $prerare_count,         $postrare_count,       $trans_method,        $should_split_orfs,
 	$filter_length,        $p_evalue,              $p_coverage,           $p_score,             $evalue,
-	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,
-	$hmmdb_build,          $blastdb_build,         $force_db_build,       $force_search,        $small_transfer,
+	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,	
+	#the following options are now obsolete
+	$hmmdb_build,          $blastdb_build,         	
+	$build_search_db,      $force_db_build,       $force_search,        $small_transfer,
 	$normalization_type,   $abundance_type,
 	#vars being tested
 	$nprocs,
@@ -156,7 +172,7 @@ sub get_options{
     my %options = (	
 	"ffdb"         => \$local_ffdb
 	, "refdb"      => \$local_reference_ffdb
-	, "projdir"    => \$project_dir
+	, "rawdata"    => \$raw_data
 	# Database-server related variables
 	, "dbuser"     => \$db_username
 	, "dbpass"     => \$db_pass
@@ -164,13 +180,14 @@ sub get_options{
 	, "dbname"     => \$dbname
 	, "dbschema"   => \$schema_name
 	# FFDB Search database related options
-	, "searchdb-prefix"   => \$db_prefix_basename
-	, "hmmsplit"   => \$hmm_db_split_size
-	, "blastsplit" => \$blast_db_split_size
-	, "family-subset" => \$family_subset_list	  ####RECENTLY CHANGED THIS KEY CHECK ELSEWHERE
-	, "reps-only"  => \$reps_only
-	, "nr"         => \$nr_db
-	, "db_suffix"  => \$db_suffix
+	, "searchdb-name"       => \$db_prefix_basename
+	, "serachdb-split-size" => \$search_db_split_size
+	, "hmmsplit"         => \$hmm_db_split_size # now obsolete
+	, "blastsplit"       => \$blast_db_split_size #now obsolete
+	, "family-subset"    => \$family_subset_list	  ####RECENTLY CHANGED THIS KEY CHECK ELSEWHERE
+	, "reps-only"        => \$reps_only
+	, "nr"               => \$nr_db
+	, "db-suffix"        => \$db_suffix #only needed for rapsearch
 	# Remote computational cluster server related variables
 	, "remote"     => \$is_remote
 	, "rhost"      => \$remote_hostname
@@ -183,16 +200,17 @@ sub get_options{
 	, "nprocs"     => \$nprocs #overrides hmmsplit, blastsplit (both =1) and seq-split-size (total seqs/nprocs)
 	#db communication method (NOTE: use EITHER multi OR bulk OR neither)
 	,    "multi"        => \$multi
-	,    "multi_count"  => \$mult_row_insert_count
+	,    "multi-count"  => \$mult_row_insert_count
 	,    "bulk"         => \$bulk
-	,    "bulk_count"   => \$bulk_insert_count
+	,    "bulk-count"   => \$bulk_insert_count
 	,    "slim"         => \$slim
-	#search methods
-	,    "use_hmmscan"   => \$use_hmmscan
-	,    "use_hmmsearch" => \$use_hmmsearch
-	,    "use_blast"     => \$use_blast
-	,    "use_last"      => \$use_last
-	,    "use_rapsearch" => \$use_rapsearch
+	#search methods 
+	,    "use_hmmscan"   => \$use_hmmscan   #obsolete
+	,    "use_hmmsearch" => \$use_hmmsearch #obsolete
+	,    "use_blast"     => \$use_blast     #obsolete
+	,    "use_last"      => \$use_last      #obsolete
+	,    "use_rapsearch" => \$use_rapsearch #obsolete
+	,    "search-method" => \$search_method
 	#general options
 	,    "seq-split-size" => \$nseqs_per_samp_split
 	,    "prerare-samps"  => \$prerare_count
@@ -200,7 +218,7 @@ sub get_options{
 	#translation options
 	,    "trans-method"   => \$trans_method
 	,    "split-orfs"     => \$should_split_orfs
-	,    "min-orf-len"    => \$filter_length
+	,    "min-filter-len" => \$filter_length
 	#search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 	,    "parse-evalue"   => \$p_evalue
 	,    "parse-coverage" => \$p_coverage
@@ -221,9 +239,10 @@ sub get_options{
 	, "goto"              => \$goto     
 	#forcing statements
 	,    "stage"       => \$stage # should we "stage" the database onto the remote machine?
-	,    "hdb"         => \$hmmdb_build
-	,    "bdb"         => \$blastdb_build
-	,    "forcedb"     => \$force_db_build
+	,    "build-searchdb" => \$build_search_db
+	,    "hdb"            => \$hmmdb_build #obsolete
+	,    "bdb"            => \$blastdb_build #obsolete
+	,    "force-searchdb" => \$force_db_build 
 	,    "forcesearch" => \$force_search
 	,    "verbose"     => \$verbose
 	,    "clobber"     => \$extraBrutalClobberingOfDirectories
@@ -232,7 +251,7 @@ sub get_options{
 	);
     my @opt_type_array = ("ffdb|d=s"
 			  , "refdb=s" 
-			  , "projdir|i=s"      
+			  , "rawdata|i=s"      
 			      # Database-server related variables
 			  , "dbuser|u=s"           
 			  , "dbpass|p=s"         
@@ -240,13 +259,14 @@ sub get_options{
 			  , "dbname=s" 
 			  , "dbschema=s"   
 			      # FFDB Search database related options
-			  , "searchdb-prefix=s"
-			  , "hmmsplit=i" 
-			  , "blastsplit=i" 
+			  , "searchdb-name=s"
+			  , "searchdb-split-size=i"
+			  , "hmmsplit=i"    #obsolete
+			  , "blastsplit=i"  #obsolete
 			  , "family-subset=s" 
 			  , "reps-only!"
 			  , "nr!"
-			  , "db_suffix:s"  
+			  , "db-suffix:s"  
 			  # Remote computational cluster server related variables
 			  , "remote!"
 			  , "rhost=s"
@@ -259,9 +279,9 @@ sub get_options{
 			  , "nprocs=i" #this overrides read_split_size!
 			  #db communication method (NOTE: use EITHER multi OR bulk OR neither)
 			  , "multi!"         ### OBSOLETE?
-			  , "multi_count:i"  ### OBSOLETE?
+			  , "multi-count:i"  ### OBSOLETE?
 			  , "bulk!"
-			  , "bulk_count:i"
+			  , "bulk-count:i"
 			  , "slim!"         
 			  #search methods
 			  , "use_hmmscan!" 
@@ -269,6 +289,7 @@ sub get_options{
 			  , "use_blast!" 
 			  , "use_last!"
 			  , "use_rapsearch!"
+			  , "search-method=s"
 			  #general options
 			  , "seq-split-size=i" 
 			  , "prerare-samps:i"
@@ -276,7 +297,7 @@ sub get_options{
 			  #translation options
 			  , "trans-method:s" 
 			  , "split-orfs!"    
-			  , "min-orf-len:i"    
+			  , "orf-filter-len:i"    
 			  #search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 			  , "parse-evalue:f" 
 			  , "parse-coverage:f"
@@ -297,9 +318,10 @@ sub get_options{
 			  , "goto|g=s"			  
 			  #forcing statements
 			  , "stage!"
-			  , "hdb!"  
-			  , "bdb!"  
-			  , "forcedb!"
+			  , "build-searchdb!"
+			  , "hdb!"  #obsolete
+			  , "bdb!"  #obsolete
+			  , "force-searchdb!"
 			  , "forcesearch!"
 			  , "verbose|v!"
 			  , "clobber"   
@@ -307,6 +329,7 @@ sub get_options{
 			  , "reload!"   		
 	);
     #grab command line options
+
     GetOptionsFromArray( \@args, \%options, @opt_type_array );
     if( defined( $conf_file ) ){
 	if( ! -e $conf_file ){ $self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); }
@@ -316,8 +339,10 @@ sub get_options{
     }
     #getopts keeps the values referenced, so we have to dereference them if we want to directly call. Note: if we ever add hash/array vals, we'll have to reconsider this function
     %options = %{ dereference_options( \%options ) };
+    %options = %{ load_defaults( \%options ) };
     $self->opts( \%options );    
 }
+
 
 sub get_password_from_file{
     my ( $self, $passfile ) = @_;
@@ -337,9 +362,10 @@ sub set_params{
     my ( $self ) = @_;
 
     # Some run time parameters
+    $self->verbose( $self->opts->{"verbose"} );
     $self->dryrun( $self->opts->{"dryrun"} );
     $self->project_id( $self->opts->{"pid"} );
-    $self->project_dir( $self->opts->{"projdir"} );
+    $self->project_dir( $self->opts->{"rawdata"} );
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
 
@@ -358,14 +384,30 @@ sub set_params{
 	$self->split_orfs( $self->opts->{"split-orfs"} );
     }
     $self->trans_method( $trans_method );
-    $self->orf_filter_length( $self->opts->{"min-orf-len"} );
+    $self->orf_filter_length( $self->opts->{"orf-filter-len"} );
 
     # Set information about the algorithms being used
-    $self->use_search_alg( "blast",     $self->opts->{"use_blast"}     );
-    $self->use_search_alg( "last",      $self->opts->{"use_last"}      );
-    $self->use_search_alg( "rapsearch", $self->opts->{"use_rapsearch"} );
-    $self->use_search_alg( "hmmsearch", $self->opts->{"use_hmmsearch"} );
-    $self->use_search_alg( "hmmscan",   $self->opts->{"use_hmmscan"}   );
+    #$self->use_search_alg( "blast",     $self->opts->{"use_blast"}     );
+    #$self->use_search_alg( "last",      $self->opts->{"use_last"}      );
+    #$self->use_search_alg( "rapsearch", $self->opts->{"use_rapsearch"} );
+    #$self->use_search_alg( "hmmsearch", $self->opts->{"use_hmmsearch"} );
+    #$self->use_search_alg( "hmmscan",   $self->opts->{"use_hmmscan"}   );
+    my $search_method = $self->opts->{"search-method"};
+    my $blast_methods = { "blast"     => 1,
+			  "rapsearch" => 1,
+			  "last"      => 1,
+    };
+    my $hmm_methods   = { "hmmscan"    => 1,
+			 "hmmsearch"  => 1,
+    };
+    $self->search_method( $search_method );
+    if( defined( $blast_methods->{$search_method} ) ){
+	$self->search_type( "blast" );
+    } elsif( defined( $hmm_methods->{$search_method} ) ){
+	$self->search_type("hmm");
+    } else {
+	$self->Shotmap::Notify::dieWithUsageError( "Can't glean search algorithm type from declared --search-method=${search_method}" );
+    }
 
     # Set local repository data
     $self->local_scripts_dir( $ENV{'SHOTMAP_LOCAL'} . "/scripts" ); #point to location of the shotmap scripts. Auto-detected from SHOTMAP_LOCAL variable.
@@ -374,62 +416,50 @@ sub set_params{
     $self->family_subset( $self->opts->{"family-subset"} ); #constrain analysis to a set of families of interest
 
     # Set the search database properties and names
-    $self->force_build_search_db( $self->opts->{"forcedb"} );
-    $self->build_search_db( "blast", $self->opts->{"bdb"} );
-    $self->build_search_db( "hmm",   $self->opts->{"hdb"} );    
-    $self->search_db_split_size( "blast", $self->opts->{"blastsplit"} );
-    $self->search_db_split_size( "hmm",   $self->opts->{"hmmsplit"}   );
+    $self->force_build_search_db( $self->opts->{"force-searchdb"} );
+    $self->build_search_db( $self->search_type, $self->opts->{"build-searchdb"} );
+    $self->search_db_split_size( $self->search_type, $self->opts->{"searchdb-split-size"} );
     $self->nr( $self->opts->{"nr"} );     #should we build a non-redundant database
     $self->reps( $self->opts->{"reps"} ); #should we only use representative sequences? Probably defunct - just alter the input db
-    my $db_prefix_basename = $self->opts->{"searchdb-prefix"};
+    my $db_prefix_basename = $self->opts->{"searchdb-name"};    
+    $self->search_db_name_suffix( $self->opts->{"db-suffix"} );
     if( defined( $self->family_subset ) ){
 	my $subset_name = basename( $self->opts->{"family-subset"} ); 
 	$db_prefix_basename = $db_prefix_basename. "_" . $subset_name; 
     }
     $self->search_db_name( "basename", $db_prefix_basename );
-    my $blastdb_name;
-    if( $self->remote ){
-	$blastdb_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
-	($self->nr()?'nr_':'') . $self->search_db_split_size( "blast");
-    } else { #local job, so no search db splits
-	$blastdb_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
-	($self->nr()?'nr':'');
-    }
-    $self->search_db_name( "blast", $blastdb_name );
-    if( ( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ) && 
-	( ( !$self->build_search_db("blast") ) && ( ! -d $self->ffdb . "/BLASTdbs/" . $blastdb_name ) ) ){
+    my $db_name;
+    if( $self->search_type eq "blast" ){
+	if( $self->remote ){
+	    $db_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
+		($self->nr()?'nr_':'') . $self->search_db_split_size( $self->search_type );
+	} else { #local job, so no search db splits
+	    $db_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
+		($self->nr()?'nr':'');
+	}
+	$self->search_db_name( $self->search_type, $db_name );
+	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
 	$self->Shotmap::Notify::dieWithUsageError(
 	    "You are apparently trying to conduct a pairwise sequence search, " .
 	    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
-	    "<${blastdb_name}>. As a result, you must use the --bdb option to build a new blast database"
+	    "<${db_name}>. As a result, you must use the --build-refdb option to build a new blast database"
 	    );
+	}
     }
-    $self->search_db_name_suffix( $self->{"opts"}->{"db_suffix"} );
-    my $hmmdb_name;
-    if( $self->remote ){
-	$hmmdb_name = "${db_prefix_basename}_" . $self->search_db_split_size( "hmm" );
-    } else { #local job, so no search db splits
-	$hmmdb_name = $db_prefix_basename;
+    if( $self->search_type eq "hmm" ){
+	if( $self->remote ){
+	    $db_name = "${db_prefix_basename}_" . $self->search_db_split_size( $self->search_type );
+	} else { #local job, so no search db splits
+	    $db_name = $db_prefix_basename;
+	    $self->search_db_name( $self->search_type, $db_name );
+	    if ( !$self->build_search_db( $self->search_type ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
+		$self->Shotmap::Notify::dieWithUsageError(
+		    "You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
+		    "and I can't find one that already exists with your requested name. As a result, you must use the --build-refdb option to build a new blast database"
+		    );
+	    }
+	}
     }
-    $self->search_db_name( "hmm", $hmmdb_name );
-    if( ( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan")  ) && 
-	( !$self->build_search_db("hmm") ) && 
-	( ! -d $self->ffdb() . "/HMMdbs/" . $hmmdb_name ) ){
-	$self->Shotmap::Notify::dieWithUsageError(
-	    "You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
-	    "and I can't find one that already exists with your requested name. As a result, you must use the --hdb option to build a new blast database"
-	    );
-    }
-    if ( ( $self->use_search_alg("hmmscan") || $self->use_search_alg("hmmsearch") ) && 
-	 !$self->build_search_db( "hmm" ) && !(-d $self->search_db_path( "hmm" ) )){
-	warn("The hmm database path did not exist, BUT we did not specify the --hdb option to build a database.");
-	die("The hmm database path did not exist, BUT we did not specify the --hdb option to build a database. We should specify --hdb probably.");
-    }
-    if ( ( $self->use_search_alg("last "|| $self->use_search_alg("blast") || $self->use_search_alg("rapsearch") ) && !$self->build_search_db( "blast" ) && !(-d $self->search_db_path( "blast" )))) {
-	warn("The blast database path did not exist, BUT we did not specify the --bdb option to build a database.");
-	die("The blast database path did not exist, BUT we did not specify the --bdb option to build a database. We should specify --bdb probably.");
-    }
-    
     # Set remote compute associated variables
     if( $self->remote ){
 	$self->stage( $self->opts->{"stage"} );
@@ -440,30 +470,17 @@ sub set_params{
 	$self->remote_master_dir( $self->opts->{"rdir"} );
 	$self->remote_scripts_dir( $self->remote_master_dir . "/scripts" ); 
 	$self->remote_ffdb(    $self->remote_master_dir . "/shotmap_ffdb" ); 
-	$self->Shotmap::Notify::warn_ssh_keys();
+	$self->Shotmap::Notify::warn_ssh_keys();	
 	#if we aren't staging, does the database exist on the remote server?
 	if( !$self->stage ){
-	    if( $self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch") ){
-		my $remote_db_dir = $self->remote_ffdb . "/BLASTdbs/" . $self->search_db_name( "blast" );
-		my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
-		my $results = `$command`;
-		if( $results == 0 ){ 
-		    $self->Shotmap::Notify::dieWithUsageError( 
-			"You are trying to search against a remote database that hasn't been staged. " . 
-			"Run with --stage to place the db ${blastdb_name} on the remote server " . $self->remote_host . "\n"
-			);
-		}
-	    }
-	    if( $self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan") ){
-		my $remote_db_dir = $self->remote_ffdb . "/HMMdbs/" . $self->search_db_name( "hmm" );
-		my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
-		my $results = `$command`;
-		if( $results == 0 ){ 
-		    $self->Shotmap::Notify::dieWithUsageError( 
-			"You are trying to search against a remote database that hasn't been staged. " . 
-			"Run with --stage to place the db ${hmmdb_name} on the remote server " . $self->remote_host . "\n"
-			);
-		}
+	    my $remote_db_dir = $self->remote_search_db;
+	    my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
+	    my $results = `$command`;
+	    if( $results == 0 ){ 
+		$self->Shotmap::Notify::dieWithUsageError( 
+		    "You are trying to search against a remote database that hasn't been staged. " . 
+		    "Run with --stage to place the db ${db_name} on the remote server " . $self->remote_host . "\n"
+		    );
 	    }
 	}
     }
@@ -472,7 +489,7 @@ sub set_params{
     if( defined( $self->opts->{"forcesearch"} ) ){
 	$self->force_search( $self->opts->{"forcesearch"} );
     }
-
+    
     # Set Relational (MySQL) database values
     $self->db_name( $self->opts->{"dbname"} );
     $self->db_host( $self->opts->{"dbhost"} );
@@ -511,17 +528,57 @@ sub set_params{
 
     # Set rarefication parameters
     if( defined( $self->opts->{"prerare-samps"} ) ){ 
-	warn( "You are running with --prerare-samps, so I will only process " . 
+	$self->Shotmap::Notify::warn( "You are running with --prerare-samps, so I will only process " . 
 	      $self->opts->{"prerare-samps"} . " sequences from each sample\n");
 	$self->prerarefy_samples( $self->opts->{"prerare-samps"} );
     };
     if( defined( $self->opts->{"postrare-samps"} ) ){ 
-	warn( "You are running with --postrare-samps. When calculating diversity statistics, I'll randomly select " . 
+	$self->Shotmap::Notify::warn( "You are running with --postrare-samps. When calculating diversity statistics, I'll randomly select " . 
 	      $self->opts->{"postrare-samps"} . " sequences from each sample\n");
 	$self->postrarefy_samples( $self->opts->{"postrare-samps"} );
     };
     
     return $self;
 }
+
+sub load_defaults{
+    my ( $options ) = shift; #options is a hashref
+    my $defaults = {
+	# FFDB Search database related options
+	"reps-only"        => 0
+	    , "nr"               => 1
+	    , "db-suffix"        => 'rsdb'
+	    , "verbose"          => 0
+	    # Remote computational cluster server related variables
+	    , "scratch"    => 1
+	    , "wait"       => 30
+	    #db communication method (NOTE: use EITHER multi OR bulk OR neither)
+	    ,    "dbschema"     => "Shotmap::Schema"
+	    ,    "bulk"         => 1
+	    ,    "bulk-count"   => 1000	
+	    #search methods 
+	    ,    "search-method" => 'rapsearch'
+	    #general options
+	    ,    "seq-split-size" => 100000
+	    #translation options
+	    ,    "trans-method"   => 'transeq'
+	    ,    "split-orfs"     => 1
+	    ,    "orf-len-filter" => 14
+	    #search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
+	    ,    "parse-score"    => 20
+	    #family classification thresholds (more stringent)
+	    ,    "top-hit"        => 1
+	    ,    "hit-type"       => 'read'
+	    #abundance claculation parameters
+	    ,    "abundance-type"     => 'coverage'
+	    ,    "normalization-type" => 'target_length'
+    };
+    foreach my $opt( keys( %$options ) ){
+	next if defined $options->{$opt}; #user provided a variable, which we want
+	$options->{$opt} = $defaults->{$opt};
+    }
+    return $options;
+}
+
     
 1;
