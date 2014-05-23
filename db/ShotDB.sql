@@ -192,7 +192,7 @@ CREATE TABLE `abundance_parameters` (
   `abundance_type` varchar(256) DEFAULT NULL, /*binary, alignment length corrected*/
   `normalization_type` varchar(256) DEFAULT NULL, /*e.g., target length, family length, none*/
   `rarefaction_depth` int(10) unsigned DEFAULT NULL,
-  `rarefaction_type`  varchar(256) DEFAULT NULL, /*pre-rarefication or post-rarefication*/
+  `rarefaction_type`  varchar(256) DEFAULT NULL, /*pre-rarefication, read, orf, class_read, class_orf*/
   PRIMARY KEY (`abundance_parameter_id`),
   KEY `abundance_type` (`abundance_type`),
   KEY `normalization_type` (`normalization_type`)

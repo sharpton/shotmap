@@ -180,12 +180,12 @@ for( a in 1:length( meta.names ) ){
   p <- PCbiplot(pca, metatypes=metatypes)
   p + theme(panel.background = element_rect(fill='white', colour='black'))
   print( paste( "Plotting ", pca.file, sep="" ) )
-  ggsave(p, file=pca.file)
+  ggsave(p, file=pca.file, width=7, height=7 )
 }
 
 ###if there's no metadata associated with samples other than ID and ALTID
 if( !has_meta ){
   p   <- PCbiplot(pca)
   pca.file <- paste( file.stem, "-PCA.pdf", sep="" )
-  ggsave(p, file=pca.file)
+  ggsave(p, file=pca.file, width=7, height=7)
 }

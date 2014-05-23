@@ -130,7 +130,7 @@ for( i in 1:dim(abund.map)[1] ){
        ylab = "Relative Abundance",
        main = paste( "Relative Abundance of Sample ", samp, sep="" )
        )
-  dev.off()
+  garbage <- dev.off()
   ##topN
   if( dim(abund.map)[2] > topN ){
     file <- paste( sample.stem, "_sample_", samp, "_RA_top", topN, ".pdf", sep="" )
@@ -140,7 +140,7 @@ for( i in 1:dim(abund.map)[1] ){
          ylab = "Relative Abundance",
          main = paste( "Relative Abundance of Sample ", samp, ", top ", topN, "families", sep="" )
          )
-    dev.off()
+   garbage <- dev.off()
   }
   ##sample RA (log scale)  
   if( print.log ){
@@ -152,7 +152,7 @@ for( i in 1:dim(abund.map)[1] ){
          ylab = "Relative Abundanc (Log)",
          main = paste( "Relative Abundance of Sample ", samp, " Log Scale", sep="" )
          )
-    dev.off()
+    garbage <- dev.off()
     ##topN
     if( dim(abund.map)[2] > topN ){
       file <- paste( sample.stem, "_sample_", samp, "_RA_log_top", topN, ".pdf", sep="" )
@@ -162,7 +162,7 @@ for( i in 1:dim(abund.map)[1] ){
            ylab = "Relative Abundance",
            main = paste( "Relative Abundance of Sample ", samp, ", top ", topN, " families", sep="" )
            )
-      dev.off()
+      garbage <- dev.off()
     }
   }
 }
@@ -186,7 +186,7 @@ for( i in 1:dim(abund.map)[1] ){
     lines( 1:length(sorted), sorted )
   }
 }
-dev.off()
+garbage <- dev.off()
 ##topN
 if( dim(abund.map)[2] > topN ){
   file <- paste( sample.stem, "_samples_RA_top", topN, ".pdf", sep="" )
@@ -206,7 +206,7 @@ if( dim(abund.map)[2] > topN ){
       lines( 1:topN, sorted[1:topN] )
     }
   }
-  dev.off()
+  garbage <- dev.off()
 }
 
 ###Plot all log-corrected sample relative abundances in single image
@@ -230,7 +230,7 @@ if( print.log ){
             lines( 1:length(sort(ra.data)), rev(sort( log( ra.data) ) ) )
         }
     }
-    dev.off()
+    garbage <- dev.off()
     ##topN
     if( dim(abund.map)[2] > topN ){
         file <- paste( sample.stem, "_samples_RA_log_top", topN, ".pdf", sep="" )
@@ -250,7 +250,7 @@ if( print.log ){
                 lines( 1:topN, sorted[1:topN] )
             }
         }
-        dev.off()
+        garbage <- dev.off()
     }
 }
 
@@ -283,7 +283,7 @@ for( b in 1:length( colnames(div.map) ) ){
           ylab( ylabel )
   file <- paste( sample.stem, "-", div.type, ".pdf", sep="" )
   if( verbose ) { print(file) }
-  ggsave( filename = file, plot = last_plot() )
+  ggsave( filename = file, plot = last_plot(), width=7, height=7 )
 }
 
 ###Can only do the below if metadata fields are provided
@@ -321,7 +321,7 @@ if( is.null( meta ) ){
               ylab( div.type )
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-boxes.pdf", sep="" )
       if( verbose ){ print(file) }
-      ggsave( filename = file, plot = last_plot() )
+      ggsave( filename = file, plot = last_plot(), width=7, height=7  )
     }
   }
 ###build scatter plots, grouping by metadata fields. Not always informative (e.g., when field is discrete)
@@ -343,7 +343,7 @@ if( is.null( meta ) ){
               ylab( div.type )
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-scatter.pdf", sep="" )
       if( verbose ){ print(file) }
-      ggsave( filename = file, plot = last_plot() )
+      ggsave( filename = file, plot = last_plot(), width=7, height=7 )
     }
   }
 ###build line plots between types
@@ -367,7 +367,7 @@ if( is.null( meta ) ){
                 ylab( div.type )
         file <- paste( compare.stem, "-", meta.type, "-", div.type, "-line.pdf", sep="" )
         print(file)
-        ggsave( filename = file, plot = last_plot() )
+        ggsave( filename = file, plot = last_plot(), width=7, height=7  )
       }
     }
   }

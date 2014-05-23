@@ -342,13 +342,12 @@ sub get_family_members_by_famid{
 
 sub get_abundance_parameter_id{
     my ( $self, $abund_type, $norm_type ) = @_; 
-    my ( $rarefaction_depth, $rarefaction_type );
+    my ( $rarefaction_depth);
+    my $rarefaction_type = $self->rarefaction_type;
     if( defined( $self->postrarefy_samples ) ){ #post rarefaction is always smallest
 	$rarefaction_depth = $self->postrarefy_samples;
-	$rarefaction_type  = "post-rarefaction";
     } elsif( defined( $self->prerarefy_samples ) ){
 	$rarefaction_depth = $self->prerarefy_samples;
-	$rarefaction_type  = "pre-rarefaction";
     }
     my $inserted = $self->get_schema->resultset( "AbundanceParameter" )->find_or_create(
 	{

@@ -105,7 +105,7 @@ for( a in 0:length( meta.names ) ){
               labs( title = paste( "Protein Family Statistics Across all Samples: ", stat, sep="" ) )
       file      <- paste( family.stem , "-", meta.field, "-", type, "-", stat, ".pdf", sep ="" )
       print( file )
-      ggsave( filename=file, plot = last_plot() )
+      ggsave( filename=file, plot = last_plot(), width=7, height=7 )
     }
     ##Print out the relative abundances for the families that belong to samples of this type
     tab.file  <- paste( family.stem, "-", meta.field, "-", type, "-family_relative_abundances.tab", sep="") 

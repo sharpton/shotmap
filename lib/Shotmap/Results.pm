@@ -24,6 +24,7 @@ sub calculate_diversity{
     my $class_id = $self->Shotmap::DB::get_classification_id(
 	$self->class_evalue(), $self->class_coverage(), $self->class_score, $db_name, $search_method, $self->top_hit_type,
 	)->classification_id();
+    $self->classification_id( $class_id );
     my $abund_param_id = $self->Shotmap::DB::get_abundance_parameter_id(
 	$self->abundance_type, $self->normalization_type
 	)->abundance_parameter_id;       
@@ -45,6 +46,7 @@ sub classify_reads{
     my $class_id = $self->Shotmap::DB::get_classification_id(
 	$self->class_evalue(), $self->class_coverage(), $self->class_score(), $db_name, $search_method, $self->top_hit_type(),
 	)->classification_id();
+    $self->classification_id( $class_id );
     if( defined( $self->postrarefy_samples ) ){       
 	$self->Shotmap::Notify::notify( "Rarefaction depth: " . $self->postrarefy_samples );
     }
@@ -90,6 +92,7 @@ sub load_results{
     my $class_id = $self->Shotmap::DB::get_classification_id(
 	$self->parse_evalue, $self->parse_coverage, $self->parse_score, $self->db_name, $search_method, $self->top_hit_type,
 	)->classification_id();
+    $self->classification_id( $class_id );
     if ($self->remote){
 	$self->Shotmap::Notify::printBanner("LOADING REMOTE SEARCH RESULTS");
 	foreach my $sample_id(@{ $self->get_sample_ids() }){

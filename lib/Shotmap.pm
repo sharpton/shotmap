@@ -378,6 +378,15 @@ sub postrarefy_samples{
     return $self->{"postrarefy"};    
 }
 
+sub rarefaction_type{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"rarefaction_type"} = $value;
+    }
+    return $self->{"rarefaction_type"};    
+    
+}
+
 sub parse_score{
     my( $self, $value ) = @_;
     if( defined( $value ) ){
@@ -427,11 +436,17 @@ sub use_search_alg{
 }
 
 sub search_method{
-    my ( $self, $method ) = @_;
-    if( defined( $method ) ){
-	$self->{"search_method"} = $method;
-    }
-    return $self->{"search_method"};
+    my ( $self, $value ) = @_;
+    my $key = qw( search_method );
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+sub classification_id{
+    my( $self, $value ) = @_;
+    my $key = "classification_id";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
 }
 
 sub local_scripts_dir{
@@ -816,6 +831,15 @@ sub nprocs{
     return $self->{"nprocs"};
 }
 
+sub search_results{
+    my( $self, $sample_id ) = @_;
+    my $path = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $self->search_method);
+    if( !(defined( $path ) ) ){
+	die( "You are trying to obtain search_results that haven't been set\n" );
+    }
+    return $path;
+}
+
 #######
 # NEED TO VALIDATE THESE
 #######
@@ -855,6 +879,17 @@ sub search_type{  #blast or hmm based on algo name
 	$self->{"search_type"} = $type;
     }
     return $self->{"search_type"};
+}
+
+sub set_value{
+    my( $self, $key, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{$key} = $value;
+    }
+    if( !defined( $self->{$key} ) ){
+	die( "You are calling for a Shotmap.pm value that hasn't been defined (<$key>)!\n" );
+    }
+    return $value
 }
 
 1;

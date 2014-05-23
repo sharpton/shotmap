@@ -2183,18 +2183,17 @@ sub calculate_abundances_flatfile{
     my $norm_type  = $self->normalization_type;
     my $abund_type = $self->abundance_type; 
     #do rarefaction here
-    my $rare_type = "read"; #could be orf, class_orf, or class_read in theory
+    my $rare_type = $self->rarefaction_type();
     my $rare_ids = (); #hashref
     my $seed_string; #if rarefing
-    
-    #for testing purposes only
-    #$self->postrarefy_samples(5);
 
     if( defined( $self->postrarefy_samples ) ){
 	#randomly grab sequence identifiers and build $rare_ids->{$seq_id}
-	( $rare_ids, $seed_string ) = $self->Shotmap::Run::get_post_rarefied_reads_flatfile( $sample_id, $rare_type );
+	( $rare_ids, $seed_string ) = $self->Shotmap::Run::get_post_rarefied_reads_flatfile( $sample_id, $rare_type );	
+	if( !defined( $rare_ids ) ){
+	    die "Something went wrong during rarefaction; got a null rare_ids hash";
+	}
     }
-
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
 	$self->Shotmap::Notify::print_verbose( "\tCalculating abundances using all reads" );
@@ -2204,8 +2203,7 @@ sub calculate_abundances_flatfile{
     } else{
 	$read_count = $self->postrarefy_samples();
     }    
-    #
-    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
+    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}_AbundanceID_${abundance_parameter_id}";
     if( defined( $self->postrarefy_samples ) ){
 	#my @samples   = keys( %$post_rare_reads );
 	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
@@ -2223,8 +2221,11 @@ sub calculate_abundances_flatfile{
 	chomp $_;
 	my ( $orf_alt_id, $read_alt_id, $sample, $target_id, $famid, $score, $evalue, $coverage, $aln_length ) = split( "\,", $_ );
 	if( defined( $self->postrarefy_samples ) ){
-	    if( $rare_type eq "read" ){
+	    if( $rare_type =~ "read" ){ #read or class_read
 		next unless defined( $rare_ids->{$read_alt_id} );
+	    }
+	    if( $rare_type =~ "orf" ){ #orf or class orf
+		next unless defined( $rare_ids->{$orf_alt_id} );
 	    }
 	}
 	print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
@@ -2316,14 +2317,31 @@ sub get_post_rarefied_reads_flatfile{
     my ( $self, $sample_id, $rare_type ) = @_;
     my $size = $self->postrarefy_samples;
     my $rare_ids = (); #hashref
+    my $draws    = (); #hashref
     my $seed_string;
+    my $path;
     if( $rare_type eq "read" ){
-	#get number of metareads
-	my $metareads_dir = $self->get_sample_path($sample_id) . "/raw/";
-	my $max = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
-	my ( $draws, $seed_string ) = $self->Shotmap::Run::generate_random_samples( $size, $max, $seed_string );
-	$rare_ids = $self->Shotmap::Run::sample_objects_in_files( $metareads_dir, $rare_type, $draws );
+	$self->Shotmap::Notify::print_verbose( "\t...rarefying readss for sample $sample_id at depth of $size\n" );
+	$path = $self->get_sample_path($sample_id) . "/raw/";
+    } elsif( $rare_type eq "orf" ){
+	$self->Shotmap::Notify::print( "\t...rarefying orfs for sample $sample_id at depth of $size\n" );
+	$path = $self->get_sample_path($sample_id) . "/orfs/";
+    } elsif( $rare_type eq "class_read" ){	
+	$self->Shotmap::Notify::print( "\t...rarefying classified reads for sample $sample_id at depth of $size\n" );	
+	$path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";
+    } elsif( $rare_type eq "class_orf" ){
+	$self->Shotmap::Notify::print( "\t...rarefying classified orfs for sample $sample_id at depth of $size\n" );
+	$path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";
+    } else {
+	die( "You provided a post rarefaction type that I do not understand!\n" );
+    }  
+    if( !defined( $path) ){
+	die "You didn't provide a properly formatted path in get_post_rarefied_reads_flatfile\n";
     }
+    my $max = $self->Shotmap::Run::count_objects_in_files( $path, $rare_type );
+    ( $draws, $seed_string ) = $self->Shotmap::Run::generate_random_samples( $size, $max, $seed_string );
+    $rare_ids = $self->Shotmap::Run::sample_objects_in_files( $path, $rare_type, $draws );
+    $draws = (); #cleanup
     return ( $rare_ids, $seed_string )
 }
 
@@ -2350,7 +2368,7 @@ sub generate_random_samples{
 sub count_objects_in_files{
     my( $self, $input, $type ) = @_;
     my $count = 0;
-    if( $type eq "read" ){
+    if( $type eq "read" || $type eq "orf" ){
 	if( -d $input ){
 	    opendir( DIR, $input ) || die "Can't opendir on $input: $!\n";
 	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
@@ -2365,23 +2383,46 @@ sub count_objects_in_files{
 		}
 		close( FILE );
 	    }
+	} else {
+	    die "In count_objects_in_file: $input doesn't exist!\n";
 	}
+    } elsif( $type eq "class_read" || $type eq "class_orf" ){
+	if( -e $input ){
+	    open( FILE, $input ) || die "Can't open $input for read: $!\n";
+	    my $ids = (); #hashref
+	    while( <FILE> ){
+		chomp $_;
+		my( $orf_alt_id, $read_alt_id, @row ) = split( "\,", $_ );
+		if( $type eq "class_read" ){
+		    $ids->{$read_alt_id}++;
+		} elsif( $type eq "class_orf" ){
+		    $ids->{$orf_alt_id}++;
+		}		
+	    }
+	    close FILE;
+	    $count = scalar( keys( %$ids ) );
+	    $ids = (); #cleanup
+	} else {
+	    die "In count_objects_in_file: $input doesn't exist!\n";
+	}
+    } else {
+	die "You tried to count_objects_in_files but supplied an incorrect type. You gave me <${type}>.";
     }
     return $count;
 }
 
 sub sample_objects_in_files{
     my( $self, $input, $type, $draws ) = @_; #draws is a hashref
-    #draws points to rows in our file (or ordered files) that we should draw from
+    #$draws points to rows in our file (or ordered files) that we should draw from
     my $id_hash = (); #a hashref
     my $count   = 1;
-    if( $type eq "read" ){
+    if( $type eq "read" || $type eq "orf" ){
 	if( -d $input ){
 	    opendir( DIR, $input ) || die "Can't opendir on $input: $!\n";
 	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
 	    closedir( DIR );
 	    foreach my $file( @files ){
-		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
+		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in sample_objects_in_file: $!\n";
 		while(<FILE>){
 		    if( $_ =~ m/^>/ ){
 			if( defined( $draws->{$count} ) ){
@@ -2394,7 +2435,30 @@ sub sample_objects_in_files{
 		}
 		close( FILE );
 	    }
+	} else {
+	    die "In sample_objects_in_file: $input doesn't exist!\n";
 	}
+    } elsif( $type eq "class_read" || $type eq "class_orf" ){
+	if( -e $input ){
+	    open( FILE, $input ) || die "Can't open $input for read: $!\n";
+	    my $ids = (); #hashref
+	    while( <FILE> ){
+		chomp $_;
+		if( defined( $draws->{$count} ) ){
+		    my( $orf_alt_id, $read_alt_id, @row ) = split( "\,", $_ );
+		    if( $type eq "class_read" ){
+			$id_hash->{$read_alt_id}++;
+		    } elsif( $type eq "class_orf" ){
+			$id_hash->{$orf_alt_id}++;
+		    }		
+		}
+		$count++;
+	    }
+	} else {
+	    die "In sample_objects_in_file: $input doesn't exist!\n";
+	}	
+    } else {
+	die "You tried to sample_objects_in_files but supplied an incorrect type. You gave me <${type}>.";
     }
     return $id_hash;
 }
