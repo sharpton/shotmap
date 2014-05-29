@@ -31,6 +31,7 @@ use DBI; #used only for DBIx::BulkLoader::Mysql
 use DBD::mysql;
 use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
 use POSIX qw(ceil);
+use XML::DOM;
 
 #
 # CONNECTION
@@ -807,7 +808,13 @@ sub build_project_ffdb {
     my $pid     = $self->{"project_id"};
     my $proj_dir = "$ffdb/projects/$db_name/$pid";
     $self->project_dir($proj_dir);
-    File::Path::make_path($proj_dir); # make_path ALREADY dies on "severe" errors. See http://search.cpan.org/~dland/File-Path-2.09/Path.pm#ERROR_HANDLING
+    File::Path::make_path($proj_dir); 
+    my $params_dir    = "$proj_dir/parameters";
+    File::Path::make_path($params_dir); 
+    $self->params_dir( $params_dir );
+    $self->params_file( $params_dir . "/parameters.xml" );
+    $self->Shotmap::DB::initialize_parameters_file( $self->params_file );
+
     #or die "Can't create new directory <$proj_dir> in build_project_ffdb: $! ";
 }
 
@@ -815,10 +822,10 @@ sub build_sample_ffdb{
     my ($self)  = @_;
     my $ffdb    = $self->ffdb();
     my $pid     = $self->project_id();
-    my $projDir = $self->project_dir; # no trailing slashes please!
+    my $projDir = $self->project_dir;
     my $outDir  = "$projDir/output";
     my $logDir  = "$projDir/logs";
-    my $searchlogs = "$logDir/" . $self->search_method;
+    my $searchlogs = "$logDir/" . $self->search_method;    
     #my $hmmscanlogs      = "$logDir/hmmscan";
     #my $hmmsearchlogs    = "$logDir/hmmsearch";
     #my $blastlogs        = "$logDir/blast";
@@ -839,7 +846,6 @@ sub build_sample_ffdb{
     #my $prerapsearchlogs = "$logDir/prerapsearch";
     my $transeqlogs      = "$logDir/transeq";
     my $parselogs        = "$logDir/parse_results";
-
     my @paths = ( $outDir, $logDir, $searchlogs, $transeqlogs, $parselogs );
     if( defined( $formatdblogs ) ){
 	push( @paths, $formatdblogs );
@@ -1150,7 +1156,7 @@ sub bulk_import{
 		print OUT join( "\n", @rows );
 		close OUT;
 		my $sql = "LOAD DATA LOCAL INFILE '" . $out . "' INTO TABLE " . $table . " FIELDS TERMINATED BY ',' " . 
-		    "LINES TERMINATED BY '\\n' ( sample_id, read_id, orf_alt_id )";
+		    "LINES TERMINATED BY '\\n' ( sample_id, read_alt_id, orf_alt_id )";
 		my $sth = $dbh->do($sql) || die "SQL Error: $DBI::errstr\n";
 		$inserts = $inserts + $sth;
 		$count = 0;
@@ -1266,5 +1272,230 @@ sub bulk_import{
     return $self;
 }
 
+sub create_flat_file_project{
+    my( $self, $name, $desc ) = @_;
+    my $ffdb    = $self->{"ffdb"};
+    my $db_name = $self->{"dbname"};
+    my $path    = "$ffdb/projects/$db_name/";
+    my $pid     = $self->Shotmap::DB::create_flat_file_id( $path );
+    return $pid;
+}
+
+sub create_flat_file_id{
+    my( $self, $path ) = @_;
+    my $id;
+    #open the ffdb path
+    if( ! -d $path ){
+	$id = 1;
+    } else {
+	opendir( DIR, $path ) || die "Can't opendir: $path\n";
+	my @files = readdir( DIR );
+	closedir( DIR );
+	my $max_id = 0;
+	#what projects have been created so far?
+	foreach my $file( @files ){
+	    next if( $file =~ m/^\./ );
+	    next unless( $file =~ m/^\d/ );
+	    if( $file > $max_id ){
+		$max_id = $file;
+	    }	
+	}       
+	#get a new, unique pid
+	$id = $max_id + 1;
+	#return the pid
+    }
+    return $id;
+}
+
+sub get_flatfile_sample_id{
+    my ( $self, $samp ) = @_;
+    my $path = $self->project_dir();
+    my $sid  = $self->Shotmap::DB::create_flat_file_id( $path );
+    return $sid;
+}
+
+#####
+# XML Functions
+####
+
+sub get_classification_id_flatfile{
+    my( $self, $evalue, $coverage, $score, $db_name, $search_method, $hit_type ) = @_;
+    $score     = _null_check( $score );
+    $coverage  = _null_check( $coverage );
+    $evalue    = _null_check( $evalue );
+    my $method = $search_method . ";" . "best_${hit_type}";
+    my $class_id;
+    my $max_id = 0;
+    my $parser = new XML::DOM::Parser;
+    my $doc = $parser->parsefile( $self->params_file() );
+    #check if id already exists for these run-time settings
+    foreach my $cid ( $doc->getElementsByTagName( 'classification_id' ) ){
+	if( $cid->hasChildNodes ){
+	    my $id       = _get_xml_value( $cid, "id" );
+	    my $id_score = _get_xml_value( $cid, "score" );
+	    my $id_eval  = _get_xml_value( $cid, "evalue" );
+	    my $id_cov   = _get_xml_value( $cid, "coverage" ); 
+	    my $id_meth  = _get_xml_value( $cid, "method" ); #e.g., rapsearch;best_read
+	    my $id_db    = _get_xml_value( $cid, "search_database" ); #e.g., Test_families_nr_50000
+	    if( $id > $max_id ){
+		$max_id = $id;
+	    }
+	    if( $id_score eq $score     || ( $id_score eq "null" && $score    eq "null" ) &&
+		$id_eval  eq $evalue    || ( $id_eval  eq "null" && $evalue   eq "null" ) &&
+		$id_cov   eq $coverage  || ( $id_cov   eq "null" && $coverage eq "null" ) &&
+		$id_meth  eq $method    &&
+		$id_db    eq $db_name   ){
+		$class_id = $id;
+		last;		
+	    }
+	}
+    }
+    if( !defined( $class_id ) ){
+	#if not, then let's create a new id
+	my $new_id   = $max_id + 1;
+	my $class_params = pop(@{$doc->getElementsByTagName('classification_parameters')});
+	my $new_cid  = $doc->createElement('classification_id');
+	
+	$doc = _add_child_element( $doc, $new_cid, 'id',    $new_id );
+	$doc = _add_child_element( $doc, $new_cid, 'score', _null_check( $score ) );
+	$doc = _add_child_element( $doc, $new_cid, 'coverage', _null_check( $coverage ) );
+	$doc = _add_child_element( $doc, $new_cid, 'evalue', _null_check( $evalue ) );
+	$doc = _add_child_element( $doc, $new_cid, 'method', $method );
+	$doc = _add_child_element( $doc, $new_cid, 'search_database', $db_name );
+
+	$class_params->appendChild($new_cid);
+	#print to file
+	$doc->printToFile( $self->params_file() );
+	$doc->dispose;
+	$class_id = $new_id;
+    }
+    return $class_id;
+}
+
+sub set_sample_parameters{
+    my( $self, $sample_id, $sample_alt_id ) = @_;
+    if( !defined( $sample_id ) ){
+	die "You did not provide a defined sample_id, so I cannot set the parameters xml file!\n";
+    }
+    if( !defined( $sample_alt_id ) ){
+	die "You did not provide a defined sample_alt_id, so I cannot set the parameters xml file!\n";
+    }
+    my $parser = new XML::DOM::Parser;
+    my $doc = $parser->parsefile( $self->params_file() );
+    my $has_hit = 0;
+    #check if id already exists 
+    foreach my $cid ( $doc->getElementsByTagName( 'sample_id' ) ){
+	if( $cid->hasChildNodes ){
+	    my $id       = _get_xml_value( $cid, "id" );
+	    my $alt_id   = _get_xml_value( $cid, "sample_alt_id" );
+	    if( $id == $sample_id && $alt_id eq $sample_alt_id ){
+		$self->Shotmap::Notify::print_verbose( "Sample $sample_id has already been set in the parameters file\n" );
+		$has_hit = 1;
+	    }
+	    if( $id == $sample_id && $alt_id ne $sample_alt_id ){
+		die "Sample id $sample_id has a alt id <${sample_alt_id}> that disagrees with parameters file <${alt_id}>\n";
+	    }
+	    if( $sample_alt_id eq $alt_id && $sample_id != $id ){
+		die "sample_alt_id <${sample_alt_id}> already has a conflicting sample id in parameters file: <${sample_id}> and <${id}>\n";
+	    }
+	}
+    }
+    if( !$has_hit ){
+	#if not, then let's create a new id
+	my $sample_params = pop(@{$doc->getElementsByTagName('samples')});
+	my $new_sid  = $doc->createElement('sample_id');
+	
+	$doc = _add_child_element( $doc, $new_sid, 'id',    $sample_id );
+	$doc = _add_child_element( $doc, $new_sid, 'sample_alt_id',    $sample_alt_id );
+
+	$sample_params->appendChild($new_sid);
+	#print to file
+	$self->Shotmap::Notify::print_verbose( "Added sample $sample_id to the parameters file\n" );
+	$doc->printToFile( $self->params_file() );
+	$doc->dispose;
+    }   
+    return $self;
+}
+
+sub get_sample_by_id_flatfile{
+    my( $self, $sample_id ) = @_;
+    if( !defined( $sample_id ) ){
+	die "You did not provide a defined sample_id, so I cannot parse the parameters xml file!\n";
+    }
+    my $sample_alt_id;
+    my $sample = (); #hashref
+    $sample->{"id"} = $sample_id;
+    my $parser = new XML::DOM::Parser;
+    my $doc = $parser->parsefile( $self->params_file() );
+    my $max_id = 0;
+    #check if id already exists for these run-time settings
+    foreach my $cid ( $doc->getElementsByTagName( 'sample_id' ) ){
+	if( $cid->hasChildNodes ){
+	    my $id       = _get_xml_value( $cid, "id" );
+	    my $alt_id   = _get_xml_value( $cid, "sample_alt_id" );
+	    if( $id > $max_id ){
+		$max_id = $id;
+	    }
+	    if( $id == $sample_id ){
+		$sample_alt_id = $alt_id;
+		$sample->{"sample_alt_id"} = $alt_id;
+		last;		
+	    }
+	}
+    }
+    if( !defined( $sample_alt_id ) ){
+	die "Couldn't extract the sample_alt_id for sample id ${sample_id} from parameters file!\n";
+    }
+    return $sample;
+}
+
+sub _null_check{
+    my( $value ) = @_;
+    if( ! defined $value ){
+	$value = "null";
+    }
+    return $value;
+}
+
+sub _add_child_element{
+    my( $parent, $new_child, $key, $value ) = @_;
+    my $new_element = $parent->createElement( $key );
+    my $new_text    = $parent->createTextNode( $value );
+    $new_element->appendChild($new_text);
+    $new_child->appendChild($new_element);
+    return $parent
+}
+
+sub get_abundance_parameter_id_flatfile{
+    my( $self, $abund_type, $norm_type, $rare_depth, $rare_type ) = @_;
+    
+}
+
+
+sub _get_xml_value{
+    my( $node, $name ) = @_;
+    my $value = $node->getElementsByTagName($name)->item(0)->getFirstChild->getNodeValue;
+    return $value;
+}
+
+sub initialize_parameters_file{
+    my( $self, $param_file ) = @_;
+    if( ! -e $param_file ){ #don't reinitialize a file that has already been created!
+	$self->Shotmap::Notify::notify( "Initialize a parameters xml file here: $param_file\n" );
+	open( OUT, ">$param_file" ) || die "Can't open $param_file for write: $!\n";
+	print OUT 
+	    "<xml>\n" 
+	    . "\t<samples>\n"
+	    . "\t</samples>\n"
+	    . "\t<classification_parameters>\n"
+	    . "\t</classification_parameters>\n"
+	    . "\t<abundance_parameters>\n"
+	    . "\t</abundance_parameters>\n"
+	    . "</xml>"
+	    ;
+	close OUT;
+    }
+    return $self;
+}
 
 1;

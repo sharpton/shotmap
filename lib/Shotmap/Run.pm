@@ -239,16 +239,98 @@ sub get_partitioned_samples{
 sub load_project{
     my ($self, $path, $nseqs_per_samp_split) = @_;    # $nseqs_per_samp_split is how many seqs should each sample split file contain?
     my ($name, $dir, $suffix) = fileparse( $path );     #get project name and load
-    my $proj = $self->Shotmap::DB::create_project($name, $self->project_desc() );
+    my $pid;  
+    if( $self->use_db ){
+	my $proj = $self->Shotmap::DB::create_project($name, $self->project_desc() );
+	$pid  = $proj->project_id()
+    } else {
+	$pid = $self->Shotmap::DB::create_flat_file_project( $name, $self->project_desc() ); #write a function that determines this!	
+    }
     #store vars in object
-    $self->project_path($path);
-    $self->project_id($proj->project_id());
+    #$self->project_path( $path );
+    $self->project_id( $pid );
+    $self->Shotmap::DB::build_project_ffdb();
     #process the samples associated with project
     $self->Shotmap::Run::load_samples();
-    $self->Shotmap::DB::build_project_ffdb();
     $self->Shotmap::DB::build_sample_ffdb(); #this also splits the sample file
-    $self->Shotmap::Notify::print_verbose("Project with PID " . $proj->project_id() . ", with files found at <$path>, was successfully loaded!\n");
+    $self->Shotmap::Run::get_project_metadata();
+    $self->Shotmap::Notify::print_verbose("Project with PID " . $pid . ", with files found at <$path>, was successfully loaded!\n");
 }
+
+#MODIFIED
+sub get_project_metadata{
+    my( $self )  = @_;
+    my $output   = File::Spec->catdir( $self->ffdb, "projects", $self->db_name, $self->project_id(), "parameters", "sample_metadata.tab" );
+
+    open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
+    my $data   = {}; #will push rows to data, need to know all fields before printing header
+    my $fields = {};
+    my $sample_hr = $self->get_sample_hashref;
+    foreach my $sample_alt_id( keys( %{ $sample_hr } ) ){
+	my $sample_id = $sample_hr->{$sample_alt_id}->{"id"};
+	my $metadata  = $sample_hr->{$sample_alt_id}->{"metadata"};
+	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
+	    if( !( defined( $metadata ) ) ){
+		warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
+		$fields = {};
+		goto PRINTMETA;
+	    }
+	    my( @fields )  = split( ",", $metadata );
+	    foreach my $field( @fields ){
+		my( $field_name, $field_value ) = split( "\=", $field );
+		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
+		$fields->{$field_name}++;
+	    }
+    }
+    if( 0 ){
+	my $samples  = $self->Shotmap::DB::get_samples_by_project_id( $self->project_id() );
+	while( my $row = $samples->next ){
+	    my $sample_id     = $row->sample_id;
+	    my $sample_alt_id = $row->sample_alt_id;
+	    $data->{$sample_id}->{"alt_id"} = $sample_alt_id;
+	    my $metadata      = $row->metadata;
+	    if( !( defined( $metadata ) ) ){
+		warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
+		$fields = {};
+		goto PRINTMETA;
+	    }
+	    my( @fields )  = split( ",", $metadata );
+	    foreach my $field( @fields ){
+		my( $field_name, $field_value ) = split( "\=", $field );
+		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
+		$fields->{$field_name}++;
+	    }
+	}
+    }
+  PRINTMETA:;
+    if( defined( $fields ) ){ #then we found metadata
+	#print the header
+	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
+	foreach my $sample_id( keys( %{ $data } ) ){
+	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	    my @values = sort(keys( %{$fields} ));
+	    foreach my $field( @values ){
+		if( $field eq $values[-1] ){
+		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
+		} else{
+		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
+		}
+	    }   
+	}
+	close OUT;
+    }
+    else{
+	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", "\n" );
+	foreach my $sample_id( keys( %{ $data } ) ){
+	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	}
+	close OUT;
+    }
+    return $output;
+}
+
 
 sub load_samples{
     my ($self) = @_;
@@ -257,6 +339,7 @@ sub load_samples{
     my $plural = ($numSamples == 1) ? '' : 's'; # pluralize 'samples'
     $self->Shotmap::Notify::notify("Processing $numSamples sample${plural} associated with project PID #" . $self->project_id() . " ");
     my $metadata = {};
+    my $sid = 0; #for nodb sample creation
     #if it exists, grab each sample's metadata
     if( defined( $self->sample_metadata ) ){
 	my @rows = split( "\n", $self->sample_metadata );
@@ -287,78 +370,89 @@ sub load_samples{
 	my $metadata_string;
 	if( defined( $self->sample_metadata ) ){
 	    $metadata_string = $metadata->{$samp};
+	    $samples{$samp}->{"metadata"} = $metadata_string;
 	}	
-	eval { # <-- this is like a "try" (in the "try/catch" sense)
-	    $insert = $self->Shotmap::DB::create_sample($samp, $pid, $metadata_string );
-	};
-	if ($@) { # <-- this is like a "catch" block in the try/catch sense. "$@" is the exception message (a human-readable string).
-	    # Caught an exception! Probably create_sample complained about a duplicate entry in the database!
-	    my $errMsg = $@;
-	    chomp($errMsg);
-	    if ($errMsg =~ m/duplicate entry/i) {
-		print STDERR ("*" x 80 . "\n");
-		print STDERR ("DATABASE INSERTION ERROR\nCaught an exception when attempting to add sample \"$samp\" for project PID #${pid} to the database.\nThe exception message was:\n$errMsg\n");
-		print STDERR ("Note that the error above was a DUPLICATE ENTRY error.\nThis is a VERY COMMON error, and is due to the database already having a sample/project ID with the same number as the one we are attempting to insert. This most often happens if a run is interrupted---so there is an entry in the database for your project run, but there are no files on the filesystem for it, since it did not complete the run. The solution to this problem is to manually remove the entries for project id #$pid from the Mysql database. Are you sure that you want to reprocess a dataset from scratch? If so, you can remove the old data from the database via thee different options:\n");
-		print STDERR ("You can do this as follows:\n");
-		print STDERR (" Option A: Rerun your mcr_handler.pl command, but add the --reload option\n" );
-		print STDERR (" Option B: Use MySQL to remove the old data, as follows:\n" );
-		print STDERR ("   1. Go to your database server (probably " . $self->get_db_hostname() . ")\n");
-		print STDERR ("   2. Log into mysql with this command: mysql -u YOURNAME -p   <--- YOURNAME is probably \"" . $self->get_username() . "\"\n");
-		print STDERR ("   3. Type these commands in mysql: use ***THE DATABASE***;   <--- THE DATABASE is probably " . $self->get_db_name() . "\n");
-		print STDERR ("   4.                        mysql: select * from project;    <--- just to look at the projects.\n");
-		print STDERR ("   5.                        mysql: delete from project where project_id=${pid};    <-- actually deletes this project.\n");
-		print STDERR ("   6. Then you can log out of mysql and hopefully re-run this script successfully!\n");
-		print STDERR ("   7. You MAY also need to delete the entry from the 'samples' table in MySQL that has the same name as this sample/proejct.\n");
-		print STDERR ("   8. Try connecting to mysql, then typing 'select * from samples;' . You should see an OLD project ID (but with the same textual name as this one) that may be preventing you from running another analysis. Delete that id ('delete from samples where sample_id=the_bad_id;'");
-		my $mrcCleanCommand = (qq{perl \$Shotmap_LOCAL/scripts/mrc_clean_project.pl} 
-				       . qq{ --pid=}    . $pid
-				       . qq{ --dbuser=} . $self->get_username()
-				       . qq{ --dbpass=} . "PUT_YOUR_PASSWORD_HERE"
-				       . qq{ --dbhost=} . $self->get_db_hostname()
-				       . qq{ --ffdb=}   . $self->ffdb()
-				       . qq{ --dbname=} . $self->get_db_name()
-				       . qq{ --schema=} . $self->{"schema_name"});
-		print STDERR (" Option C: Run mrc_cleand_project.pl as follows:\n" );
-		print STDERR ("$mrcCleanCommand\n");
-		print STDERR ("*" x 80 . "\n");
-		die "Terminating: Duplicate database entry error! See above for a possible solution.";
+	if( $self->use_db ){
+	    eval { # <-- this is like a "try" (in the "try/catch" sense)
+		$insert = $self->Shotmap::DB::create_sample($samp, $pid, $metadata_string );
+	    };
+	    if ($@) { # <-- this is like a "catch" block in the try/catch sense. "$@" is the exception message (a human-readable string).
+		# Caught an exception! Probably create_sample complained about a duplicate entry in the database!
+		my $errMsg = $@;
+		chomp($errMsg);
+		if ($errMsg =~ m/duplicate entry/i) {
+		    print STDERR ("*" x 80 . "\n");
+		    print STDERR ("DATABASE INSERTION ERROR\nCaught an exception when attempting to add sample \"$samp\" for project PID #${pid} to the database.\nThe exception message was:\n$errMsg\n");
+		    print STDERR ("Note that the error above was a DUPLICATE ENTRY error.\nThis is a VERY COMMON error, and is due to the database already having a sample/project ID with the same number as the one we are attempting to insert. This most often happens if a run is interrupted---so there is an entry in the database for your project run, but there are no files on the filesystem for it, since it did not complete the run. The solution to this problem is to manually remove the entries for project id #$pid from the Mysql database. Are you sure that you want to reprocess a dataset from scratch? If so, you can remove the old data from the database via thee different options:\n");
+		    print STDERR ("You can do this as follows:\n");
+		    print STDERR (" Option A: Rerun your mcr_handler.pl command, but add the --reload option\n" );
+		    print STDERR (" Option B: Use MySQL to remove the old data, as follows:\n" );
+		    print STDERR ("   1. Go to your database server (probably " . $self->get_db_hostname() . ")\n");
+		    print STDERR ("   2. Log into mysql with this command: mysql -u YOURNAME -p   <--- YOURNAME is probably \"" . $self->get_username() . "\"\n");
+		    print STDERR ("   3. Type these commands in mysql: use ***THE DATABASE***;   <--- THE DATABASE is probably " . $self->get_db_name() . "\n");
+		    print STDERR ("   4.                        mysql: select * from project;    <--- just to look at the projects.\n");
+		    print STDERR ("   5.                        mysql: delete from project where project_id=${pid};    <-- actually deletes this project.\n");
+		    print STDERR ("   6. Then you can log out of mysql and hopefully re-run this script successfully!\n");
+		    print STDERR ("   7. You MAY also need to delete the entry from the 'samples' table in MySQL that has the same name as this sample/proejct.\n");
+		    print STDERR ("   8. Try connecting to mysql, then typing 'select * from samples;' . You should see an OLD project ID (but with the same textual name as this one) that may be preventing you from running another analysis. Delete that id ('delete from samples where sample_id=the_bad_id;'");
+		    my $mrcCleanCommand = (qq{perl \$Shotmap_LOCAL/scripts/mrc_clean_project.pl} 
+					   . qq{ --pid=}    . $pid
+					   . qq{ --dbuser=} . $self->get_username()
+					   . qq{ --dbpass=} . "PUT_YOUR_PASSWORD_HERE"
+					   . qq{ --dbhost=} . $self->get_db_hostname()
+					   . qq{ --ffdb=}   . $self->ffdb()
+					   . qq{ --dbname=} . $self->get_db_name()
+					   . qq{ --schema=} . $self->{"schema_name"});
+		    print STDERR (" Option C: Run mrc_cleand_project.pl as follows:\n" );
+		    print STDERR ("$mrcCleanCommand\n");
+		    print STDERR ("*" x 80 . "\n");
+		    die "Terminating: Duplicate database entry error! See above for a possible solution.";
+		}
+		die "Terminating: Database insertion error! See the message above for more details..."; # no "newline" with die!
+	    }       
+	    $samples{$samp}->{"id"} = $insert->sample_id();
+	    my $sid                 = $insert->sample_id(); # just a short name for the sample ID above
+	    if( $self->bulk_load() ){
+		my $tmp    = "/tmp/" . $samp . ".sql";	    
+		my $table  = "metareads";
+		my $nrows  = 10000;
+		my @fields = ( "sample_id", "read_alt_id", "seq" );
+		my $fks    = { "sample_id" => $sid }; #foreign keys and fields not in file 
+		unless( $self->is_slim() ){ 
+		    $self->Shotmap::DB::bulk_import( $table, $samples{$samp}->{"path"}, $tmp, $nrows, $fks, \@fields );
+		}
 	    }
-	    die "Terminating: Database insertion error! See the message above for more details..."; # no "newline" with die!
-	}
-
-	$samples{$samp}->{"id"} = $insert->sample_id();
-	my $sid                 = $insert->sample_id(); # just a short name for the sample ID above
-	if( $self->bulk_load() ){
-	    my $tmp    = "/tmp/" . $samp . ".sql";	    
-	    my $table  = "metareads";
-	    my $nrows  = 10000;
-	    my @fields = ( "sample_id", "read_alt_id", "seq" );
-	    my $fks    = { "sample_id" => $sid }; #foreign keys and fields not in file 
-            #unless( $self->is_slim() ){ #we require reads to be loaded so that we can scale rarefaction analysis later
-	    $self->Shotmap::DB::bulk_import( $table, $samples{$samp}->{"path"}, $tmp, $nrows, $fks, \@fields );
-	    #} #from the commented unless block above
-	}
-	else{
-	    #could speed this up by getting out of bioperl...
-	    my $seqs                = Bio::SeqIO->new( -file => $samples{$samp}->{"path"}, -format => 'fasta' );
-	    my $numReads            = 0;
-	    #unless( $self->is_slim() ){ #we require reads to be loaded so that we can scale rarefaction analysis later
-    	      if ($self->is_multiload()) {
-		  my @read_names = (); # empty list to start...
-		  while (my $read = $seqs->next_seq()) {
-		      my $read_name = $read->display_id();
-		      push( @read_names, $read_name );
-		      $numReads++;
-		  }
-		  $self->Shotmap::DB::create_multi_metareads( $sid, \@read_names );
-	      } else{
-		  while (my $read = $seqs->next_seq()) { ## If we AREN'T multi-loading, then do this...
-		      my $read_name = $read->display_id();
-		      $self->Shotmap::DB::create_metaread($read_name, $sid);
-		      $numReads++;
-		  }
-	      }
-	      $self->Shotmap::Notify::notify("Loaded $numReads reads for sample $sid into the database.");
+	    else{
+		#could speed this up by getting out of bioperl...
+		my $seqs                = Bio::SeqIO->new( -file => $samples{$samp}->{"path"}, -format => 'fasta' );
+		my $numReads            = 0;
+		#unless( $self->is_slim() ){ #we require reads to be loaded so that we can scale rarefaction analysis later
+		if ($self->is_multiload()) {
+		    my @read_names = (); # empty list to start...
+		    while (my $read = $seqs->next_seq()) {
+			my $read_name = $read->display_id();
+			push( @read_names, $read_name );
+			$numReads++;
+		    }
+		    $self->Shotmap::DB::create_multi_metareads( $sid, \@read_names );
+		} else{
+		    while (my $read = $seqs->next_seq()) { ## If we AREN'T multi-loading, then do this...
+			my $read_name = $read->display_id();
+			$self->Shotmap::DB::create_metaread($read_name, $sid);
+			$numReads++;
+		    }
+		}
+		$self->Shotmap::Notify::notify("Loaded $numReads reads for sample $sid into the database.");
+	    }
+	} else {
+	    #flatfile stuff here
+	    if( $sid == 0 ){
+		$sid = $self->Shotmap::DB::get_flatfile_sample_id( $samp );
+	    } else {
+		$sid++;
+	    }
+	    $self->Shotmap::DB::set_sample_parameters( $sid, $samp );
+	    $samples{$samp}->{"id"} = $sid;
 	}
     }
     $self->set_samples(\%samples);
@@ -459,7 +553,9 @@ sub back_load_project(){
     my $ffdb = $self->ffdb();
     my $dbname = $self->db_name();
     $self->project_id( $project_id );
-    $self->project_path("$ffdb/projects/$dbname/$project_id");
+    $self->project_dir("$ffdb/projects/$dbname/$project_id");
+    $self->params_dir( $self->project_dir . "/parameters" );
+    $self->params_file( $self->params_dir . "/parameters.xml" );
     if( $self->remote ){
 	$self->remote_script_path(      "hmmscan",      $self->remote_project_path() . "/run_hmmscan.sh" );
 	$self->remote_script_path(    "hmmsearch",    $self->remote_project_path() . "/run_hmmsearch.sh" );
@@ -477,18 +573,22 @@ sub back_load_project(){
 sub back_load_samples{
     my $self = shift;
     my $project_id = $self->project_id();
-    my $project_path = $self->get_project_path();
+    my $project_path = $self->project_dir();
     opendir( PROJ, $project_path ) || die "can't open $project_path for read: $!\n";
     my @files = readdir( PROJ );
     closedir PROJ;
     my %samples = ();
     foreach my $file( @files ){
-	next if ( $file =~ m/^\./ || $file =~ m/logs/ || $file =~ m/hmmscan/ || $file =~ m/output/ || $file =~ m/\.sh/ );
+	next if ( $file =~ m/^\./ || $file =~ m/logs/ || $file =~ m/hmmscan/ || $file =~ m/output/ || $file =~ m/\.sh/  || $file =~ m/parameters/ );
 	my $sample_id = $file;
-	my $samp    = $self->Shotmap::DB::get_sample_by_sample_id( $sample_id );
-#	my $sample_name = $samp->name();
-#	$samples{$sample_name}->{"id"} = $sample_id;
-	my $sample_alt_id = $samp->sample_alt_id();
+	my $sample_alt_id;
+	if( $self->use_db ){
+	    my $samp    = $self->Shotmap::DB::get_sample_by_sample_id( $sample_id );
+	    $sample_alt_id = $samp->sample_alt_id();
+	} else {
+	    my $samp = $self->Shotmap::DB::get_sample_by_id_flatfile( $sample_id );
+	    $sample_alt_id = $samp->{"sample_alt_id"};
+	}
 	$samples{$sample_alt_id}->{"id"} = $sample_id;
     }
     $self->set_samples( \%samples );
@@ -650,7 +750,7 @@ sub spawn_local_threads($$$){
 	    }	    
 	}
 	open STDERR, ">&=", \*STDOUT or print "$0: dup: $!";
-	print $cmd . "\n";
+	$self->Shotmap::Notify::print_verbose( "About to run the following command:\n${cmd}" );
 	exec($cmd) or die ("Couldn't exec $cmd: $!");
 	sleep(10);
 	exit( 0 );
@@ -674,7 +774,6 @@ sub destroy_spawned_threads{
     my @children = @{ $ra_children };
     
     if( $pid == 0 ){ # if I have a parent, i.e. if I'm the child process
-	print "Hello!\n";
 	#could optionally do something here
 	exit( 0 );
     } else {
@@ -796,26 +895,25 @@ sub parse_and_load_search_results_bulk{
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo, $orf_split_filename);
     my $query_seqs     = File::Spec->catfile($self->get_sample_path($sample_id), "orfs", $orf_split_filename);
     my $output_file    = $search_results . ".mysqld.splitcat";    
-    $self->Shotmap::Notify::print( "Grabbing results for sample ${sample_id} from ${search_results}\n");
+    $self->Shotmap::Notify::print_verbose( "Grabbing results for sample ${sample_id} from ${search_results}\n");
     #open search results, get all results for this split
     $self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, $orf_split_filename, $top_type );
     #Optionally load the data into the searchresults table
-    unless( $self->is_slim ){
-	$self->Shotmap::Notify::print( "Loading results for sample ${sample_id} into database\n");
-	if( 1 ){ #we REQUIRE this type lof loading now
-	    my $tmp    = "/tmp/" . $sample_id . ".sql";	    
-	    my $table  = "searchresults";
-	    my $nrows  = 10000;
-	    my @fields = ( "orf_alt_id", "read_alt_id", "sample_id", "target_id", "famid", "score", "evalue", "orf_coverage", "aln_length", "classification_id" );
-	    my $fks    = { "sample_id"         => $sample_id, 
-			   "classification_id" => $class_id,
-	    };	   #do we need this? seems safer, and easier to insert, remove samples/classifications from table this way, but also a little slower with extra key check. those tables are small.
-	    $self->Shotmap::DB::bulk_import( $table, $output_file, $tmp, $nrows, $fks, \@fields );    
+    if( $self->use_db ){
+	unless( $self->is_slim ){
+	    $self->Shotmap::Notify::print_verbose( "Loading results for sample ${sample_id} into database\n");
+	    if( 1 ){ #we REQUIRE this type lof loading now
+		my $tmp    = "/tmp/" . $sample_id . ".sql";	    
+		my $table  = "searchresults";
+		my $nrows  = 10000;
+		my @fields = ( "orf_alt_id", "read_alt_id", "sample_id", "target_id", "famid", "score", "evalue", "orf_coverage", "aln_length", "classification_id" );
+		my $fks    = { "sample_id"         => $sample_id, 
+			       "classification_id" => $class_id,
+		};	   #do we need this? seems safer, and easier to insert, remove samples/classifications from table this way, but also a little slower with extra key check. those tables are small.
+		$self->Shotmap::DB::bulk_import( $table, $output_file, $tmp, $nrows, $fks, \@fields );    
+	    }
 	}
     }
-    #clean up
-#    close $fh;
-#    unlink( $split_results_cat );
     return $self;
 }
 
@@ -857,7 +955,9 @@ sub parse_mysqld_results_from_dir{
     }
     my $fh;
     open( $fh, ">$output_file" ) || die "Can't open $output_file for write: $!\n";
-
+    if( !defined( $orf_tophits ) ){
+	$self->Shotmap::Notify::warn( "No results were obtained while parsing $results_dir!\n" );
+    }
     foreach my $orf( keys( %$orf_tophits ) ){      
 	if( $top_type eq "best_in_fam" ){
 	    foreach my $fam( keys( %{ $orf_tophits->{$orf} } ) ){
@@ -1804,7 +1904,7 @@ sub parse_results {
     my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
     my $nprocs       = $self->nprocs();
     my $trans_method = $self->trans_method;
-    my $proj_dir     = $self->project_path;
+    my $proj_dir     = $self->project_dir;
     my $scripts_dir  = $self->local_scripts_dir;
     my $t_score      = $self->parse_score;
     my $t_coverage   = $self->parse_coverage;
@@ -2027,10 +2127,10 @@ sub classify_reads_flatfile{
 	$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type, "recurse" );
     }
     #only if the user wants a full database
-    unless( $self->is_slim ){ 
+    unless( $self->is_slim || ! $self->use_db ){ 
         #have yet to write this function...
-	$self->DB::load_classifications_from_file( $output_file );
-    }
+	$self->Shotmap::DB::load_classifications_from_file( $output_file );
+    }m
     $self->Shotmap::Notify::print( "\t...classification complete" );
     return $output_file;
 }
@@ -2179,7 +2279,7 @@ sub calculate_abundances{
 }
 
 sub calculate_abundances_flatfile{
-    my ( $self, $sample_id, $class_id, $abundance_parameter_id, $class_map ) = @_;
+    my ( $self, $sample_id, $class_id, $abundance_parameter_id, $class_map, $length_hash ) = @_;
     my $norm_type  = $self->normalization_type;
     my $abund_type = $self->abundance_type; 
     #do rarefaction here
@@ -2217,6 +2317,10 @@ sub calculate_abundances_flatfile{
 
     my $abundances = {}; #maps families to abundances
     open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
+    #do some preprocessing for database-free analysis
+    if( ! $self->use_db ){
+
+    }
     while(<MAP>){
 	chomp $_;
 	my ( $orf_alt_id, $read_alt_id, $sample, $target_id, $famid, $score, $evalue, $coverage, $aln_length ) = split( "\,", $_ );
@@ -2231,9 +2335,17 @@ sub calculate_abundances_flatfile{
 	print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
 	my ( $target_length, $family_length );
 	if( $norm_type eq 'target_length' ){
-	    $target_length = $self->Shotmap::DB::get_target_length( $target_id );
+	    if( $self->use_db ){
+		$target_length = $self->Shotmap::DB::get_target_length( $target_id );
+	    } else {
+		$target_length = $length_hash->{$target_id};
+	    }
 	} elsif( $norm_type eq 'family_length' ){
-	    $family_length = $self->Shotmap::DB::get_family_length( $famid );
+	    if( $self->use_db ){
+		$family_length = $self->Shotmap::DB::get_family_length( $famid );
+	    } else {
+		$family_length = $length_hash->{$famid};
+	    }
 	}
 	if( $abund_type eq 'binary' ){
 	    my $raw;
@@ -2669,7 +2781,7 @@ sub calculate_diversity{
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
     #does one already exist? if so, use it (this allows some additional customization, but is a bit hacky)
     my $metadata_table;
-    my $potential = $outdir . "sample_metadata.tab";
+    my $potential = $self->params_dir . "/sample_metadata.tab";
     if( -e $potential ){
 	warn( "Using the metadata table located at $potential. If you prefer I use a different table, please first delete this file\n");
 	$metadata_table = $potential;
@@ -2689,7 +2801,7 @@ sub calculate_diversity{
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
     my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} < ${script}";
-    print $cmd . "\n";
+    $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
@@ -2704,7 +2816,7 @@ sub calculate_diversity{
     #produce plots and output tables for this analysis
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
     $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
-    $self->Shotmap::Notify::print_verbose( $cmd . "\n" );
+    $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
     #ORDINATE SAMPLES BY FAMILY RELATIVE ABUNDANCE (e.g. PCA Coordinates)
@@ -2715,62 +2827,8 @@ sub calculate_diversity{
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
     $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
     $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
-    $self->Shotmap::Notify::print_verbose( print $cmd . "\n" );
+    $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
-}
-
-#MODIFIED
-sub get_project_metadata{
-    my( $self )  = @_;
-    my $output   = File::Spec->catdir( $self->ffdb, "projects", $self->db_name, $self->project_id(), "output", "sample_metadata.tab" );
-    my $samples  = $self->Shotmap::DB::get_samples_by_project_id( $self->project_id() );
-    open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
-    my $data   = {}; #will push rows to data, need to know all fields before printing header
-    my $fields = {};
-    while( my $row = $samples->next ){
-	my $sample_id     = $row->sample_id;
-	my $sample_alt_id = $row->sample_alt_id;
-	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
-	my $metadata      = $row->metadata;
-	if( !( defined( $metadata ) ) ){
-	    warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
-	    $fields = {};
-	    goto PRINTMETA;
-	}
-	my( @fields )  = split( ",", $metadata );
-	foreach my $field( @fields ){
-	    my( $field_name, $field_value ) = split( "\=", $field );
-	    $data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
-	    $fields->{$field_name}++;
-	}
-    }
-  PRINTMETA:;
-    if( defined( $fields ) ){ #then we found metadata
-	#print the header
-	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
-	foreach my $sample_id( keys( %{ $data } ) ){
-	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
-	    my @values = sort(keys( %{$fields} ));
-	    foreach my $field( @values ){
-		if( $field eq $values[-1] ){
-		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
-		} else{
-		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
-		}
-	    }   
-	}
-	close OUT;
-    }
-    else{
-	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", "\n" );
-	foreach my $sample_id( keys( %{ $data } ) ){
-	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
-	}
-	close OUT;
-    }
-    return $output;
 }
 
 sub count_seqs_in_file{
@@ -2786,5 +2844,20 @@ sub count_seqs_in_file{
     return $counter;       
 }
 
+sub parse_file_cols_into_hash{
+    my( $self, $file, $key_col_num, $val_col_num, $delimiter ) = @_; #0 index columns in file
+    if( !defined( $delimiter ) ){
+	$delimiter = "\t";
+    }
+    my $hash = ();
+    open( FILE, $file ) || die "Can't open $file for read: $!\n";
+    while( <FILE> ){
+	chomp $_;
+	my @data = split( $delimiter, $_ );
+	$hash->{$data[$key_col_num]} = $data[$val_col_num];
+    }
+    close FILE;
+    return $hash;
+}
 
 1;

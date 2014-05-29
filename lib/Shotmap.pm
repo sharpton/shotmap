@@ -33,7 +33,7 @@ sub new{
     $self->{"user"}        = undef; #username to interact with DB
     $self->{"pass"}        = undef; #password to interact with DB
     $self->{"dbname"}      = undef; #name of the mysql database to talk to
-    $self->{"projectpath"} = undef; #path to the raw data
+    $self->{"rawdata"} = undef; #path to the raw data
     $self->{"projectname"} = undef;
     $self->{"project_id"}  = undef;
     $self->{"proj_desc"}   = undef;
@@ -95,15 +95,15 @@ sub wait{
     return $self->{"wait"};    
 }
 
-sub project_path{
+sub raw_data{
     my $self = shift;
     my $path = shift;
     if( defined( $path ) ){
-	$self->{"projectpath"} = $path;
+	$self->{"rawdata"} = $path;
     }
-    return $self->{"projectpath"};
+    return $self->{"rawdata"};
 }
-sub get_project_path{ my $self = shift; return $self->project_path };
+sub get_project_dir{ my $self = shift; return $self->project_dir };
 
 sub get_sample_ids {
     my ($self) = @_;
@@ -874,12 +874,43 @@ sub build_remote_script_dir {
 }
 
 sub search_type{  #blast or hmm based on algo name
-    my( $self, $type ) = @_;
-    if( defined( $type ) ){
-	$self->{"search_type"} = $type;
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"search_type"} = $value;
     }
     return $self->{"search_type"};
 }
+
+sub use_db{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"use_db"} = $value;
+    }
+    return $self->{"use_db"};
+}
+
+sub db_type{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"db_type"} = $value;
+    }
+    return $self->{"db_type"};
+
+}
+
+sub params_dir{
+    my( $self, $value ) = @_;
+    my $key = "parameters_dir";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub params_file{
+    my( $self, $value ) = @_;
+    my $key = "parameters_file";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}   
 
 sub set_value{
     my( $self, $key, $value ) = @_;

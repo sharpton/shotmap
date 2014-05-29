@@ -69,20 +69,10 @@ sub check_vars{
 	    "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, ".
 	    "so please specify the full path in that case. Specify a directory that exists."
 	);
-    (defined($self->opts->{"dbhost"}))          
+    (defined( $self->opts->{"db"} ) ) 
 	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--dbhost (remote database hostname: example --dbhost='data.youruniversity.edu') MUST be specified!"
-	);
-    (defined($self->opts->{"dbuser"}))
-          or $self->Shotmap::Notify::dieWithUsageError(
-	      "--dbuser (remote database mysql username: example --dbuser='dataperson') MUST be specified!"
-	  );
-    (defined($self->opts->{"dbpass"}) || defined($self->opts->{"conf-file"})) 
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--dbpass (mysql password for user --dbpass='" . $self->opts->{"dbuser"} . 
-	    "') or --conf-file (file containing password) MUST be specified here in super-insecure plaintext, " .
-	    "unless your database does not require a password, which is unusual. If it really is the case that you require NO password, " .
-	    "you should specify --dbpass='' OR include a password in --conf-file ...."
+	    "I do not know if you want to use a mysql database to store your data or not. Please specify with --db. Select from:\n" .
+	    "<none> <full> <slim>"
 	);
     if( defined( $self->opts->{"conf-file"} ) ){
 	( -e $self->opts->{"conf-file"} ) or 
@@ -169,16 +159,42 @@ sub check_vars{
 		$self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n"
 	    );
     }    
-    if (!defined($self->opts->{"dbname"})) {
+    my $dbtype = $self->opts->{"db"};
+    if( $dbtype ne "none" &&
+	$dbtype ne "full" &&
+	$dbtype ne "slim" ){
 	$self->Shotmap::Notify::dieWithUsageError(
-	    "Note: --dbname=NAME was not specified on the command line, so I don't know which mysql database to talk to. Exiting\n"
+	    "I do not recognize the option you've provided with --db. Please specify with --db. Select from:\n" .
+	    "<none> <full> <slim>"
 	    );
-    }    
-    if (!defined($self->opts->{"dbschema"}) ) {
-	my $schema_name = "Shotmap::Schema";
-	$self->Shotmap::Notify::warn(
-	    "Note: --dbschema=SCHEMA was not specified on the command line, so we are using the default schema name, which is \"$schema_name\".\n"
+    }
+    if( $dbtype ne "none" ){
+	(defined($self->opts->{"dbhost"}))          
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--dbhost (remote database hostname: example --dbhost='data.youruniversity.edu') MUST be specified!"
 	    );
+	(defined($self->opts->{"dbuser"}))
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--dbuser (remote database mysql username: example --dbuser='dataperson') MUST be specified!"
+	    );
+	(defined($self->opts->{"dbpass"}) || defined($self->opts->{"conf-file"})) 
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--dbpass (mysql password for user --dbpass='" . $self->opts->{"dbuser"} . 
+		"') or --conf-file (file containing password) MUST be specified here in super-insecure plaintext, " .
+		"unless your database does not require a password, which is unusual. If it really is the case that you require NO password, " .
+		"you should specify --dbpass='' OR include a password in --conf-file ...."
+	    );
+	if (!defined($self->opts->{"dbname"})) {
+	    $self->Shotmap::Notify::dieWithUsageError(
+		"Note: --dbname=NAME was not specified on the command line, so I don't know which mysql database to talk to. Exiting\n"
+		);
+	}    
+	if (!defined($self->opts->{"dbschema"}) ) {
+	    my $schema_name = "Shotmap::Schema";
+	    $self->Shotmap::Notify::warn(
+		"Note: --dbschema=SCHEMA was not specified on the command line, so we are using the default schema name, which is \"$schema_name\".\n"
+		);
+	}
     }
     (defined($self->opts->{"searchdb-name"})) 
 	or $self->Shotmap::Notify::dieWithUsageError( 
@@ -268,7 +284,7 @@ sub get_options{
 
     my( $conf_file,            $local_ffdb,            $local_reference_ffdb, $raw_data,         $input_pid,
 	$goto,                 $db_username,           $db_pass,              $db_hostname,         $dbname,
-	$schema_name,          $db_prefix_basename,    $search_db_split_size,
+	$schema_name,          $db_prefix_basename,    $search_db_split_size, $db_type,
 	#the following options are now obsolete
 	$hmm_db_split_size,    $blast_db_split_size, 
 	$family_subset_list,  
@@ -301,6 +317,7 @@ sub get_options{
 	, "refdb"      => \$local_reference_ffdb
 	, "rawdata"    => \$raw_data
 	# Database-server related variables
+	, "db"         => \$db_type 
 	, "dbuser"     => \$db_username
 	, "dbpass"     => \$db_pass
 	, "dbhost"     => \$db_hostname
@@ -330,7 +347,7 @@ sub get_options{
 	,    "multi-count"  => \$mult_row_insert_count
 	,    "bulk"         => \$bulk
 	,    "bulk-count"   => \$bulk_insert_count
-	,    "slim"         => \$slim
+	,    "slim"         => \$slim #no longer specified at the command line, use db-type
 	#search methods 
 	,    "use_hmmscan"   => \$use_hmmscan   #obsolete
 	,    "use_hmmsearch" => \$use_hmmsearch #obsolete
@@ -381,6 +398,7 @@ sub get_options{
 			  , "refdb=s" 
 			  , "rawdata|i=s"      
 			      # Database-server related variables
+			  , "db=s"
 			  , "dbuser|u=s"           
 			  , "dbpass|p=s"         
 			  , "dbhost=s"          
@@ -494,7 +512,7 @@ sub set_params{
     $self->verbose( $self->opts->{"verbose"} );
     $self->dryrun( $self->opts->{"dryrun"} );
     $self->project_id( $self->opts->{"pid"} );
-    $self->project_dir( $self->opts->{"rawdata"} );
+    $self->raw_data( $self->opts->{"rawdata"} );
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
 
@@ -620,23 +638,32 @@ sub set_params{
     }
     
     # Set Relational (MySQL) database values
-    $self->db_name( $self->opts->{"dbname"} );
-    $self->db_host( $self->opts->{"dbhost"} );
-    $self->db_user( $self->opts->{"dbuser"} );
-    my $DBIstring = "DBI:mysql:" . $self->db_name . ":" . $self->db_host;
-    $self->dbi_connection($DBIstring);
-    if( defined( $self->opts->{"dbpass"} ) ){
-	$self->db_pass( $self->opts->{"dbpass"} ); 
-    } elsif( defined( $self->opts->{"conf-file"}) ){
-	my $pass = $self->Shotmap::Load::get_password_from_file( $self->opts->{"conf-file"} );
-	$self->db_pass( $pass );
+    $self->db_type( $self->opts->{"db"} );
+    if( $self->db_type ne "none" ){
+	$self->use_db( 1 );
+	$self->db_name( $self->opts->{"dbname"} );
+	$self->db_host( $self->opts->{"dbhost"} );
+	$self->db_user( $self->opts->{"dbuser"} );
+	my $DBIstring = "DBI:mysql:" . $self->db_name . ":" . $self->db_host;
+	$self->dbi_connection($DBIstring);
+	if( defined( $self->opts->{"dbpass"} ) ){
+	    $self->db_pass( $self->opts->{"dbpass"} ); 
+	} elsif( defined( $self->opts->{"conf-file"}) ){
+	    my $pass = $self->Shotmap::Load::get_password_from_file( $self->opts->{"conf-file"} );
+	    $self->db_pass( $pass );
+	}
+	$self->schema_name( $self->opts->{"dbschema"} );
+	$self->build_schema();
+	$self->multi_load( $self->opts->{"multi"} );
+	$self->bulk_load( $self->opts->{"bulk"}  );
+	$self->bulk_insert_count( $self->opts->{"bulk_count"} );
+	if( $self->db_type eq "slim" ){
+	    $self->is_slim( 1 );
+	}
+    } else {
+	$self->use_db( 0 );
+	$self->db_name( "nodb" );
     }
-    $self->schema_name( $self->opts->{"dbschema"} );
-    $self->build_schema();
-    $self->multi_load( $self->opts->{"multi"} );
-    $self->bulk_load( $self->opts->{"bulk"}  );
-    $self->is_slim( $self->opts->{"slim"} );
-    $self->bulk_insert_count( $self->opts->{"bulk_count"} );
 
     # Set parsing values
     $self->parse_evalue( $self->opts->{"parse-evalue"} ); 
@@ -674,8 +701,10 @@ sub set_params{
 sub load_defaults{
     my ( $options ) = shift; #options is a hashref
     my $defaults = {
-	# FFDB Search database related options
-	"reps-only"        => 0
+	    # db settings
+  	    "db" => "none"
+	    # FFDB Search database related options
+	    , "reps-only"        => 0
 	    , "nr"               => 1
 	    , "db-suffix"        => 'rsdb'
 	    , "verbose"          => 0
@@ -686,21 +715,21 @@ sub load_defaults{
 	    ,    "dbschema"     => "Shotmap::Schema"
 	    ,    "bulk"         => 1
 	    ,    "bulk-count"   => 1000	
-	    #search methods 
+	    # search methods 
 	    ,    "search-method" => 'rapsearch'
-	    #general options
+	    # general options
 	    ,    "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
-	    #translation options
+	    # translation options
 	    ,    "trans-method"   => 'transeq'
 	    ,    "split-orfs"     => 1
 	    ,    "orf-len-filter" => 14
-	    #search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
+	    # search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 	    ,    "parse-score"    => 20
-	    #family classification thresholds (more stringent)
+	    # family classification thresholds (more stringent)
 	    ,    "top-hit"        => 1
 	    ,    "hit-type"       => 'read'
-	    #abundance claculation parameters
+	    # abundance claculation parameters
 	    ,    "abundance-type"     => 'coverage'
 	    ,    "normalization-type" => 'target_length'
     };

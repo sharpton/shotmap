@@ -22,7 +22,7 @@ sub load_project{
     my( $self ) = @_;
     my $is_remote   = $self->remote();
     my $dryRun      = $self->dryrun();
-    my $project_dir = $self->project_dir();
+    my $project_dir = $self->raw_data();
     #LOAD PROJECT, SAMPLES, METAREADS
     #Grab the samples associated with the project
     $self->Shotmap::Notify::printBanner("LOADING PROJECT");
@@ -38,7 +38,9 @@ sub load_project{
 ############
 #Load Data. Project id becomes a project var in load_project
     
-    $self->Shotmap::Run::check_prior_analyses( $self->opts->{"reload"} ); #have any of these samples been processed already?
+    if( $self->use_db ) { 
+	$self->Shotmap::Run::check_prior_analyses( $self->opts->{"reload"} ); #have any of these samples been processed already?
+    }
     
     if (!$dryRun) {
 	$self->Shotmap::Run::load_project($project_dir );

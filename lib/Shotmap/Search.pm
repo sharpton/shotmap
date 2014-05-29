@@ -14,6 +14,7 @@ package Shotmap::Search;
 
 use Shotmap;
 use File::Basename;
+use File::Copy;
 
 sub build_search_db{
     my( $self ) = @_;
@@ -42,22 +43,48 @@ sub build_search_db{
     }
     
     #may not need to build the search database, but let's see if we need to load the database info into mysql....
-    $self->Shotmap::Notify::printBanner("LOADING FAMILY DATA"); #could run a check to see if this is necessary, the loadings could be sped up as well....
+    if( $self->use_db ){
+	$self->Shotmap::Notify::printBanner("LOADING FAMILY DATA"); #could run a check to see if this is necessary, the loadings could be sped up as well....
 
-    if( ! $self->Shotmap::Run::check_family_loadings( $search_type, $self->db_name ) ){
-	$self->Shotmap::Run::load_families( $search_type, $self->db_name );
-    }
-    if( ! $self->Shotmap::Run::check_familymember_loadings( $search_type, $self->db_name ) ){
-	$self->Shotmap::Run::load_family_members( $search_type, $self->db_name );
-    }    
-    #still need to build this
-    if( defined( $self->family_annotations ) ){ #points to file that contains annotations for families
-	if( ! -e $self->family_annotations ){
-	    die "The path to the family annotations that you specified does not seem to exist! You pointed me to <" . $self->family_annotations . ">\n";
-	} else {
-	    $self->Shotmap::DB::load_annotations( $self->family_annotations );
+	if( ! $self->Shotmap::Run::check_family_loadings( $search_type, $self->db_name ) ){
+	    $self->Shotmap::Run::load_families( $search_type, $self->db_name );
 	}
-    }
+	if( ! $self->Shotmap::Run::check_familymember_loadings( $search_type, $self->db_name ) ){
+	    $self->Shotmap::Run::load_family_members( $search_type, $self->db_name );
+	}    
+	#still need to build this
+	if( defined( $self->family_annotations ) ){ #points to file that contains annotations for families
+	    if( ! -e $self->family_annotations ){
+		die "The path to the family annotations that you specified does not seem to exist! You pointed me to <" . $self->family_annotations . ">\n";
+	    } else {
+		$self->Shotmap::DB::load_annotations( $self->family_annotations );
+	    }
+	}
+    } else {
+	my $raw_db_path    = $self->search_db_path( $search_type ); 
+	my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
+	my $ffdb_famlen_cp = $self->params_dir . "/family_lengths.tab";
+	my $symlink_exists = eval { symlink( $famlen_tab, $ffdb_famlen_cp ); 1 };
+	if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
+	    copy( $famlen_tab, $ffdb_famlen_cp );
+	}
+	if( ! -e $famlen_tab ){
+	    die "Can't seem to create a copy of the family length table located here:\n  $famlen_tab \n".
+		"Trying to place it here:\n  $ffdb_famlen_cp\n";
+	}
+	if( $search_type eq "blast" ){
+	    my $seqlen_tab     = $self->search_db_path( $search_type ) . "/sequence_lengths.tab";
+	    my $ffdb_seqlen_cp = $self->params_dir . "/sequence_lengths.tab";
+	    $symlink_exists    = eval { symlink( $seqlen_tab, $ffdb_seqlen_cp); 1 };
+	    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
+		copy( $seqlen_tab, $ffdb_seqlen_cp );
+	    }
+	    if( ! -e $seqlen_tab ){
+		die "Can't seem to create a copy of the family length table located here:\n  $seqlen_tab \n".
+		    "Trying to place it here:\n  $ffdb_seqlen_cp\n";
+	    }	    
+	}
+    }    
     return $self;
 }
 
@@ -152,10 +179,11 @@ sub stage_search_db{
     my $projID = $self->project_id();
     my $dbname = $self->db_name();
     my $localScriptDir = $self->local_scripts_dir();
+    my $search_method = $self->search_method;
 
     if ($self->remote && $self->stage){
 	$self->Shotmap::Notify::printBanner("STAGING REMOTE SEARCH DATABASE");
-	if (defined($self->search_db_name("hmm")) && ($self->use_search_alg("hmmsearch") || $self->use_search_alg("hmmscan"))){
+	if (defined($self->search_db_name("hmm")) && ( $search_method eq "hmmsearch" || $search_method eq "hmmscan" )){
 	    $self->Shotmap::Run::remote_transfer_search_db( $self->search_db_name("hmm"), "hmm");
 	    if (!$self->scratch){
 		print "Not using remote scratch space, apparently...\n";
@@ -165,20 +193,21 @@ sub stage_search_db{
 		print "Using remote scratch space, apparently...\n";
 	    }
 	}	
-	if (defined($self->search_db_name("blast")) && ($self->use_search_alg("blast") || $self->use_search_alg("last") || $self->use_search_alg("rapsearch"))){
+	if (defined($self->search_db_name("blast")) && ( $search_method eq "blast" || $search_method eq "last" || $search_method eq "rapsearch" )){
+	    print "Here\n";
 	    my $blastdb_name = $self->search_db_name( "blast" );
 	    my $use_scratch  = $self->scratch;
 	    $self->Shotmap::Run::remote_transfer_search_db($self->search_db_name("blast"), "blast");
 	    #should do optimization here. Also, should roll over to blast+
 	    if( !$self->scratch ){
-		print "Not using remote scratch space, apparently...\n";
+		$self->Shotmap::Notify::print_verbose ("Not using remote scratch space, apparently...\n");
 		$self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("blast"), "blast");
 	    } else {
-		print "Using remote scratch space, apparently...\n";
+		$self->Shotmap::Notify::print_verbose( "Using remote scratch space, apparently...\n" );
 	    }
 	    my $project_path = $self->remote_project_path();
 	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
-	    if ($self->use_search_alg("blast")){
+	    if ($search_method eq "blast" ){
 		print "Building remote formatdb script...\n";
 		my $formatdb_script_path = "$local_ffdb/projects/$dbname/$projID/run_formatdb.sh";
 		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_formatdb_script.pl -o $formatdb_script_path " .
@@ -186,7 +215,7 @@ sub stage_search_db{
 		$self->Shotmap::Run::transfer_file($formatdb_script_path, ($self->remote_connection() . ":" . $self->remote_script_path("formatdb") ));
 		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("formatdb") );
 	    }
-	    if ($self->use_search_alg("last")){
+	    if ($search_method eq "last" ){
 		print "Building remote lastdb script...\n";
 		my $lastdb_script = "$local_ffdb/projects/$dbname/$projID/run_lastdb.sh";
 		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_lastdb_script.pl -o $lastdb_script " . 
@@ -194,7 +223,7 @@ sub stage_search_db{
 		$self->Shotmap::Run::transfer_file($lastdb_script, ($self->remote_connection() . ":" . $self->remote_script_path("lastdb") ));
 		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("lastdb") ); #this will work for last
 	    }
-	    if ($self->use_search_alg("rapsearch")){
+	    if ($search_method eq "rapsearch" ){
 		print "Building remote prerapsearch script...\n";
 		my $db_suffix = $self->search_db_name_suffix();
 		my $prerapsearch_script = "$local_ffdb/projects/$dbname/$projID/run_prerapsearch.sh";

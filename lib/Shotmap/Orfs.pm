@@ -24,33 +24,35 @@ sub load_orfs{
     my $dbname     = $self->db_name();
     my $projID     = $self->project_id();
     my $local_ffdb = $self->ffdb();
-    unless( $self->is_slim ){
-	$self->Shotmap::Notify::printBanner("LOADING TRANSLATED READS");
-	foreach my $sample_id (@{ $self->get_sample_ids() }){
-	    my $projID     = $self->project_id();
-	    my $in_orf_dir = "$local_ffdb/projects/$dbname/$projID/$sample_id/orfs";
-	    my $orfCount   = 0;
-	    foreach my $in_orfs(@{ $self->MRC::DB::get_split_sequence_paths($in_orf_dir, 1) }){
-		warn "Processing orfs in <$in_orfs>...";
-		my $orfs = Bio::SeqIO->new(-file => $in_orfs, -format => 'fasta'); #we should move this out of bioperl for speed...
-		if( $self->bulk_load() ){
-		    if( !$dryRun) { $self->Shotmap::Run::bulk_load_orf( $in_orfs, $sample_id, $self->trans_method ); }
-		    else { $self->Shotmap::Notify::dryNotify(); }
-		}
-		elsif ($self->is_multiload()){
-		    if (!$dryRun) { $self->Shotmap::Run::load_multi_orfs($orfs, $sample_id, $self->trans_method); }
-		    else { $self->Shotmap::Notify::dryNotify(); }
-		}
-		else {
-		    while (my $orf = $orfs->next_seq()) {
-			my $orf_alt_id  = $orf->display_id();
-			my $read_alt_id = Shotmap::Run::parse_orf_id($orf_alt_id, $self->trans_method );
-			if (!$dryRun) { $self->Shotmap::Run::load_orf($orf_alt_id, $read_alt_id, $sample_id); }
+    if( $self->use_db ){
+	unless( $self->is_slim ){
+	    $self->Shotmap::Notify::printBanner("LOADING TRANSLATED READS");
+	    foreach my $sample_id (@{ $self->get_sample_ids() }){
+		my $projID     = $self->project_id();
+		my $in_orf_dir = "$local_ffdb/projects/$dbname/$projID/$sample_id/orfs";
+		my $orfCount   = 0;
+		foreach my $in_orfs(@{ $self->Shotmap::DB::get_split_sequence_paths($in_orf_dir, 1) }){
+		    warn "Processing orfs in <$in_orfs>...";
+		    my $orfs = Bio::SeqIO->new(-file => $in_orfs, -format => 'fasta'); #we should move this out of bioperl for speed...
+		    if( $self->bulk_load() ){
+			if( !$dryRun) { $self->Shotmap::Run::bulk_load_orf( $in_orfs, $sample_id, $self->trans_method ); }
 			else { $self->Shotmap::Notify::dryNotify(); }
-			$self->Shotmap::Notify::print_verbose( "Added " . ($orfCount++) . " orfs to the DB...\n" );
 		    }
+		    elsif ($self->is_multiload()){
+			if (!$dryRun) { $self->Shotmap::Run::load_multi_orfs($orfs, $sample_id, $self->trans_method); }
+			else { $self->Shotmap::Notify::dryNotify(); }
+		    }
+		    else {
+			while (my $orf = $orfs->next_seq()) {
+			    my $orf_alt_id  = $orf->display_id();
+			    my $read_alt_id = Shotmap::Run::parse_orf_id($orf_alt_id, $self->trans_method );
+			    if (!$dryRun) { $self->Shotmap::Run::load_orf($orf_alt_id, $read_alt_id, $sample_id); }
+			    else { $self->Shotmap::Notify::dryNotify(); }
+			    $self->Shotmap::Notify::print_verbose( "Added " . ($orfCount++) . " orfs to the DB...\n" );
+			}
+		    }
+		    
 		}
-		
 	    }
 	}
     }
