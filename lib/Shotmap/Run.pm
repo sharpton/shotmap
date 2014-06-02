@@ -2130,7 +2130,7 @@ sub classify_reads_flatfile{
     unless( $self->is_slim || ! $self->use_db ){ 
         #have yet to write this function...
 	$self->Shotmap::DB::load_classifications_from_file( $output_file );
-    }m
+    }
     $self->Shotmap::Notify::print( "\t...classification complete" );
     return $output_file;
 }
