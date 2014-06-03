@@ -1082,8 +1082,7 @@ sub build_search_db{
     #Have you built this DB already?
 
     if( -d $raw_db_path && !($force) ){
-	warn "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --forcedb option.\n";
-	exit(0);
+	die "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --force-searchdb option.\n";
     }
 
     #create the HMMdb dir that will hold our split hmmdbs
