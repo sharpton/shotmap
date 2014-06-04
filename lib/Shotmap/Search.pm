@@ -194,7 +194,6 @@ sub stage_search_db{
 	    $self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("hmm"), "hmm");
 	}	
 	if (defined($self->search_db_name("blast")) && ( $search_method eq "blast" || $search_method eq "last" || $search_method eq "rapsearch" )){
-	    print "Here\n";
 	    my $blastdb_name = $self->search_db_name( "blast" );
 	    my $use_scratch  = $self->scratch;
 	    $self->Shotmap::Run::remote_transfer_search_db($self->search_db_name("blast"), "blast");
