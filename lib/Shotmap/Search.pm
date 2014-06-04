@@ -29,7 +29,7 @@ sub build_search_db{
 		);
 	}
 	$self->Shotmap::Notify::printBanner("BUILDING HMM DATABASE");
-	$self->Shotmap::Run::build_search_db( $self->search_db_name( $search_type ), $self->search_db_split_size( $search_type ), $self->force_build_search_db, $search_type );
+	$self->Shotmap::Run::build_search_db( $self->search_db_name( $search_type ), $self->force_build_search_db, $search_type );
     }
     #blast-like
     if ($self->build_search_db("blast")) {
@@ -188,10 +188,10 @@ sub stage_search_db{
 	    if (!$self->scratch){
 		print "Not using remote scratch space, apparently...\n";
 		#should do optimization here
-		$self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("hmm"), "hmm");
 	    } else {
 		print "Using remote scratch space, apparently...\n";
 	    }
+	    $self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("hmm"), "hmm");
 	}	
 	if (defined($self->search_db_name("blast")) && ( $search_method eq "blast" || $search_method eq "last" || $search_method eq "rapsearch" )){
 	    print "Here\n";
@@ -201,10 +201,10 @@ sub stage_search_db{
 	    #should do optimization here. Also, should roll over to blast+
 	    if( !$self->scratch ){
 		$self->Shotmap::Notify::print_verbose ("Not using remote scratch space, apparently...\n");
-		$self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("blast"), "blast");
 	    } else {
 		$self->Shotmap::Notify::print_verbose( "Using remote scratch space, apparently...\n" );
 	    }
+	    $self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("blast"), "blast");
 	    my $project_path = $self->remote_project_path();
 	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
 	    if ($search_method eq "blast" ){
