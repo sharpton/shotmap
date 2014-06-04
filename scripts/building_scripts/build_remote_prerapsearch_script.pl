@@ -96,8 +96,9 @@ if( $scratch ){
     #Copy files over to the node's scratch dir
     print OUT join( "\n",
 		    "echo \"Copying dbfiles to scratch\"            >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
-		    "cp \${DBPATH}/\${DB}.gz /scratch/              >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
-		    "gunzip /scratch/\${DB}.gz                      >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
+		    "cp \${DBPATH}/\${DB}* /scratch/              >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
+		    #no longer compress
+		    #"gunzip /scratch/\${DB}.gz                      >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
 		    "\n");
 
     #Run the job
@@ -109,8 +110,8 @@ if( $scratch ){
     print OUT join( "\n",
 		    "echo \"removing input and dbfiles from scratch\" >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
 		    "echo \"moving results to main\"                  >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
-		    "gzip /scratch/\${DB}*                            >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
-		    "mv /scratch/\${DB}*.gz \${DBPATH}/                  >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
+		    #"gzip /scratch/\${DB}*                            >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
+		    "mv /scratch/\${DB}* \${DBPATH}/                  >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
 		    "echo \"moved to main\"                           >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
 		    "date                                             >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",
 		    "echo \"RUN FINISHED\"                            >> \$LOGS/prerapsearch/\${JOB_ID}.\${SGE_TASK_ID}.all 2>&1",

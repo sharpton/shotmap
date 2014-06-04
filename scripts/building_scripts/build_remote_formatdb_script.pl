@@ -98,8 +98,8 @@ if( $scratch ){
     #Copy files over to the node's scratch dir
     print OUT join( "\n",
 		    "echo \"Copying dbfiles to scratch\"            >> ${ALL_FILE} 2>&1",
-		    "cp \${DBPATH}/\${DB}.gz /scratch/              >> ${ALL_FILE} 2>&1",
-		    "gunzip /scratch/\${DB}.gz                      >> ${ALL_FILE} 2>&1",
+		    "cp \${DBPATH}/\${DB}* /scratch/              >> ${ALL_FILE} 2>&1",
+		    #"gunzip /scratch/\${DB}.gz                      >> ${ALL_FILE} 2>&1",
 		    "\n");
     #RUN HMMER
     print OUT "date                                                 >> ${ALL_FILE} 2>&1\n";
@@ -111,9 +111,9 @@ if( $scratch ){
     print OUT join( "\n",
 		    "echo \"removing input and dbfiles from scratch\" >> ${ALL_FILE} 2>&1",
 		    "echo \"moving results to netapp\"                >> ${ALL_FILE} 2>&1",
-		    "gzip /scratch/\${DB}*                            >> ${ALL_FILE} 2>&1",
-		    "mv /scratch/\${DB}*.gz \${DBPATH}/                  >> ${ALL_FILE} 2>&1",
-#		    "mv /scratch/\${DB}* \${DBPATH}/\${DB}            >> ${ALL_FILE} 2>&1",
+		    #"gzip /scratch/\${DB}*                            >> ${ALL_FILE} 2>&1",
+		    #"mv /scratch/\${DB}*.gz \${DBPATH}/                  >> ${ALL_FILE} 2>&1",
+		    "mv /scratch/\${DB}* \${DBPATH}/\${DB}            >> ${ALL_FILE} 2>&1",
 		    "echo \"moved to netapp\"                         >> ${ALL_FILE} 2>&1",
 		    "date                                             >> ${ALL_FILE} 2>&1",
 		    "echo \"RUN FINISHED\"                            >> ${ALL_FILE} 2>&1",
