@@ -564,7 +564,12 @@ sub set_params{
 
     # Set the search database properties and names
     $self->force_build_search_db( $self->opts->{"force-searchdb"} );
-    $self->build_search_db( $self->search_type, $self->opts->{"build-searchdb"} );
+    if( $self->force_build_search_db ){
+	$self->build_search_db( $self->search_type, 1 );
+	$self->stage(1) if $self->remote;
+    } else {
+	$self->build_search_db( $self->search_type, $self->opts->{"build-searchdb"} );
+    }
     $self->search_db_split_size( $self->search_type, $self->opts->{"searchdb-split-size"} );
     $self->nr( $self->opts->{"nr"} );     #should we build a non-redundant database
     $self->reps( $self->opts->{"reps"} ); #should we only use representative sequences? Probably defunct - just alter the input db
@@ -609,7 +614,7 @@ sub set_params{
     }
     # Set remote compute associated variables
     if( $self->remote ){
-	$self->stage( $self->opts->{"stage"} );
+	$self->stage( $self->opts->{"stage"} ) unless defined $self->stage(); #might have set above in force-searchdb statements
 	$self->remote_user( $self->opts->{"ruser"} );
 	$self->remote_host( $self->opts->{"rhost"} );
 	print( $self->remote_host . "\n" );
