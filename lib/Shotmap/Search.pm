@@ -22,7 +22,7 @@ sub build_search_db{
     my $search_method = $self->search_method;
     #NOTE: These warning should NEVER be needed given the precautions we take in Load.pm (search method defines type of database to build!)
     #hmm
-    if ($self->build_search_db($search_type)){
+    if ($self->build_search_db("hmm")){
 	if ( $search_method ne "hmmsearch" && $search_method ne "hmmscan" ){
 	    $self->Shotmap::Notify::warn("It seems that you want to build an hmm database, but you aren't invoking hmmscan or hmmsearch. " .
 					 "While I will continue, you should check your settings to make certain you aren't making a mistake."
@@ -32,7 +32,7 @@ sub build_search_db{
 	$self->Shotmap::Run::build_search_db( $self->search_db_name( $search_type ), $self->search_db_split_size( $search_type ), $self->force_build_search_db, $search_type );
     }
     #blast-like
-    if ($self->build_search_db($search_type)) {
+    if ($self->build_search_db("blast")) {
 	if ( $search_method ne "blast" && $search_method ne "last" && $search_method ne "rapsearch" ){
 	    $self->Shotmap::Notify::warn("It seems that you want to build a sequence database, but you aren't invoking pairwise sequence search algorithgm. " .
 					 "While I will continue, you should check your settings to make certain you aren't making a mistake. "

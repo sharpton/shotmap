@@ -589,7 +589,7 @@ sub set_params{
 	$self->Shotmap::Notify::dieWithUsageError(
 	    "You are apparently trying to conduct a pairwise sequence search, " .
 	    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
-	    "<${db_name}>. As a result, you must use the --build-refdb option to build a new blast database"
+	    "<${db_name}>. As a result, you must use the --build-searchdb option to build a new blast database"
 	    );
 	}
     }
@@ -602,7 +602,7 @@ sub set_params{
 	    if ( !$self->build_search_db( $self->search_type ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
 		$self->Shotmap::Notify::dieWithUsageError(
 		    "You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
-		    "and I can't find one that already exists with your requested name. As a result, you must use the --build-refdb option to build a new blast database"
+		    "and I can't find one that already exists with your requested name. As a result, you must use the --build-searchdb option to build a new blast database"
 		    );
 	    }
 	}

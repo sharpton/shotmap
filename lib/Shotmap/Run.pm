@@ -1082,8 +1082,7 @@ sub build_search_db{
     #Have you built this DB already?
 
     if( -d $raw_db_path && !($force) ){
-	warn "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --forcedb option.\n";
-	exit(0);
+	die "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --force-searchdb option.\n";
     }
 
     #create the HMMdb dir that will hold our split hmmdbs
@@ -2297,9 +2296,9 @@ sub calculate_abundances_flatfile{
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
 	$self->Shotmap::Notify::print_verbose( "\tCalculating abundances using all reads" );
-	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
+	#$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
         #flat file alternative here: 
-	#$read_count = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
+	$read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
     } else{
 	$read_count = $self->postrarefy_samples();
     }    
