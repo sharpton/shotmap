@@ -32,7 +32,7 @@ use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
 use Bio::SearchIO;
-use DBIx::Class::ResultClass::HashRefInflator;
+#use DBIx::Class::ResultClass::HashRefInflator;
 use Benchmark;
 use File::Spec;
 use List::Util qw( shuffle );

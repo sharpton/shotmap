@@ -26,7 +26,7 @@ use Data::Dumper;
 use File::Basename;
 use File::Copy;
 use File::Path qw(make_path rmtree);
-use DBIx::Class::ResultClass::HashRefInflator;
+#use DBIx::Class::ResultClass::HashRefInflator;
 use DBI; #used only for DBIx::BulkLoader::Mysql
 use DBD::mysql;
 use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
