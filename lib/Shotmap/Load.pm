@@ -603,7 +603,7 @@ sub set_params{
 		$self->Shotmap::Notify::dieWithUsageError(
 		    "You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
 		    "and I can't find one that already exists with your requested name. As a result, you must use the --build-searchdb option to build a new blast database"
-		    );2
+		    );
 	    }
 	}
     }

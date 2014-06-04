@@ -2296,9 +2296,9 @@ sub calculate_abundances_flatfile{
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
 	$self->Shotmap::Notify::print_verbose( "\tCalculating abundances using all reads" );
-	$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
+	#$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
         #flat file alternative here: 
-	#$read_count = $self->Shotmap::Run::count_objects_in_files( $metareads_dir, $rare_type );
+	$read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
     } else{
 	$read_count = $self->postrarefy_samples();
     }    
