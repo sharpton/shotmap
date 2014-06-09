@@ -21,7 +21,6 @@ use File::Basename;
 use File::Path;
 use File::Spec;
 use IPC::System::Simple qw(capture $EXITVAL);
-use Data::Dumper;
 
 sub new{
     my ($proto) = @_;

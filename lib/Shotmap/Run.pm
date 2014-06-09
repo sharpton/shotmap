@@ -1857,7 +1857,7 @@ sub run_search{
 	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
-            $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+            $cmd = "rapsearch -b=0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
             $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
         #ADD ADDITIONAL METHODS HERE    
