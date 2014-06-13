@@ -922,6 +922,75 @@ sub parse_mysqld_results_from_dir{
     opendir( RES, $results_dir ) || die "Can't open $results_dir for read in parse_and_load_search_results_bulk: $!\n";
     my @result_files = readdir( RES );
     closedir( RES );
+    my $touched = 0; #have we init output file during this run?
+    PARSELOOP: foreach my $result_file( @result_files ){
+	#testing purposes only...
+	#next if ( $result_file =~ m/\.splitcat/ );
+
+	#each resultfile contains unique orfs, so process one at a time 
+	my $orf_tophits = {};
+	#we need to enable recurision here (single level) for local runs so that we can get to the parse search results       
+	if( defined( $recurse) && -d "${results_dir}/${result_file}" ){ 
+	    opendir( RECURSE, "${results_dir}/${result_file}" ) || die "Can't open ${results_dir}/${result_file} for readdir: $!\n";
+	    my @recurse_files = readdir RECURSE;
+	    closedir RECURSE;
+	    #Here, we have to look across all db-split-result-files for an orf-split
+	    foreach my $recurse_file( @recurse_files ){
+		next if ( $recurse_file !~ m/\.mysqld/ );
+		if( $top_type eq "best_in_fam" ){
+		    $orf_tophits = ${ find_orf_fam_tophit( "${results_dir}/${result_file}/${recurse_file}", $orf_tophits ) };
+		} elsif( $top_type eq "best_hit" ){
+		    #we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
+		    $orf_tophits = ${ find_orf_tophit( "${results_dir}/${result_file}/${recurse_file}", $orf_tophits ) };
+		}
+	    }
+	}
+	next if( $result_file !~ m/\.mysqld/ ); #we only want to load the mysql data tables that we produced earlier
+	if(not( $result_file =~ m/$file_string_to_match/ )) {
+	    warn "Skipped the file $result_file, as it did not match the name: $file_string_to_match.";
+	    next; ## skip it!
+	}
+	#we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
+	#only if we want expanded search result ouput. Probably rare
+	if( $top_type eq "best_in_fam" ){
+	    $orf_tophits = ${ find_orf_fam_tophit( "${results_dir}/${result_file}", $orf_tophits ) };
+	} elsif( $top_type eq "best_hit" ){
+	    #we have to look across all result files in this dir and for each orf to fam mapping, grab the top scoring hit
+	    $orf_tophits = ${ find_orf_tophit( "${results_dir}/${result_file}", $orf_tophits ) };
+	}
+	#let's write this orf-split's results to file
+	my $fh;
+	if( ! $touched ){
+	    open( $fh, ">$output_file" ) || die "Can't open $output_file for write: $!\n";
+	    $touched = 1;
+	} else {
+	    open( $fh, ">>$output_file" ) || die "Can't open $output_file for write: $!\n";
+	}	    
+	if( !defined( $orf_tophits ) ){
+	    $self->Shotmap::Notify::warn( "No results were obtained while parsing $results_dir!\n" );
+	}
+	foreach my $orf( keys( %$orf_tophits ) ){      
+	    if( $top_type eq "best_in_fam" ){
+		foreach my $fam( keys( %{ $orf_tophits->{$orf} } ) ){
+#		print $fh $orf_tophits->{$orf}->{$fam}->{'row'} . "\n";
+		    print $fh $orf_tophits->{$orf}->{$fam} . "\n";
+		}
+	    } elsif( $top_type eq "best_hit" ){
+		#print $fh $orf_tophits->{$orf}->{'row'} . "\n";
+		print $fh $orf_tophits->{$orf} . "\n";
+	    }
+	}
+	$orf_tophits = {};
+	close $fh;
+    }
+    return $self;
+}
+
+sub parse_mysqld_results_from_dir_obsolete{
+    my ( $self, $results_dir, $output_file, $file_string_to_match, $top_type, $recurse ) = @_; #top_type is "best_hit" or "best_in_fam"
+    opendir( RES, $results_dir ) || die "Can't open $results_dir for read in parse_and_load_search_results_bulk: $!\n";
+    my @result_files = readdir( RES );
+    closedir( RES );
     my $orf_tophits = {};
     PARSELOOP: foreach my $result_file( @result_files ){
 	#we need to enable recurision here (single level) for local runs so that we can get to the parse search results       
@@ -961,12 +1030,15 @@ sub parse_mysqld_results_from_dir{
     foreach my $orf( keys( %$orf_tophits ) ){      
 	if( $top_type eq "best_in_fam" ){
 	    foreach my $fam( keys( %{ $orf_tophits->{$orf} } ) ){
-		print $fh $orf_tophits->{$orf}->{$fam}->{'row'} . "\n";
+#		print $fh $orf_tophits->{$orf}->{$fam}->{'row'} . "\n";
+		print $fh $orf_tophits->{$orf}->{$fam} . "\n";
 	    }
 	} elsif( $top_type eq "best_hit" ){
-	    print $fh $orf_tophits->{$orf}->{'row'} . "\n";
+	    #print $fh $orf_tophits->{$orf}->{'row'} . "\n";
+	    print $fh $orf_tophits->{$orf} . "\n";
 	}
     }
+    $orf_tophits = {};
     close $fh;
 }
 
@@ -984,20 +1056,26 @@ sub find_orf_tophit{ #for each orf to family mapping, find the top hit
 	   warn( "Can't parse orf_alt_id, famid, or score from $result_file where line is $_\n" );
 	   next;
 	}
+#	if( !defined($orf_tophit->{$orf} ) ){
+#	    $orf_tophit->{$orf}->{'score'} = $score;
+#	    $orf_tophit->{$orf}->{'row'}   = $_;
+#	}
+#	elsif( $score > $orf_tophit->{$orf}->{'score'} ){
+#	    $orf_tophit->{$orf}->{'score'} = $score;
+#	    $orf_tophit->{$orf}->{'row'}   = $_;
+#	}
 	if( !defined($orf_tophit->{$orf} ) ){
-	    $orf_tophit->{$orf}->{'score'} = $score;
-	    $orf_tophit->{$orf}->{'row'}   = $_;
+	    $orf_tophit->{$orf} = $_;
 	}
-	elsif( $score > $orf_tophit->{$orf}->{'score'} ){
-	    $orf_tophit->{$orf}->{'score'} = $score;
-	    $orf_tophit->{$orf}->{'row'}   = $_;
+	elsif( $score > _get_score_from_mysqld_row( $orf_tophit->{$orf} ) ){
+	    $orf_tophit->{$orf} = $_;
 	}
 	else{
 	    #do nothing. this is a poorer hit than what we already have
 	}
     }
     close FILE;
-    return $orf_tophit;
+    return \$orf_tophit;
 }
 
 sub find_orf_fam_tophit{ #for each orf to family mapping, find the top hit
@@ -1014,20 +1092,39 @@ sub find_orf_fam_tophit{ #for each orf to family mapping, find the top hit
 	   warn( "Can't parse orf_alt_id, famid, or score from $result_file where line is $_\n" );
 	   next;
 	}
+#	if( !defined($orf_fam_tophit->{$orf}->{$famid} ) ){
+#	    $orf_fam_tophit->{$orf}->{$famid}->{'score'} = $score;
+#	    $orf_fam_tophit->{$orf}->{$famid}->{'row'}   = $_;
+#	}
+#	elsif( $score > $orf_fam_tophit->{$orf}->{$famid}->{'score'} ){
+#	    $orf_fam_tophit->{$orf}->{$famid}->{'score'} = $score;
+#	    $orf_fam_tophit->{$orf}->{$famid}->{'row'}   = $_;
+#	}
 	if( !defined($orf_fam_tophit->{$orf}->{$famid} ) ){
-	    $orf_fam_tophit->{$orf}->{$famid}->{'score'} = $score;
-	    $orf_fam_tophit->{$orf}->{$famid}->{'row'}   = $_;
+	    $orf_fam_tophit->{$orf}->{$famid} = $_;
 	}
-	elsif( $score > $orf_fam_tophit->{$orf}->{$famid}->{'score'} ){
-	    $orf_fam_tophit->{$orf}->{$famid}->{'score'} = $score;
-	    $orf_fam_tophit->{$orf}->{$famid}->{'row'}   = $_;
+	elsif( $score > _get_score_from_mysqld_row( $orf_fam_tophit->{$orf}->{$famid} ) ){
+	    $orf_fam_tophit->{$orf}->{$famid} = $_;
 	}
+
 	else{
 	    #do nothing. this is a poorer hit than what we already have
 	}
     }
     close FILE;
-    return $orf_fam_tophit;
+    return \$orf_fam_tophit;
+}
+
+sub _get_score_from_mysqld_row{
+    my $row = @_;
+    my $score;
+    if( $_ =~ m/(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)/ ){
+	$score  = $6;
+    }
+    if( !defined( $score ) ){
+	die "Could parse score from the following mysqld row:\n$row\n";
+    }
+    return $score;
 }
 
 sub _parse_famid_from_ffdb_seqid {
@@ -2121,6 +2218,8 @@ sub classify_reads_flatfile{
     #if remote, use splitcat files in search_results/algo dir
     if( $self->remote ){
 	$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type );
+	#consider playing with this if we want no splitcat files....
+	#$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type, "recurse" );
     } else {
     #if local, use the raw mysqld file in each search_results/algo/orf_split/ dir
 	$self->Shotmap::Run::parse_mysqld_results_from_dir( $search_results, $output_file, ".mysqld", $top_type, "recurse" );
@@ -2130,7 +2229,7 @@ sub classify_reads_flatfile{
         #have yet to write this function...
 	$self->Shotmap::DB::load_classifications_from_file( $output_file );
     }
-    $self->Shotmap::Notify::print( "\t...classification complete" );
+    $self->Shotmap::Notify::print( "\t...classification complete. Classification map located here: ${output_file}." );
     return $output_file;
 }
 
@@ -2187,7 +2286,7 @@ sub calculate_abundances{
 	$output .= "_Rare_${rare_size}";
     }
     $output .= ".tab";
-    $self->Shotmap::Notify::print( "\t...Building a classification map");
+    $self->Shotmap::Notify::print( "\t...Calculating abundances");
     open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
     print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
     #how many reads should we count for relative abundance analysis?
@@ -2253,10 +2352,10 @@ sub calculate_abundances{
 		} else{
 		    die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
 		}
-		$abundances->{$famid}->{"raw"} += $coverage;
+		$abundances->{$famid} += $coverage;
 		$abundances->{"total"} += $coverage;
 	    } else{
-		die( "You are trying to calculate a type of abundance that I'm not aware of. Reveived <${abund_type}>. Exiting\n" );		
+		die( "You are trying to calculate a type of abundance that I'm not aware of. Received <${abund_type}>. Exiting\n" );		
 	    }	   
 	}
     }
@@ -2268,7 +2367,7 @@ sub calculate_abundances{
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
-	my $raw = $abundances->{$famid}->{"raw"};
+	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
 	#now, insert the data into mysql.
 	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abundance_parameter_id, $class_id );
@@ -2310,15 +2409,15 @@ sub calculate_abundances_flatfile{
 	$output .= "_Rare_${rare_size}";
     }
     $output .= ".tab";
-    $self->Shotmap::Notify::print( "\tBuilding a classification map..."); 
-    open( OUT, ">$output" ) || die "Can't open $output for write in build_classification_map: $!";    
+    $self->Shotmap::Notify::print( "\tCalculating abundances..."); 
+    open( OUT, ">$output" ) || die "Can't open $output for write: $!";    
     print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
 
     my $abundances = {}; #maps families to abundances
     open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
     #do some preprocessing for database-free analysis
     if( ! $self->use_db ){
-
+	
     }
     while(<MAP>){
 	chomp $_;
@@ -2332,13 +2431,14 @@ sub calculate_abundances_flatfile{
 	    }
 	}
 	print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
+	
 	my ( $target_length, $family_length );
 	if( $norm_type eq 'target_length' ){
 	    if( $self->use_db ){
 		$target_length = $self->Shotmap::DB::get_target_length( $target_id );
-	    } else {
+	   } else {
 		$target_length = $length_hash->{$target_id};
-	    }
+	   }
 	} elsif( $norm_type eq 'family_length' ){
 	    if( $self->use_db ){
 		$family_length = $self->Shotmap::DB::get_family_length( $famid );
@@ -2357,7 +2457,7 @@ sub calculate_abundances_flatfile{
 	    } else{
 		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
 	    }			    
-	    $abundances->{$famid}->{"raw"} += $raw;
+	    $abundances->{$famid} += $raw;
 	    $abundances->{"total"}++; #we want RPKM like abundances here, so we don't carry the length of the gene/family in the total 		
 	    
 	} elsif( $abund_type eq 'coverage' ){ #number of bases in read that match the family
@@ -2372,7 +2472,7 @@ sub calculate_abundances_flatfile{
 	    } else{
 		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
 	    }
-	    $abundances->{$famid}->{"raw"} += $coverage;
+	    $abundances->{$famid} += $coverage;
 	    $abundances->{"total"} += $coverage;
 	} else{
 	    die( "You are trying to calculate a type of abundance that I'm not aware of. Reveived <${abund_type}>. Exiting\n" );		
@@ -2384,9 +2484,10 @@ sub calculate_abundances_flatfile{
     if( $self->database() ){   
 	#now, insert the data into mysql.
 	$self->Shotmap::Notify::print_verbose( "Inserting Abundance Data\n" );
-	$self->Shotmap::Run::insert_abundance_hash_into_database( $sample_id, $class_id, $abundance_parameter_id, $abundances );
+	$self->Shotmap::Run::insert_abundance_hash_into_database( $sample_id, $class_id, $abundance_parameter_id, \$abundances );
     }
-    $self->Shotmap::Run::build_sample_abundance_map_flatfile( $sample_id, $class_id, $abundance_parameter_id, $abundances );
+    $self->Shotmap::Run::build_sample_abundance_map_flatfile( $sample_id, $class_id, $abundance_parameter_id, \$abundances );
+    $abundances = ();
     $self->Shotmap::Notify::print( "\t...abundance calculation complete. Proceeding." );
     return $self;
 }
@@ -2396,7 +2497,7 @@ sub insert_abundance_hash_into_database{
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
-	my $raw = $abundances->{$famid}->{"raw"};
+	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
 	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abund_param_id, $class_id );
     }
@@ -2416,7 +2517,7 @@ sub build_sample_abundance_map_flatfile{
     my $total = $abundances->{"total"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
-	my $raw = $abundances->{$famid}->{"raw"};
+	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
 	print ABUND join( "\t", $sample_id, $famid, $raw, $ra, "\n" );
     }
@@ -2453,7 +2554,7 @@ sub get_post_rarefied_reads_flatfile{
     ( $draws, $seed_string ) = $self->Shotmap::Run::generate_random_samples( $size, $max, $seed_string );
     $rare_ids = $self->Shotmap::Run::sample_objects_in_files( $path, $rare_type, $draws );
     $draws = (); #cleanup
-    return ( $rare_ids, $seed_string )
+    return ( \$rare_ids, $seed_string )
 }
 
 sub generate_random_samples{

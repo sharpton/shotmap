@@ -157,6 +157,7 @@ sub load_results{
 	    }
 	}
     }
+    #once results are loaded in the database, we could wipe the raw db-split, orf-split mysqld files and only keep the orf-split catted results
     return $self;
 }
 
