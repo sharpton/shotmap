@@ -298,7 +298,7 @@ sub get_options{
 	$nseqs_per_samp_split, $prerare_count,         $postrare_count,       $trans_method,        $should_split_orfs,
 	$filter_length,        $p_evalue,              $p_coverage,           $p_score,             $evalue,
 	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,	
-	$rarefaction_type,
+	$rarefaction_type,     $class_level,
 	#the following options are now obsolete
 	$hmmdb_build,          $blastdb_build,         	
 	$build_search_db,      $force_db_build,       $force_search,        $small_transfer,
@@ -373,6 +373,7 @@ sub get_options{
 	,    "class-evalue"   => \$evalue
 	,    "class-coverage" => \$coverage
 	,    "class-score"    => \$score
+	,    "class-level"    => \$class_level
 	,    "top-hit"        => \$top_hit
 	,    "hit-type"       => \$top_hit_type
 	#abundance claculation parameters
@@ -454,8 +455,9 @@ sub get_options{
 			  , "class-evalue:f"
 			  , "class-coverage:f"
 			  , "class-score:f"
+			  , "class-level=s"  #read, orf
 			  ,    "top-hit!"      ### NEED TO INTEGRATE METHODS
-			  ,    "hit-type:s"    ### NEED TO INTEGRATE METHODS  
+			  ,    "hit-type:s"  
 			  #abundance calculation parameters
 			  , "abundance-type:s"
 			  , "normalization-type:s"			  
@@ -681,6 +683,7 @@ sub set_params{
     $self->class_evalue( $self->opts->{"class-evalue"} ); 
     $self->class_coverage( $self->opts->{"class-coverage"} ); 
     $self->class_score( $self->opts->{"class-score"} ); 
+    $self->class_level( $self->opts->{"class-level"} );
     $self->top_hit_type( $self->opts->{"hit-type"} );
     
     # Set abundance calculation parameters
@@ -733,7 +736,8 @@ sub load_defaults{
 	    ,    "parse-score"    => 20
 	    # family classification thresholds (more stringent)
 	    ,    "top-hit"        => 1
-	    ,    "hit-type"       => 'read'
+	    ,    "hit-type"       => 'best_hit'
+	    ,    "class-level"    => 'read'
 	    # abundance claculation parameters
 	    ,    "abundance-type"     => 'coverage'
 	    ,    "normalization-type" => 'target_length'

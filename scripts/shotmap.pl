@@ -63,6 +63,7 @@ if (defined($pipe->opts->{"goto"}) && $pipe->opts->{"goto"}) {
     if ($goto eq "G" or $goto eq "GET")     {     warn "Skipping to get remote hmmscan results step!\n"; goto GETRESULTS; }
     if ($goto eq "L" or $goto eq "LOADRESULTS"){  warn "Skipping to get remote hmmscan results step!\n"; goto LOADRESULTS; }
     if ($goto eq "C" or $goto eq "CLASSIFY"){     warn "Skipping to classifying reads step!\n";          goto CLASSIFYREADS; }
+    if ($goto eq "A" or $goto eq "ABUNDANCE"){    warn "Skipping to calculating abundances step!\n";     goto ABUNDANCE; }
     if ($goto eq "D" or $goto eq "DIVERSITY")  {  warn "Skipping to producing output step!\n";           goto CALCDIVERSITY; }
     die "QUITTING DUE TO INVALID --goto OPTION: (specifically, the option was \"$goto\"). If we got to here in the code, it means there was an INVALID FLAG PASSED TO THE GOTO OPTION.";
 }
@@ -95,6 +96,8 @@ if( $pipe->remote ){
  LOADRESULTS: $pipe->Shotmap::Results::load_results();
 # Classify reads into families
  CLASSIFYREADS: $pipe->Shotmap::Results::classify_reads();
+# Calculate family abundances
+ ABUNDANCE: $pipe->Shotmap::Results::calculate_abundances();
 # Calculate diversity
  CALCDIVERSITY: $pipe->Shotmap::Results::calculate_diversity();
 $pipe->Shotmap::Notify::printBanner("ANALYSIS COMPLETED!");

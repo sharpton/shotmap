@@ -361,6 +361,14 @@ sub class_score{
     return $self->{"c_score"};
 }
 
+sub class_level{
+   my ( $self, $value ) = @_;    
+    if( defined( $value ) ){
+	$self->{"c_level"} = $value;
+    }
+    return $self->{"c_level"};
+}
+
 sub prerarefy_samples{
     my( $self, $value ) = @_;
     if( defined( $value ) ){
