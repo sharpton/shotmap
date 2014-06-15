@@ -971,6 +971,7 @@ sub classify_mysqld_results_from_dir{
 	#each resultfile contains unique orfs, so process one at a time 
 	my $tophits = {};
 	next if ( $result_file =~ m/^\./ );
+	next if ( $result_file =~ m/splitcat/ ); #we have now eliminated the need for these files, skip them if processing an old run
 	#we need to enable recurision here (single level) for local runs so that we can get to the parse search results       
 	if( defined( $recurse) && -d "${results_dir}/${result_file}" ){ 
 	    opendir( RECURSE, "${results_dir}/${result_file}" ) || die "Can't open ${results_dir}/${result_file} for readdir: $!\n";
