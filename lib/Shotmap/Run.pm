@@ -2466,7 +2466,19 @@ sub calculate_abundances_flatfile{
 	if( !defined( $rare_ids ) ){
 	    die "Something went wrong during rarefaction; got a null rare_ids hash";
 	}
-	$self->Shotmap::Notify::print( "\t...rarefaction complete!" );
+	my $outdir     = File::Spec->catdir( 
+	    $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abundance_parameter_id}"
+	    );
+	if( ! -d $outdir ){
+	    File::Path::make_path($outdir);
+	}
+	my $rare_out   = $outdir . "/Rarefied_Sequences_Sample_${sample_id}.txt";
+	open( RARE, ">$rare_out" ) || die "Can't open $rare_out for write: $!\n";
+	foreach my $id ( keys( %$rare_ids ) ){
+	    print RARE "$id\n";
+	}
+	close RARE;
+	$self->Shotmap::Notify::print( "\t...rarefaction complete! Selected sequence ids can be found here: $rare_out" );
     }
     my $read_count;
     if(!defined( $self->postrarefy_samples() ) ){
@@ -2633,7 +2645,7 @@ sub get_post_rarefied_reads_flatfile{
     my $seed_string;
     my $path;
     if( $rare_type eq "read" ){
-	$self->Shotmap::Notify::print_verbose( "\t...rarefying readss for sample $sample_id at depth of $size\n" );
+	$self->Shotmap::Notify::print_verbose( "\t...rarefying reads for sample $sample_id at depth of $size\n" );
 	$path = $self->get_sample_path($sample_id) . "/raw/";
     } elsif( $rare_type eq "orf" ){
 	$self->Shotmap::Notify::print( "\t...rarefying orfs for sample $sample_id at depth of $size\n" );

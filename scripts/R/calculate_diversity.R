@@ -44,7 +44,7 @@ goods.coverage <- function( count.map, class.map ) {
   #count = apply( abunds.map, 1, function(df){length(subset(df, df > 0))} ) 
     count = class.map
     tmap  = t(count.map)
-    singletons = apply( tmap, 2, function(df){length(subset(df, df <= 1 & df > 0 ) ) } ) 
+    singletons = apply( tmap, 2, function(df){length(subset(df, df == 1 ) ) } ) 
     coverage   = 1 - ( singletons / count )
     return( coverage )
 }
@@ -89,8 +89,11 @@ if( verbose ){
 abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
 abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
 count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS" ) #could try to do all work in the .df object instead, enables ggplot
-class.map  <- unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) )[,2]
-names(class.map) <- unique( abund.df$SAMPLE.ID)
+class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) ) )
+class.df   <- class.df[ order( class.df[,1] ), ]
+class.map  <- class.df$V2
+names(class.map) <- class.df$V1
+class.map  <- 
 seq.map    <- unique(cbind(abund.df$SAMPLE.ID, abund.df$TOT.SEQS) )[,2]
 names(seq.map) <- unique( abund.df$SAMPLE.ID)
 samples    <- rownames(abund.map)
