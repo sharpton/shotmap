@@ -93,9 +93,12 @@ class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQ
 class.df   <- class.df[ order( class.df[,1] ), ]
 class.map  <- class.df$V2
 names(class.map) <- class.df$V1
-class.map  <- 
-seq.map    <- unique(cbind(abund.df$SAMPLE.ID, abund.df$TOT.SEQS) )[,2]
-names(seq.map) <- unique( abund.df$SAMPLE.ID)
+
+seq.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$TOT.SEQS) ) )
+seq.df   <- seq.df[ order( seq.df[,1] ), ]
+seq.map  <- seq.df$V2
+names(seq.map) <- seq.df$V1
+
 samples    <- rownames(abund.map)
 famids     <- colnames(abund.map)
 
