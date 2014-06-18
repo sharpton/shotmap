@@ -56,6 +56,7 @@ my $project_id = $pipe->project_id();
 $pipe->project_dir("$ffdb/projects/$dbname/$project_id");
 $pipe->params_dir( $pipe->project_dir . "/parameters" );
 $pipe->params_file( $pipe->params_dir . "/parameters.xml" );
+$pipe->Shotmap::DB::initialize_parameters_file( $pipe->params_file );
 $pipe->Shotmap::DB::set_sample_parameters( $sample_id, $sample_alt_id );
 #remove all *.tmp files from rapsearch search_results
 my $rapdir = $pipe->project_dir . "/$sample_id/search_results/rapsearch/";
