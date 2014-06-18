@@ -10,13 +10,14 @@ print "parse_results.pl @ARGV";
 my ( $results_tab, $query_orfs_file,
      $sample_id,   $algo,            $trans_method,
      $t_evalue,    $t_coverage,      $t_score, 
+     $no_coverage, $target_skip_string
     );
 
 my $parse_type = "best_hit"; #use this to save space. Will still have to look across searchdb splits for top hit.
 
 GetOptions(
     "results-tab=s"  => \$results_tab,
-    "orfs-file=s"    => \$query_orfs_file,
+    "orfs-file:s"    => \$query_orfs_file,
     "sample-id=i"    => \$sample_id,
 #    "class-id=i"     => \$classification_id,
     "algo=s"         => \$algo,
@@ -25,6 +26,8 @@ GetOptions(
     "coverage=s"     => \$t_coverage,
     "score=s"        => \$t_score,
     "parse-type=s"   => \$parse_type, #what results should we store? 'best_hit' (per read), 'best_per_fam' (per read), 'all' (above thresholds)
+    "no_coverage"    => \$no_coverage,
+    "target-skip-string" => \$target_skip_string,
     );
 
 if( $t_evalue eq "NULL" && $t_coverage eq "NULL" && $t_score eq "NULL" ){
@@ -45,20 +48,29 @@ if( $t_score  eq "NULL" ){
 #blast, last, rapsearch don't have sequence lengths in table, so we have to look them up for coverage calculation.
 #if we wanted to calculate target coverage, we could do something similar using the db split file
 my %seqlens    = ();
-if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
-    %seqlens   = %{ get_sequence_lengths_from_file( $query_orfs_file ) };
+unless( $no_coverage ){
+    if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch" ){
+	%seqlens   = %{ get_sequence_lengths_from_file( $query_orfs_file ) };
+    }
 }
 
 my $hitmap = {};
 
-print "hello\n";
+my $res_fh;
+my $compressed = "${results_tab}.gz";
+if( -e $results_tab && -e $compressed ){
+    die "It looks like the compression of $results_tab is incomplete...";
+} elsif( -e $results_tab ){
+    open( $res_fh, "$results_tab" ) || die "can't open $results_tab for read: $!\n";    
+} elsif( -e $compressed ){
+    open( $res_fh, "zmore $compressed|" ) || die "can't open $compressed for read: $!\n";    
+}
 
-open( RES, "$results_tab" ) || die "can't open $results_tab for read: $!\n";    
 my $output = $results_tab . ".mysqld";
 open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
-while(<RES>){
+while(<$res_fh>){
     chomp $_;
-    if( $_ =~ m/^\#/ || $_ =~ m/^$/) {
+    if( $_ =~ m/^\#/ || $_ =~ m/^$/ || $_ =~ m/$compressed/ ) {
 	next; # skip comments (lines starting with a '#') and completely-blank lines
     }
     my($qid, $qlen, $tid, $tlen, $evalue, $score, $start, $stop);
@@ -97,7 +109,9 @@ while(<RES>){
 	    $stop   = $10; 
 	    $evalue = $11; 
 	    $score  = $12;
-	    $qlen   = $seqlens{$qid};	    
+	    unless( $no_coverage ){
+		$qlen   = $seqlens{$qid};	    
+	    }
 	} else{
 	    warn( "couldn't parse results from $algo file:\n$_ ");
 	    next;
@@ -118,6 +132,9 @@ while(<RES>){
 	}
     }
     my $famid;
+    if( defined( $target_skip_string ) ){
+	next if( $tid =~ m/$target_skip_string/ );
+    }
     if( $algo eq "blast" || $algo eq "last" || $algo eq "rapsearch"){
 	$famid = parse_famid_from_ffdb_seqid( $tid );
     } else{
@@ -134,7 +151,7 @@ while(<RES>){
 	}
     }
     #calculate coverage from query perspective
-    if( !defined( $qlen ) ){
+    if( !defined( $qlen ) && ! $no_coverage){
 	die( "Can't calculate the query sequence length for ${qid} using orf_file ${query_orfs_file}\n" );
     }
     my ( $aln_len, $coverage );
@@ -145,7 +162,11 @@ while(<RES>){
     } elsif ($stop == $start) {
 	$aln_len  = 0;
     }
-    $coverage = $aln_len / $qlen; # <-- coverage calc must include ****first base!*****, so add one	
+    if( $no_coverage ){
+	$coverage = 0;
+    } else {
+	$coverage = $aln_len / $qlen; # <-- coverage calc must include ****first base!*****, so add one	
+    }
     #do we pass the defined thresholds?
     if( defined( $t_score ) ){
 	next unless $score >= $t_score;
@@ -173,6 +194,8 @@ while(<RES>){
 	}	
     }
 }
+close $res_fh;
+
 #need to print the data if the parse types were not 'all'
 if( $parse_type eq 'best_hit' ){
     foreach my $qid( keys( %{ $hitmap } ) ){
@@ -190,7 +213,6 @@ elsif( $parse_type eq 'best_per_family' ){
 }
 
 close OUT;
-
 #DONE.
 
     

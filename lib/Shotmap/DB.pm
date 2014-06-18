@@ -960,11 +960,11 @@ sub get_split_sequence_paths {
 	my $newPath = (defined($should_use_full_path) && $should_use_full_path) ? "$base_directory/$file" : "$file"; # use the FULL path, or just the filename?
 	push(@paths, $newPath);
     }
-    return \@paths; # apparently returns an array to all the ... paths
+    return \@paths; 
 }
 
 sub get_hmmdbs{
-    my $is_remote  = 0; # what is up with this. This is a default value I guess?
+    my $is_remote  = 0; 
     my $self       = shift;
     my $hmmdb_name = shift;
     $is_remote = shift;
@@ -1340,9 +1340,9 @@ sub get_classification_id_flatfile{
 	    if( $id > $max_id ){
 		$max_id = $id;
 	    }
-	    if( $id_score eq $score     || ( $id_score eq "null" && $score    eq "null" ) &&
-		$id_eval  eq $evalue    || ( $id_eval  eq "null" && $evalue   eq "null" ) &&
-		$id_cov   eq $coverage  || ( $id_cov   eq "null" && $coverage eq "null" ) &&
+	    if( ( $id_score eq $score     || ( $id_score eq "null" && $score    eq "null" ) ) &&
+		( $id_eval  eq $evalue    || ( $id_eval  eq "null" && $evalue   eq "null" ) ) &&
+		( $id_cov   eq $coverage  || ( $id_cov   eq "null" && $coverage eq "null" ) ) &&
 		$id_meth  eq $method    &&
 		$id_db    eq $db_name   ){
 		$class_id = $id;
@@ -1467,8 +1467,64 @@ sub _add_child_element{
 }
 
 sub get_abundance_parameter_id_flatfile{
-    my( $self, $abund_type, $norm_type, $rare_depth, $rare_type ) = @_;
+    my( $self, $abund_type, $norm_type ) = @_;
     
+    my ( $rare_depth);
+    my $rare_type = $self->rarefaction_type;
+    if( defined( $self->postrarefy_samples ) ){ #post rarefaction is always smallest                                                                                                                                                         
+	$rare_depth = $self->postrarefy_samples;
+    } elsif( defined( $self->prerarefy_samples ) ){
+        $rare_depth = $self->prerarefy_samples;
+    }
+
+    $abund_type = _null_check( $abund_type );
+    $norm_type  = _null_check( $norm_type );
+    $rare_depth = _null_check( $rare_depth );
+    $rare_type  = _null_check( $rare_type );
+    my $abund_id;
+    my $max_id = 0;
+    my $parser = new XML::DOM::Parser;
+    my $doc = $parser->parsefile( $self->params_file() );
+    #check if id already exists for these run-time settings
+    foreach my $aid ( $doc->getElementsByTagName( 'abundance_id' ) ){
+	if( $aid->hasChildNodes ){
+	    my $id            = _get_xml_value( $aid, "id" );
+	    my $id_abund_type = _get_xml_value( $aid, "abundance_type" );
+	    my $id_norm_type  = _get_xml_value( $aid, "normalization_type" );
+	    my $id_rare_type  = _get_xml_value( $aid, "rarefaction_type" ); 
+	    my $id_rare_depth = _get_xml_value( $aid, "rarefaction_depth" ); 
+	    if( $id > $max_id ){
+		$max_id = $id;
+	    }
+	    if( ( $id_abund_type eq $abund_type || ( $id_abund_type eq "null" && $abund_type eq "null" ) ) &&
+		( $id_norm_type  eq $norm_type  || ( $id_norm_type  eq "null" && $norm_type  eq "null" ) ) &&
+		( $id_rare_type  eq $rare_type  || ( $id_rare_type  eq "null" && $rare_type  eq "null" ) ) &&
+		( $id_rare_depth eq $rare_depth || ( $id_rare_depth eq "null" && $rare_depth eq "null" ) )
+		){
+		$abund_id = $id;
+		last;		
+	    }
+	}
+    }
+    if( !defined( $abund_id ) ){
+	#if not, then let's create a new id
+	my $new_id   = $max_id + 1;
+	my $abund_params = pop(@{$doc->getElementsByTagName('abundance_parameters')});
+	my $new_aid  = $doc->createElement('abundance_id');
+	
+	$doc = _add_child_element( $doc, $new_aid, 'id',    $new_id );
+	$doc = _add_child_element( $doc, $new_aid, 'abundance_type', _null_check( $abund_type ) );
+	$doc = _add_child_element( $doc, $new_aid, 'normalization_type', _null_check( $norm_type ) );
+	$doc = _add_child_element( $doc, $new_aid, 'rarefaction_type', _null_check( $rare_type ) );
+	$doc = _add_child_element( $doc, $new_aid, 'rarefaction_depth', _null_check( $rare_depth) );
+
+	$abund_params->appendChild($new_aid);
+	#print to file
+	$doc->printToFile( $self->params_file() );
+	$doc->dispose;
+	$abund_id = $new_id;
+    }
+    return $abund_id;
 }
 
 

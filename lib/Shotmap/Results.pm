@@ -203,11 +203,13 @@ sub load_results{
 	    }
 	}
     } else{
-	$self->Shotmap::Notify::printBanner("LOADING SEARCH RESULTS");
-	foreach my $sample_id(@{ $self->get_sample_ids() }){
-	    my $path_to_split_orfs = File::Spec->catdir($self->get_sample_path($sample_id), "orfs");     
-	    foreach my $orf_split_file_name(@{ $self->Shotmap::DB::get_split_sequence_paths($path_to_split_orfs, 0) }) { # maybe could be glob("$path_to_split_orfs/*")
-		$self->Shotmap::Run::parse_and_load_search_results_bulk( $sample_id, $orf_split_file_name, $class_id, $search_method ); #top_hit_type and strict clustering gets used in diversity calcs now
+	if( $self->use_db ){
+	    $self->Shotmap::Notify::printBanner("LOADING SEARCH RESULTS");
+	    foreach my $sample_id(@{ $self->get_sample_ids() }){
+		my $path_to_split_orfs = File::Spec->catdir($self->get_sample_path($sample_id), "orfs");     
+		foreach my $orf_split_file_name(@{ $self->Shotmap::DB::get_split_sequence_paths($path_to_split_orfs, 0) }) { # maybe could be glob("$path_to_split_orfs/*")
+		    $self->Shotmap::Run::parse_and_load_search_results_bulk( $sample_id, $orf_split_file_name, $class_id, $search_method ); #top_hit_type and strict clustering gets used in diversity calcs now
+		}
 	    }
 	}
     }
@@ -236,6 +238,32 @@ sub parse_results{
 	foreach my $sample_id(@{ $self->get_sample_ids() }){
 	    $self->Shotmap::Notify::notify("Parsing results for sample ID $sample_id" );
 	    $self->Shotmap::Run::parse_results( $sample_id, $search_method,   $waittime, $verbose );
+	}
+    }
+    return $self;
+}
+
+sub parse_results_hack{
+    my( $self ) = @_;
+    my $waittime     = $self->wait;
+    my $verbose      = $self->verbose;
+    my $force_search = $self->force_search;
+    my $search_method = $self->search_method;
+    my $search_type   = $self->search_type;
+
+    if( $self->remote ){
+	$self->Shotmap::Notify::printBanner("PARSING REMOTE SEARCH RESULTS");
+	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
+	foreach my $sample_id(@{ $self->get_sample_ids() }) {
+	    $self->Shotmap::Run::parse_results_remote($sample_id, $search_method,   $db_splits,   $waittime, $verbose, $force_search);
+	    $self->Shotmap::Notify::print( "Progress report: finished ${sample_id} on " . `date` );
+	}  
+    } else {
+	$self->Shotmap::Notify::printBanner("PARSING SEARCH RESULTS"); 
+	#force search is called from environment in spawn_local_threads
+	foreach my $sample_id(@{ $self->get_sample_ids() }){
+	    $self->Shotmap::Notify::notify("Parsing results for sample ID $sample_id" );
+	    $self->Shotmap::Run::parse_results_hack( $sample_id, $search_method,   $waittime, $verbose );
 	}
     }
     return $self;

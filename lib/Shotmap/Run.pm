@@ -26,7 +26,7 @@ use Shotmap::DB;
 use Data::Dumper;
 use File::Basename;
 use File::Cat;
-use File::Copy;
+use File::Copy qw( move );
 use File::Path;
 use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
@@ -38,6 +38,7 @@ use File::Spec;
 use List::Util qw( shuffle );
 use Math::Random qw( :all );
 use Parallel::ForkManager;
+use POSIX;
 
 # ServerAliveInterval : in SECONDS
 # ServerAliveCountMax : number of times to keep the connection alive
@@ -571,6 +572,9 @@ sub back_load_project(){
     if( ! -d $self->params_dir ){
 	File::Path::make_path( $self->params_dir );
     }
+    if( ! -e $self->params_file ){
+	$self->Shotmap::DB::initialize_parameters_file( $self->params_file );
+    }
     my $search_type = $self->search_type;
     my $raw_db_path    = $self->search_db_path( $search_type ); 
     my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
@@ -622,6 +626,7 @@ sub back_load_samples{
 	$samples{$sample_alt_id}->{"id"} = $sample_id;
     }
     $self->set_samples( \%samples );
+
     #back load remote data
     warn("Back-loading of samples is now complete.");
     #return $self;
@@ -1093,9 +1098,13 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
     my( $self, $result_file, $tophit ) = @_; #tophit is a hashref
     my $hit_type = $self->top_hit_type;
     my $level    = $self->class_level;
-
-    open( FILE, $result_file ) || die "Can't open $result_file for read: $!\n";
-    while(<FILE>){
+    my $res_fh;
+    if( $result_file =~ m/\.gz/ ){
+	open( $res_fh, "zcat $result_file|" ) || die "Can't open $result_file for read: $!\n";
+    } else {
+	open( $res_fh, $result_file ) || die "Can't open $result_file for read: $!\n";
+    }
+    while(<$res_fh>){
 	chomp $_;
 	my( $read, $orf, $famid, $score, $evalue, $coverage );
 	if( $_ =~ m/(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)/ ){
@@ -1157,7 +1166,7 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 		"hit_type = <${hit_type}> && class_level = <${level}>\n";
 	}
     }
-    close FILE;
+    close $res_fh;
     return \$tophit;
 }
 
@@ -2028,35 +2037,19 @@ sub run_search{
         
 	#execute
 	system( $cmd );
+	#compress results
+	if( $type eq "rapsearch" ){
+	    gzip_file( "${outfile}.m8" );    
+	    unlink( "$outfile.m8" );
+	} else{
+	    gzip_file( $outfile );
+	    unlink( $outfile );
+	}
         $pm->finish; 
     }
     $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish...\n" );
     $pm->wait_all_children;
-    #following is now obsolete:
-    if( 0 ){
-      SEARCHFORK: for( my $i=1; $i<=$nprocs; $i++ ){
-	  my $cmd;
-	  my $log_file = $log_file_prefix . "_${i}.log";
-	  my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
-	  #create output directory
-	  my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
-	  File::Path::make_path($outdir);
-	  #PICK UP HERE
-	  my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
-	  my $outfile     = File::Spec->catfile( $outdir, $outbasename );
-	  if( $type eq "rapsearch" ){	
-	      my $suffix = $self->search_db_name_suffix;
-	      $cmd = "rapsearch -b 0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1 &";
-	      print "$cmd\n";
-	  }
-	  #ADD ADDITIONAL METHODS HERE
-	  
-	  #SPAWN THREADS
-	  $self->Shotmap::Run::spawn_local_threads( $cmd, "search", $outfile );
-      }
-    }
     $self->Shotmap::Notify::print( "\t...$type finished. Proceeding\n" );
-    return $self;
     if( $compressed ){
 	gzip_file( $db_file );    
     }
@@ -2075,8 +2068,10 @@ sub parse_results {
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
     my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
     my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
-    my $pm = Parallel::ForkManager->new($nprocs);
+
     
+    my $pm = Parallel::ForkManager->new($nprocs);
+
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
         #do some work here                                                                                                                                                                                                                   
@@ -2112,60 +2107,117 @@ sub parse_results {
 	    $cmd .= " --coverage=NULL ";
 	}
 	if( $type eq "rapsearch" ){	
-	    $cmd .= " > $log_file"; 
+	    $cmd .= " &> $log_file"; 
 	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	}
 	#execute
 	system( $cmd );
+	gzip_file( $infile . ".mysqld" );
+	unlink( $infile . ".mysqld" );
+       
         $pm->finish; 
     }
     $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish..." );
     $pm->wait_all_children;
     $self->Shotmap::Notify::print( "\t...search results are parsed. Proceeding." );
-    #following is now obsolete
-    if( 0 ){
-      PARSEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
-	  #set some loop specific variables
-	  my $log_file = $log_file_prefix . "_${i}.log";	
-	  my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
-	  my $infile   = File::Spec->catfile( $self->get_sample_path($sample_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
-	  if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
-	      $infile = $infile . ".m8";
-	  }
-	  my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
-	  my $cmd  = "perl $script_file "
-	      . "--results-tab=$infile "
-	      . "--orfs-file=$query_orfs_file "
-	      . "--sample-id=$sample_id "
-	      . "--algo=$type "
-	      . "--trans-method=$trans_method "
-	      . "--parse-type=best_hit "
-	      ;	
-	  if( defined( $t_score ) ){
-	      $cmd .= " --score=$t_score ";
-	  } else {
-	      $cmd .= " --score=NULL ";
-	  }
-	  if( defined( $t_evalue ) ){
-	      $cmd .= " --evalue=$t_evalue ";
-	  } else { 
-	      $cmd .= " --evalue=NULL ";
-	  }
-	  if( defined( $t_coverage ) ){
-	      $cmd .= " --coverage=$t_coverage ";
-	  } else {
-	      $cmd .= " --coverage=NULL ";
-	  }
-	  if( $type eq "rapsearch" ){	
-	      $cmd .= " > $log_file"; #Not dumping STDERR to STDOUT for some reason, so this is off.
-	      $self->Shotmap::Notify::print_verbose( "$cmd\n" );
-	  }	
-	  #SPAWN THREADS
-	  $self->Shotmap::Run::spawn_local_threads( $cmd, "parse", "${infile}.mysqld" );
-      }
-    }
     return $self;
 }
+
+#this is a routine we point to when we are taking an old remote run and reparsing locally
+sub parse_results_hack {
+    my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
+    my $nprocs       = $self->nprocs();
+    my $trans_method = $self->trans_method;
+    my $proj_dir     = $self->project_dir;
+    my $scripts_dir  = $self->local_scripts_dir;
+    my $t_score      = $self->parse_score;
+    my $t_coverage   = $self->parse_coverage;
+    my $t_evalue     = $self->parse_evalue;
+    File::Path::make_path( $self->project_dir() . "/logs/parse_results/" );
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
+    my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
+    my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "search_results", "rapsearch")) . "split_"; 
+    
+    my $nsplits_to_proc = 200;
+    my $nloops = ceil ( $nsplits_to_proc / $self->nprocs );
+    my $count  = 0;
+    
+    while( $count < $nloops ){
+	$count++;
+	
+	my $pm = Parallel::ForkManager->new($nprocs);
+
+	for( my $j=1; $j<=$nprocs; $j++ ){
+	    my $i   = $j + ( ($count - 1 ) * $nprocs );
+	    my $pid = $pm->start and next;
+	    #do some work here                                                                                                                                                                                                                   
+	    #set some loop specific variables
+	    my $indir   = File::Spec->catdir( $self->get_sample_path($sample_id), "search_results", $type, $orfbasename . $i . ".fa");
+	    my $log_file = $log_file_prefix . "_${i}.log";     
+	    my $res_stem = "${orfbasename}${i}.fa-" . $self->search_db_name($type); #it's always 1 for a local search since we only split metagenome
+	    #presumes results are compressed
+	    my $resbasename = $res_stem . "_base.tab.m8.gz";
+	    $self->Shotmap::Notify::print_verbose( "cat ${indir}/${res_stem}_[0-9]*[!d].gz > ${indir}/${resbasename}\n" ); #[!d].gz because we don't want old mysqld files!
+	    system( "cat ${indir}/${res_stem}_[0-9]*[!d].gz > ${indir}/${resbasename}" );
+	    
+	    my $infile   = File::Spec->catfile( $indir, $resbasename );
+	    #parse_results.pl needs to append the .gz extension for proper opening of file:
+	    $infile =~ s/\.gz//;
+	    #if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file       	
+		#$infile = $infile . ".m8";
+	    #}
+	    my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
+	    my $cmd  = "perl $script_file "
+		. "--results-tab=$infile "
+		. "--orfs-file=$query_orfs_file "
+		. "--sample-id=$sample_id "
+		. "--algo=$type "
+		. "--trans-method=$trans_method "
+		. "--parse-type=best_hit "
+		. "--no_coverage "
+		. "--target-skip-string=rep "
+		;	
+	    if( defined( $t_score ) ){
+		$cmd .= " --score=$t_score ";
+	    } else {
+		$cmd .= " --score=NULL ";
+	    }
+	    if( defined( $t_evalue ) ){
+		$cmd .= " --evalue=$t_evalue ";
+	    } else { 
+		$cmd .= " --evalue=NULL ";
+	    }
+	    if( defined( $t_coverage ) ){
+		$cmd .= " --coverage=$t_coverage ";
+	    } else {
+		$cmd .= " --coverage=NULL ";
+	    }
+	    if( $type eq "rapsearch" ){	
+		$cmd .= " &> $log_file"; 
+		$self->Shotmap::Notify::print_verbose( "$cmd\n" );
+	    }
+	    #execute
+	    system( $cmd );
+	    gzip_file( $infile . ".mysqld" );
+	    #we don't want to store the catted results or the uncompressed mysqld file
+	    unlink( $infile . ".gz" );
+	    unlink( $infile . ".mysqld" );
+
+	    #so that the downstream tools work, we need to rename this to be the _1 file instead of _base
+	    my $outfile = $infile . ".mysqld.gz";
+	    my $newout  = $outfile;
+	    $newout  =~ s/\_base\./\_1\./;
+	    move $outfile, $newout;
+
+	    $pm->finish; 
+	}
+	$self->Shotmap::Notify::print( "\tWaiting for local jobs to finish..." );
+	$pm->wait_all_children;
+    }
+    $self->Shotmap::Notify::print( "\t...search results are parsed. Proceeding." );
+    return $self;
+}
+
 
 sub parse_results_remote {
     my ($self, $sample_id, $type, $nsplits, $waitTimeInSeconds, $verbose, $forceparse) = @_;
@@ -2251,7 +2303,7 @@ sub get_remote_search_results {
 	if( $self->small_transfer ){ #only grab mysqld files
 	    $self->Shotmap::Notify::print( "You have --small-transfer set, so I'm only grabbing the .mysqld files from the remote server.\n" );
 	    File::Path::make_path( $local_search_res_dir );
-	    $self->Shotmap::Run::transfer_file_into_directory("$remote_results_output_dir/*.mysqld", "$local_search_res_dir/");	    
+	    $self->Shotmap::Run::transfer_file_into_directory("$remote_results_output_dir/*.mysqld*", "$local_search_res_dir/");	    
 	} else { #grab everything
 	    $self->Shotmap::Run::transfer_directory("$remote_results_output_dir", "$local_search_res_dir");
 	}
@@ -2486,7 +2538,11 @@ sub calculate_abundances_flatfile{
 	#$read_count = $self->Shotmap::DB::get_reads_by_sample_id( $sample_id )->count(); 
         #flat file alternative here: 
 	if( $self->class_level eq "read" ){
-	    $read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
+	    if( defined( $self->prerarefy_samples() ) ){
+		$read_count = $self->prerarefy_samples();
+	    } else {
+		$read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
+	    }
 	} elsif( $self->class_level eq "orf" ){
 	    $read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/orfs/", "read" );
 	}
