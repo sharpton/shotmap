@@ -105,8 +105,8 @@ while(<$res_fh>){
 	if( $_ =~ m/^(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)$/ ){
 	    $qid    = $1;
 	    $tid    = $2;
-	    $start  = $9; 
-	    $stop   = $10; 
+	    $start  = $7; 
+	    $stop   = $8; 
 	    $evalue = $11; 
 	    $score  = $12;
 	    unless( $no_coverage ){

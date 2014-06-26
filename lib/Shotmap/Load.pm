@@ -676,7 +676,7 @@ sub set_params{
     $self->parse_evalue( $self->opts->{"parse-evalue"} ); 
     $self->parse_coverage( $self->opts->{"parse-coverage"} ); 
     $self->parse_score( $self->opts->{"parse-score"} );
-    $self->small_transfer( $self->opts->{"small-transfer"} ); #????
+    $self->small_transfer( $self->opts->{"small-transfer"} );
     
     # Set classification values
     $self->clustering_strictness( $self->opts->{"is-strict"}); 

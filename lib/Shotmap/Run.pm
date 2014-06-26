@@ -1118,7 +1118,7 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 	   warn( "Can't parse orf_alt_id, famid, or score from $result_file where line is $_\n" );
 	   next;
 	}
-	if ( ! $self->Shotmap::Run::check_passing_hit( $score, $evalue, $coverage ) ){
+	if ( ! $self->Shotmap::Run::check_passing_hit( $score, $evalue, $coverage ) ){	    
 	    next;
 	}
 	if( $hit_type eq "best_hit" && $level eq "orf" ){
@@ -1142,7 +1142,7 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 		#do nothing. this is a poorer hit than what we already have
 	    }
 	} elsif ( $hit_type eq "best_hit" && $level eq "read" ){
-	    if( !defined($tophit->{$read} ) ){
+	    if( !defined( $tophit->{$read} ) ){
 		$tophit->{$read} = $_;
 	    }
 	    elsif( $score > _get_score_from_mysqld_row( $tophit->{$read} ) ){
@@ -1192,9 +1192,9 @@ sub check_passing_hit{
 }
 
 sub _get_score_from_mysqld_row{
-    my $row = @_;
+    my ( $row ) = @_;
     my $score;
-    if( $_ =~ m/(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)/ ){
+    if( $row =~ m/(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)/ ){
 	$score  = $6;
     }
     if( !defined( $score ) ){
