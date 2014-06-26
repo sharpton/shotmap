@@ -2111,7 +2111,8 @@ sub parse_results {
 	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	}
 	#execute
-        #system( $cmd );                                                                                                                                                       my $results = IPC::System::Simple::capture("$cmd");
+        #system( $cmd );
+	my $results = IPC::System::Simple::capture("$cmd");
         (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
 	gzip_file( $infile . ".mysqld" );
 	unlink( $infile . ".mysqld" );
