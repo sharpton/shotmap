@@ -1554,4 +1554,16 @@ sub initialize_parameters_file{
     return $self;
 }
 
+sub get_database_size_from_seqlen_table{
+    my( $self, $seqlen_file ) = @_;
+    my $count = 0;
+    open( IN, $seqlen_file ) || die "Can't open $seqlen_file for read: $!\n";
+    while(<IN>){
+	$count++;
+    }
+    close IN;
+    return $count;
+}
+
+
 1;

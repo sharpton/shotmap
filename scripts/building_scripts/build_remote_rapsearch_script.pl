@@ -152,8 +152,8 @@ if( $use_scratch ){
     #RUN
     print OUT "date                                                                                   >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just the statistics, so -b 0
-    print OUT "echo \"rapsearch -b=0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
-    print OUT "rapsearch -b=0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                    >> ${RAP_ALL} 2>&1\n";
     #CLEANUP
     print OUT join( "\n",
@@ -170,8 +170,8 @@ if( $use_scratch ){
     print( "Not using scratch\n" );
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just statistics, so -b 0
-    print OUT "echo \"rapsearch -b=0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
-    print OUT "rapsearch -b=0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #CLEANUP
     print OUT join( "\n",

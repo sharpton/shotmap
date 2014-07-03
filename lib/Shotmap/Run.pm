@@ -2030,7 +2030,17 @@ sub run_search{
 	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
-            $cmd = "rapsearch -b=0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+	    #see note in Shotmap::Search::build_search_script for why we do this stuff below
+	    #RAPsearch has no direct way to correct the evalue based on the database length. So, we instead need to adjust the evalue reporting
+	    #threshold (rapsearch -e). This is a little hacky as we'll use the number of sequences in the database (actully number digits of total seqs) 
+	    #as an adjustment proxy.
+	    #This shouldn't influence the final analysis, as our adjustment will be large. So, when we parse, we'll have more hits than we actually need
+	    #to consider. This errs on the side of increasing the report size (lots of false hits) to maximize the inclusion of true hits, and we
+	    #let the parser do the work.
+	    my $db_size = $self->Shotmap::DB::get_database_size_from_seqlen_table( $self->params_dir . "/sequence_lengths.tab" ); 
+	    my $digits  = length( $db_size );
+	    #actually, for now we'll just force -e. not ideal solution, but when digits is largish (e.g., >=7), rapsearch breaks
+	    $cmd = "rapsearch -b=0 -e 4.0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
             $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
         #ADD ADDITIONAL METHODS HERE    
@@ -3154,5 +3164,6 @@ sub parse_file_cols_into_hash{
     close FILE;
     return $hash;
 }
+
 
 1;
