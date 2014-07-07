@@ -38,6 +38,33 @@ $pipe->Shotmap::Notify::pipeline_params();
 
 my $path_to_family_annotations;
 
+my ( $sample_id, $sample_alt_id );
+foreach my $arg( @ARGV ){
+    if( $arg =~ m/\-\-sid\=(.*)/ ){
+	$sample_id = $1;
+    }
+    if( $arg =~ m/\-\-salt\=(.*)/ ){
+	$sample_alt_id = $1;
+    }    
+}
+print "hacking run for:\n";
+print join( "\t", $sample_id, $sample_alt_id, "\n" );
+#hack-specific pre-backloading to get parameters file in order
+my $ffdb   = $pipe->ffdb();
+my $dbname = $pipe->db_name();
+my $project_id = $pipe->project_id();
+$pipe->project_dir("$ffdb/projects/$dbname/$project_id");
+$pipe->params_dir( $pipe->project_dir . "/parameters" );
+$pipe->params_file( $pipe->params_dir . "/parameters.xml" );
+$pipe->Shotmap::DB::initialize_parameters_file( $pipe->params_file );
+$pipe->Shotmap::DB::set_sample_parameters( $sample_id, $sample_alt_id );
+#remove all *.tmp files from rapsearch search_results
+my $rapdir = $pipe->project_dir . "/$sample_id/search_results/rapsearch/";
+print( "find $rapdir -name \"*.tmp*\" -exec rm {} \;");
+#create an output directory
+my $outdir = $pipe->project_dir . "/output/";
+system( "mkdir $outdir" );
+
 # What step of the pipeline are we running?
 ## If the user has specified something in the --goto option, then we skip some parts of the analysis and go directly
 ## to the "skip to this part" part.
@@ -87,7 +114,7 @@ if( $pipe->remote ){
 # Execute search
  EXECUTESEARCH: $pipe->Shotmap::Search::run_search();
 # Parse search results
- PARSERESULTS: $pipe->Shotmap::Results::parse_results();
+ PARSERESULTS: $pipe->Shotmap::Results::parse_results_hack();
 # Get search results from remote server
 if( $pipe->remote ){
  GETRESULTS: $pipe->Shotmap::Results::grab_results();

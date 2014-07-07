@@ -37,15 +37,16 @@ print.log = 0   #should rank abundance curves be plotted in log space?
 topN      = 100 #how many of the most abundant families should be plotted in rank abundance curves?
 
 ####Good's coverage
-####takes matrix of family abundances by sample
+####takes matrices of family counts by sample and number of classified reads by sample
 #Note: May not make sense for coverage-based abundances!
-goods.coverage <- function( abunds.map ) {  
+goods.coverage <- function( count.map, class.map ) {  
 ###count = apply( abunds.map, 1, sum ) #this may need to be amended for coverage-based abundances
-  count = apply( abunds.map, 1, function(df){length(subset(df, df > 0))} ) 
-  tmap  = t(abunds.map)
-  singletons = apply( tmap, 2, function(df){length(subset(df, df <= 1 & df > 0 ) ) } ) #what is a singleton in coverage-abudance context?
-  coverage   = 1 - ( singletons / count )
-  return( coverage )
+  #count = apply( abunds.map, 1, function(df){length(subset(df, df > 0))} ) 
+    count = class.map
+    tmap  = t(count.map)
+    singletons = apply( tmap, 2, function(df){length(subset(df, df == 1 ) ) } ) 
+    coverage   = 1 - ( singletons / count )
+    return( coverage )
 }
 
 ###Autodetect metadata variable type
@@ -87,6 +88,17 @@ if( verbose ){
 }
 abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
 abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
+count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS" ) #could try to do all work in the .df object instead, enables ggplot
+class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) ) )
+class.df   <- class.df[ order( class.df[,1] ), ]
+class.map  <- class.df$V2
+names(class.map) <- class.df$V1
+
+seq.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$TOT.SEQS) ) )
+seq.df   <- seq.df[ order( seq.df[,1] ), ]
+seq.map  <- seq.df$V2
+names(seq.map) <- seq.df$V1
+
 samples    <- rownames(abund.map)
 famids     <- colnames(abund.map)
 
@@ -107,9 +119,11 @@ shannon    <- diversity(abund.map)
 if( verbose ) { print( "Calculating Richness..." ) }
 richness   <- specnumber(abund.map)
 if( verbose ) {print( "Calculating Good's Coverage..." )}
-goods      <- goods.coverage(abund.map)
+goods      <- goods.coverage(count.map, class.map)
+if( verbose ) {print( "Calculating Classification Rate..." )}
+class.rate <- class.map / seq.map
 
-div.map    <- cbind( shannon, richness, goods )
+div.map    <- cbind( shannon, richness, goods, class.rate )
 div.file   <- paste( sample.stem, ".tab", sep="" )
 print( paste( "Producing diversity map file here: ", div.file, sep="") )
 write.table( div.map, file = div.file )

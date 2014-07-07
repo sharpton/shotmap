@@ -21,7 +21,6 @@ use File::Basename;
 use File::Path;
 use File::Spec;
 use IPC::System::Simple qw(capture $EXITVAL);
-use Data::Dumper;
 
 sub new{
     my ($proto) = @_;
@@ -360,6 +359,14 @@ sub class_score{
 	$self->{"c_score"} = $value;
     }
     return $self->{"c_score"};
+}
+
+sub class_level{
+   my ( $self, $value ) = @_;    
+    if( defined( $value ) ){
+	$self->{"c_level"} = $value;
+    }
+    return $self->{"c_level"};
 }
 
 sub prerarefy_samples{
