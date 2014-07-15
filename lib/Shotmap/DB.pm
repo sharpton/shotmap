@@ -893,7 +893,12 @@ sub split_sequence_file{
     if( $self->remote ){
 	$nseqs_per_split  = $self->read_split_size();
     } else {
-	my $total_reads  = $self->Shotmap::Run::count_seqs_in_file( $full_seq_file );
+	my $total_reads;
+	if( defined( $self->Shotmap::prerarefy_samples() ) ){
+	    $total_reads = $self->Shotmap::prerarefy_samples();
+	} else {
+	    $total_reads = $self->Shotmap::Run::count_seqs_in_file( $full_seq_file );
+	}
 	$nseqs_per_split = ceil($total_reads / $self->nprocs()  ); #round up to nearest integer to be sure we get all reads
     }
     #a list of filenames
@@ -930,20 +935,28 @@ sub split_sequence_file{
 	if( eof ) {
 	    print OUT "$header\n$sequence\n";	    
 	}
-	if( $seq_ct == $nseqs_per_split ){	
+	if( $seq_ct == $nseqs_per_split - 1 ){	
 	    close OUT;
+	    unless( $self->remote ){
+		Shotmap::Run::gzip_file( $splitout );
+		unlink( $splitout );
+	    }
 	    $counter++;
 	    my $outname  = $basename . $counter . ".fa";
-	    my $splitout = $split_dir . "/" . $outname;
+	    $splitout = $split_dir . "/" . $outname;
 	    unless( eof ){
 		open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
 		push( @output_names, $outname );
 		$self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
-		$seq_ct = 0;
+		$seq_ct = 0;		
 	    }
 	}
     }    
     close OUT;
+    unless( $self->remote ){
+	Shotmap::Run::gzip_file( $splitout );
+	unlink( $splitout );
+    }
     close SEQS;
     return \@output_names;
 }

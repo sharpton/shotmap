@@ -450,7 +450,7 @@ sub get_options{
 			  , "parse-evalue:f" 
 			  , "parse-coverage:f"
 			  , "parse-score:f"   
-			  , "small-transfer!"  ### ???
+			  , "small-transfer!"
 			  #family classification thresholds (more stringent)
 			  , "class-evalue:f"
 			  , "class-coverage:f"
@@ -733,7 +733,7 @@ sub load_defaults{
 	    ,    "split-orfs"     => 1
 	    ,    "orf-len-filter" => 14
 	    # search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
-	    ,    "parse-score"    => 20
+	    ,    "parse-score"    => 28
 	    # family classification thresholds (more stringent)
 	    ,    "top-hit"        => 1
 	    ,    "hit-type"       => 'best_hit'

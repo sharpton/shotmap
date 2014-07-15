@@ -659,11 +659,15 @@ sub translate_reads {
         if( $method eq 'transeq' || $method eq 'transeq_split' ){
             my $infile   = "${input}/${inbasename}${i}.fa";
             my $outfile  = "${output}/${outbasename}${i}.fa";
-            $cmd      = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
-            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
+	    if( -e "${infile}.gz" ){
+		$cmd    = "zcat ${infile}.gz | transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson stdin $outfile > /dev/null 2>&1";
+	    } else {
+		$cmd    = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
+	    }	    
         }
 	#ADD ADDITIONAL METHODS
 	#execute
+	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	system( $cmd );
 	$pm->finish; # Terminates the child process
 
@@ -2019,8 +2023,7 @@ sub run_search{
     my $pm = Parallel::ForkManager->new($nprocs);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
-        #do some work here                                                                                                                                                                                                                   
-	my $cmd;
+        #do some work here                                                                                 
         my $log_file = $log_file_prefix . "_${i}.log";
 	my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
 	#create output directory
@@ -2028,6 +2031,7 @@ sub run_search{
 	File::Path::make_path($outdir);
 	my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
 	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
+	my $cmd;
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
@@ -2091,7 +2095,7 @@ sub parse_results {
 
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
-        #do some work here                                                                                                                                                                                                                   
+        #do some work here                                                                                 
 	#set some loop specific variables
 	my $log_file = $log_file_prefix . "_${i}.log";	
 	my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
