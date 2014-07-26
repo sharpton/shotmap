@@ -15,6 +15,14 @@ metadata.tab      <- Args[6]  #required
 test.type         <- Args[7]  #optional, is auto set below if NA
 verbose           <- Args[8]
 
+#for troubleshooting
+samp.abund.map <- "metahit.ibd-abundance-tables.tab"
+family.stem    <- "test"
+metadata.tab   <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/metadata/metahit.ibd-metadata-fmt.tab"
+
+reduce_tests = 0 #this isn't working yet
+verbose = 1
+
 if( is.na( verbose ) ){
     verbose = 0
 } else {
@@ -73,6 +81,31 @@ autodetect <- function( val.list, cont.thresh) {
   return( type )
 }
 
+#Only retain those families where that have at least 3 observations in at least
+#one class
+drop_bad_fams <- function( test.data, classes ){
+  new.df <- apply( test.data, 1, FUN=function( x ) drop_rows(x, classes) )	      
+  return( new.df )
+}
+
+drop_rows <- function( x, classes ){
+  new.df <- NULL	      
+  retain = 0    
+  for( i in length( unique( classes ) ) ){
+    class <- unique(classes)[i]
+    indx  <- which( classes == class )
+    samps <- x[indx]
+    measured <- samps[ samps > 0 ]
+    if( length( measured > 3 ) ){
+      retain = 1
+    }
+  }	 
+  if( retain ){
+     new.df <- rbind( new.df, x )
+  } 
+  return( new.df )
+}
+
 print( "Loading data..." );
 
 ####get the metadata
@@ -83,19 +116,28 @@ meta.names <- colnames( meta )
 abund.map <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE)
 ra.map    <- abund.map
 ra.map$ABUNDANCE <- NULL #don't need the abundance field for this script
+ra.map$ABUNDANCE  <- NULL #don't need the abundance field for this script
+ra.map$COUNTS     <- NULL
+ra.map$TOT.ABUND  <- NULL
+ra.map$TOT.SEQS   <- NULL
+ra.map$CLASS.SEQS <- NULL
 a.tmp     <- melt(ra.map, id=c("SAMPLE.ID","FAMILY.ID") ) #reshape ra.map to get sample.ids by fam.ids
-ra.map    <- dcast(a.tmp, SAMPLE.ID~FAMILY.ID) 
+ra.map    <- dcast(a.tmp, SAMPLE.ID~FAMILY.ID, fill=0) 
 row.names(ra.map) <- ra.map$SAMPLE.ID #push sampleids to the rowname and drop the column from the df
 ra.map$SAMPLE.ID <- NULL
 samples   <- rownames(ra.map)
 famids    <- colnames(ra.map)
+
+#make sure the meta table only includes samples in our abundance file
+#CHECK NAMING CONVENTION
+meta <- subset( meta, meta$SAMPLE.ID %in% samples )
 
 ###map sampleid to family id to relative abundance using melt
 for( a in 1:length( meta.names ) ){
   to.plot = 1
   meta.field <- meta.names[a]    
   if( meta.field == "SAMPLE.ID" | meta.field == "SAMPLE.ALT.ID" ){
-    next
+      next
   }
   ##was was this here previously? I don't think it make sense to skip, we just don't want to plot
   if( autodetect( meta[,meta.field] ) == "continuous" ){
@@ -103,7 +145,9 @@ for( a in 1:length( meta.names ) ){
   }
   print( paste("Processing <", meta.field, ">...", sep="") )
   types <- unique( meta[,meta.field] )
+
   if( length( types ) < 2 ){
+      print( paste("Not enough types of <", meta.field, "> to conduct these statistics. Passing...", sep=""))
       next
   }     
   if( length(types) > n.type.plot.lim ){
@@ -134,7 +178,10 @@ for( a in 1:length( meta.names ) ){
     fam.map.x <- ra.map[as.character(x.samps),]
     fam.map.y <- ra.map[as.character(y.samps),]
     test.data <- t(rbind( fam.map.x, fam.map.y )) #this needs to be families by samples for multtest
-    classes <- c( rep(0, length(x.samps) ), rep(1, length(y.samps ) ) )
+    classes   <- c( rep(0, length(x.samps) ), rep(1, length(y.samps ) ) )
+    if( reduce_tests ){
+        test.data <- drop_bad_fams( test.data, classes )
+    }	
     ##RUN THE TEST
     ##t.test
     if( test.type == "t.test" ){
@@ -151,7 +198,7 @@ for( a in 1:length( meta.names ) ){
     num.p           <- length(procs) + 1  #add 1 for raw.p
     rnd.p           <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
-    rnd.p2 <- data.frame( test.type=test.type, rnd.p)
+    rnd.p2          <- data.frame( test.type=test.type, rnd.p)
     ##now do something with this output
     tab.file <- paste( family.stem, "-", meta.field, "-", test.type, "-pvals.tab", sep="" )
     print( paste( "Generating p-value table for ", tab.file, sep="") )
@@ -196,6 +243,7 @@ for( a in 1:length( meta.names ) ){
     adjp          <- res$adjp[order(res$index), ] #according to help, this returns rows in original order in res
     num.p         <- length(procs) + 1  #add 1 for raw.p
     rnd.p         <- round(adjp[,1:num.p], 4)
+    rownames(rnd.p) <- rownames( test.data )
     rnd.cor       <- round(rawp0$cor.estimate, 4 )
     res           <- data.frame( test.type="spearman", cor.estimate=rnd.cor, rnd.p )
     #print results to output
