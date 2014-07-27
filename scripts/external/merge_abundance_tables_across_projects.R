@@ -29,16 +29,17 @@ metadata.tab      <- Args[5]
 outfile           <- Args[6]
 ags.normalize     <- Args[7]
 reset.total_bp    <- Args[8]
-total_bp          <- Args[9]
+total_bp          <- as.numeric(Args[9])
 
 #in.dir       <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/SFAM/test/"
 #metadata.tab <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/SFAM/test/metahit.avg_size-metadata.tab"
 #outfile      <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/SFAM/test/metahit-abundance-tables.tab"
-ags.normalize <- 1
-reset.total_bp <- 1
-total_bp       <- 20000000 * 70
+#ags.normalize <- 1
+#reset.total_bp <- 1
+#total_bp       <- 20000000 * 70
 
 metadata.delim <- ""
+col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
 
 files <- list.files( in.dir )
 abund.map.files <- files[grep(glob2rx("*Abundance_Map*"), files)]
@@ -48,8 +49,10 @@ meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE, sep
 meta.names <- colnames( meta )
 sample.alt.ids <- meta$SAMPLE.ID    #This must be in the metadata file!
 
-if( reset.total_bp ){
-    meta$total_bp <- total_bp
+if( !(is.na( reset.total_bp ) ) ){
+    if( reset.total_bp == 1 ){   
+    	meta$total_bp <- total_bp
+    }    
 }
 
 if( is.null(sample.alt.ids)){
@@ -67,18 +70,20 @@ for ( z in 1:length(sample.alt.ids) ){
   index  <- grep( paste(alt.id, "_", sep=""), abund.map.files) 
   if( length(index) == 0 ){
       print( paste( "WARNING: Cannot find abundance file for sample ", alt.id, ". Passing this sample...", sep="" ) )
-      next
+     next
   }
   abund.file <- abund.map.files[index]
   print( paste( "Processing ", abund.file, sep="") )
-  tmp.map    <- read.table( file=paste( in.dir, "/", abund.file, sep=""), header=TRUE, check.names=FALSE)	
+  tmp.map    <- read.table( file=paste( in.dir, "/", abund.file, sep=""), header=TRUE, check.names=FALSE, colClasses = col.classes )
   #replace sample_id number with sample_alt_id from the file name
   tmp.map$SAMPLE.ID <- alt.id
   #normalize abundance/relative abundance by AGS
-  if( ags.normalize ){  
-    meta.sub <- subset( meta, meta$SAMPLE.ID == alt.id )
-    ags.norm.abund <- tmp.map$REL.ABUND / ( meta.sub$total_bp / meta.sub$avg_size )  #Or is it ABUNDANCE / TOT.ABUND?    
-    tmp.map$ABUNDANCE <- ags.norm.abund
+  if( !is.na( ags.normalize ) ) {
+    if( ags.normalize == 1 ){  
+      meta.sub <- subset( meta, meta$SAMPLE.ID == alt.id )
+      ags.norm.abund <- tmp.map$REL.ABUND / ( meta.sub$total_bp / meta.sub$avg_size )  #Or is it ABUNDANCE / TOT.ABUND?    
+      tmp.map$ABUNDANCE <- ags.norm.abund
+    }
   }
   #append tmp.map to abund.map
   abund.map <- rbind( abund.map, tmp.map )

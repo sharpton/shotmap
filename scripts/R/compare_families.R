@@ -23,6 +23,8 @@ metadata.tab   <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_ou
 reduce_tests = 0 #this isn't working yet
 verbose = 1
 
+col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
+
 if( is.na( verbose ) ){
     verbose = 0
 } else {
@@ -113,7 +115,7 @@ meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
 meta.names <- colnames( meta )
 
 ###get family abundances by samples
-abund.map <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE)
+abund.map <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE, colClasses = col.classes )
 ra.map    <- abund.map
 ra.map$ABUNDANCE <- NULL #don't need the abundance field for this script
 ra.map$ABUNDANCE  <- NULL #don't need the abundance field for this script
