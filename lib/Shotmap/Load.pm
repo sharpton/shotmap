@@ -235,6 +235,8 @@ sub check_vars{
 	my $type = $self->opts->{"rarefaction-type"};
 	if( $type !~ "read" &&
 	    $type !~ "orf"  &&
+	    $type !~ "class-read" &&
+	    $type !~ "class-orf" &&
 	    $type !~ "pre-rarefaction" ){
 	    $self->Shotmap::Notify::dieWithUsageError( 
 		"You must specify a correct rarefaction-type with --rarefaction-type. ".

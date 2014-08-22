@@ -2717,7 +2717,10 @@ sub build_sample_abundance_map_flatfile{
 }
 
 sub get_post_rarefied_reads_flatfile{
-    my ( $self, $sample_id, $rare_type ) = @_;
+    my ( $self, $sample_id, $rare_type, $check ) = @_;
+    if( ! defined( $check ) ){
+	$check = 0;
+    }
     my $size = $self->postrarefy_samples;
     my $rare_ids = (); #hashref
     my $draws    = (); #hashref
@@ -2742,6 +2745,14 @@ sub get_post_rarefied_reads_flatfile{
 	die "You didn't provide a properly formatted path in get_post_rarefied_reads_flatfile\n";
     }
     my $max = $self->Shotmap::Run::count_objects_in_files( $path, $rare_type );
+    if( $check == 1 ){
+	my $bit = 1;
+	if( $max < $size ){
+	    warn( "There are not enough ${rare_type}s in sample ${sample_id} to rarefy to a depth of ${size} (only found $max). I will have to skip all downstream analyses for this sample.\n" );
+	    $bit = 0;
+	}
+	return $bit;
+    }
     ( $draws, $seed_string ) = $self->Shotmap::Run::generate_random_samples( $size, $max, $seed_string );
     $rare_ids = $self->Shotmap::Run::sample_objects_in_files( $path, $rare_type, $draws );
     $draws = (); #cleanup
@@ -3140,9 +3151,11 @@ sub calculate_diversity{
     my $ordin_path_stem  = "Ordinations";
     File::Path::make_path( $outdir . "/${ordin_path_stem}/" );
     File::Path::make_path( $outdir . "/${ordin_path_stem}/" );
+    my $center           = 1;
+    my $scale            = 1;
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
     $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
-    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} < ${script}";
+    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} ${center} ${scale} < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }

@@ -10,18 +10,17 @@ options(error=recover)
 Args              <- commandArgs()
 samp.abund.map    <- Args[4]  #required
 family.stem       <- Args[5]  #required
-#compare.stem     <- Args[6]  #required
 metadata.tab      <- Args[6]  #required
 test.type         <- Args[7]  #optional, is auto set below if NA
 verbose           <- Args[8]
 
 #for troubleshooting
-samp.abund.map <- "metahit.ibd-abundance-tables.tab"
-family.stem    <- "test"
-metadata.tab   <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/metadata/metahit.ibd-metadata-fmt.tab"
+#samp.abund.map <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/MC/stats/no_ags/metahit-spain-abundance-tables.tab"
+#family.stem    <- "test"
+#metadata.tab   <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/metadata/metahit.ibd-metadata-fmt.ags-updated.tab"
 
 reduce_tests = 0 #this isn't working yet
-verbose = 1
+#verbose = 1
 
 col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
 
@@ -36,25 +35,23 @@ if( verbose ) {
     require(ggplot2)
     require(reshape2)
     require(multtest)
+    require(coin)
+    require( qvalue )
 } else {
     msg.trap <- capture.output( suppressMessages( library( vegan ) ) )
     msg.trap <- capture.output( suppressMessages( library( ggplot2 ) ) )
     msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
     msg.trap <- capture.output( suppressMessages( library( multtest ) ) )
+    msg.trap <- capture.output( suppressMessages( library( coin ) ) )
+    msg.trap <- capture.output( suppressMessages( library( qvalue ) ) )
 }
-
-###For testing purposes only
-#samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-#metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata_test.tab"
-#family.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Family_Diversity_cid_54_aid_1"
-#compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_Families_cid_54_aid_1"
 
 ###Set autodetection thresholds
 cont.thresh    = 0.2 #if there are fewer than this fraction of uniq vars in list, force discrete
 n.type.plot.lim = 10  #if there are more than this number of uniq vars in list, don't plot results, only produce table files
 
 ###Set some multiple testing parameters
-procs         <- c("Bonferroni", "Holm", "Hochberg", "SidakSS", "SidakSD", "BH", "BY") #used in multtest
+procs         <- c("Bonferroni", "Holm", "Hochberg", "SidakSS", "SidakSD", "BH", "BY", "qvalue" ) #used in multtest
 proc2plot     <- "BH" #must be one of the above
 sig.threshold <- 0.05
 
@@ -116,9 +113,9 @@ meta.names <- colnames( meta )
 
 ###get family abundances by samples
 abund.map <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE, colClasses = col.classes )
-ra.map    <- abund.map
-ra.map$ABUNDANCE <- NULL #don't need the abundance field for this script
-ra.map$ABUNDANCE  <- NULL #don't need the abundance field for this script
+ra.map    <- abund.map    #originally used RelAbunds, but SN's MicrobeCensus shows AGS corrected ABUND is more accurate
+ra.map$REL.ABUND <- NULL  #don't need the rel.abundance field for this script
+ra.map$REL.ABUND  <- NULL #don't need the rel.abundance field for this script
 ra.map$COUNTS     <- NULL
 ra.map$TOT.ABUND  <- NULL
 ra.map$TOT.SEQS   <- NULL
@@ -134,17 +131,19 @@ famids    <- colnames(ra.map)
 #CHECK NAMING CONVENTION
 meta <- subset( meta, meta$SAMPLE.ID %in% samples )
 
-###map sampleid to family id to relative abundance using melt
+###map sampleid to family id to abundance using melt
 for( a in 1:length( meta.names ) ){
   to.plot = 1
-  meta.field <- meta.names[a]    
+  meta.field <- meta.names[a]
   if( meta.field == "SAMPLE.ID" | meta.field == "SAMPLE.ALT.ID" ){
       next
   }
-  ##was was this here previously? I don't think it make sense to skip, we just don't want to plot
-  if( autodetect( meta[,meta.field] ) == "continuous" ){
-    ##next
+
+  #for metahit analysis only!
+  if( meta.field == "subject_id" | meta.field == "total_bp" | meta.field == "total_reads" | meta.field == "read_length" | meta.field == "reads_sampled" | meta.field == "total_coverage" ){
+      next
   }
+
   print( paste("Processing <", meta.field, ">...", sep="") )
   types <- unique( meta[,meta.field] )
 
@@ -190,7 +189,9 @@ for( a in 1:length( meta.names ) ){
       rawp0 <- apply(test.data, 1, function(x) t.test(x~classes)$p.value)
     } else if( test.type == "wilcoxon.test" ){   
       ##fastest procedure seems to be applying wilcox.test to df rows
-      rawp0 <- apply(test.data, 1, function(x) wilcox.test(x~classes)$p.value)
+      #rawp0 <- apply(test.data, 1, function(x) wilcox.test(x~classes)$p.value)
+      #update to coin
+      rawp0 <- apply(test.data, 1, function(x) pvalue(wilcox_test(x~factor(classes), data = list(abundance = x, feature = factor(classes) ), distribution="exact" ) ) )
       ##from: http://www.bioconductor.org/packages/2.12/bioc/vignettes/multtest/inst/doc/multtest.pdf
       ##teststat  <- mt.teststat( test.data, classes, test="wilcoxon" )
       ##rawp0           <- 2 * (1 - pnorm(abs(teststat)))
@@ -200,6 +201,11 @@ for( a in 1:length( meta.names ) ){
     num.p           <- length(procs) + 1  #add 1 for raw.p
     rnd.p           <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
+    rnd.p <- as.data.frame( rnd.p )
+    if( "qvalue" %in% procs ){    	    	
+    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+	rnd.p$qvalue <- qvals
+    }
     rnd.p2          <- data.frame( test.type=test.type, rnd.p)
     ##now do something with this output
     tab.file <- paste( family.stem, "-", meta.field, "-", test.type, "-pvals.tab", sep="" )
@@ -216,12 +222,19 @@ for( a in 1:length( meta.names ) ){
     names(classes.unsort) <-meta$SAMPLE.ID
     test.data <- t( ra.map )
     classes   <- classes.unsort[ colnames( test.data ) ]
-    rawp0     <- apply( test.data, 1, function(x) kruskal.test( x~classes)$p.value )
+    #rawp0     <- apply( test.data, 1, function(x) kruskal.test( x~classes)$p.value )
+    #update to coin	   
+    rawp0           <- apply( test.data, 1, function(x) pvalue( kruskal_test( x~classes, data = list(abundance = x, feature = classes ), distribution = approximate(B=5000) ) ) )    
     res             <- mt.rawp2adjp(rawp0, procs, na.rm=TRUE)
     adjp            <- res$adjp[order(res$index), ]
     num.p           <- length(procs) + 1  #add 1 for raw.p
     rnd.p           <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
+    rnd.p <- as.data.frame( rnd.p )
+    if( "qvalue" %in% procs ){    	    	
+    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+	rnd.p$qvalue <- qvals
+    }
     rnd.p2          <- data.frame( test.type="kruskal.test", rnd.p)
     ##now do something with this output
     tab.file        <- paste( family.stem, "-", meta.field, "-kruskal-pvals.tab", sep="" )
@@ -230,12 +243,12 @@ for( a in 1:length( meta.names ) ){
   }  
   ##Correlation analyses on continuous vars
   ##just linear for now, but could fit additional models in the future
-  else if( length(meta$SAMPLE.ID) > 2 & autodetect( meta[,meta.field], cont.thresh ) == "continuous" ){ #spearman's correlation and lm analysis, reqs 3 or more samples
-    print("...preparing spearman rank correlation tests...")
+  else if( length(meta$SAMPLE.ID) > 2 & autodetect( meta[,meta.field], cont.thresh ) == "continuous" ){ #kendall correlation and lm analysis, reqs 3 or more samples
+    print("...preparing kendall rank correlation tests...")
     meta.vals     <- meta[order(meta$SAMPLE.ID),][,meta.field] #have to order by sample id to map to ra.map
     test.data     <- t(ra.map)
     rawp0         <- as.data.frame(t(apply( test.data, 1, function(row){
-      s<-cor.test( row, meta.vals, type="spearman" )
+      s<-cor.test( row, meta.vals, type="kendall", exact=TRUE )
       c(s$estimate, s$p.value)
     } )))
     colnames(rawp0) <- c( "cor.estimate", "p.value" )
@@ -246,10 +259,15 @@ for( a in 1:length( meta.names ) ){
     num.p         <- length(procs) + 1  #add 1 for raw.p
     rnd.p         <- round(adjp[,1:num.p], 4)
     rownames(rnd.p) <- rownames( test.data )
+    rnd.p <- as.data.frame( rnd.p )
+    if( "qvalue" %in% procs ){    	    	
+    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+	rnd.p$qvalue <- qvals
+    }
     rnd.cor       <- round(rawp0$cor.estimate, 4 )
-    res           <- data.frame( test.type="spearman", cor.estimate=rnd.cor, rnd.p )
+    res           <- data.frame( test.type="kendall", cor.estimate=rnd.cor, rnd.p )
     #print results to output
-    tab.file      <- paste( family.stem, "-", meta.field, "-RA_spearman_statistics.tab", sep="")
+    tab.file      <- paste( family.stem, "-", meta.field, "-RA_kendall_statistics.tab", sep="")
     print( paste( "Generating p-value table for ", tab.file, sep="") )
     write.table( res, tab.file )        
 #    sigs          <- apply( res, 1, function(row){      
@@ -261,6 +279,7 @@ for( a in 1:length( meta.names ) ){
 #      }
 #    } )
     ##add linear fit plot here, maybe...  
+
   }
 }
 

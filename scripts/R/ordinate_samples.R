@@ -7,7 +7,11 @@ Args              <- commandArgs()
 samp.abund.map    <- Args[4]
 file.stem         <- Args[5]
 metadata.tab      <- Args[6]
-verbose           <- Args[7]
+to.scale          <- Args[7]
+to.center         <- Args[8]
+verbose           <- Args[9]
+
+col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
 
 if( is.na( verbose ) ){
     verbose = 0
@@ -30,19 +34,20 @@ if( verbose ) {
 }
 
 
+
 method            <- "pca" #not currently used, but reserved for later
-to.scale          <- 1
-to.center         <- 1
+#to.scale          <- 1
+#to.center         <- 1
 topN              <- 5
 to.plotloadings   <- 1
 
 plotloadings <- FALSE
 scale  <- FALSE
 center <- FALSE
-if( to.scale ){
+if( to.scale == 1 ){
   scale <- TRUE
 }
-if( to.center ){
+if( to.center == 1 ){
   center <- TRUE
 }
 if( to.plotloadings ){
@@ -52,9 +57,10 @@ if( to.plotloadings ){
 plotstem <- method
 
 #For testing purposes only
-#samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-#metadata.tab   <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
-#file.stem      <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Sample_ordination_cid_54_aid_1"
+#samp.abund.map <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/SFAM/stats/no_ags//metahit.ibd-abundance-tables.tab"
+#metadata.tab <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/metadata/metahit.ibd-metadata-fmt.ags-updated.tab"
+#file.stem <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/SFAM/stats/no_ags/clusters/test_ordination"
+#verbose = 1
 
 ###Thanks to crayola (http://stackoverflow.com/questions/6578355/plotting-pca-biplot-with-ggplot2)
 PCbiplot <- function(PC, x="PC1", y="PC2", plotloadings=TRUE, topN=10, metatypes=NULL) {
@@ -98,14 +104,15 @@ meta.names <- colnames( meta )
 
 ###get family abundances by samples
 print( "Grabbing family abundance data..." )
-abund.df <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
+abund.df  <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE, colClasses = col.classes )
 abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
 samples    <- rownames(abund.map)
 famids     <- colnames(abund.map)
 
 ###get family relative abundances by samples
 print( "Grabbing relative abundance data..." )
-ra.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND" ) #could try to do all work in .df object, enables ggplot
+#USE THE ABUNDANCE PARAMETER INSTEAD IN THE CASE OF AGS-NORMALIZATION
+ra.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE", fill=0 ) #could try to do all work in .df object, enables ggplot
 
 pca <- NULL
 if( scale & center ){
@@ -131,18 +138,19 @@ d         <-vegdist(pca$x[,1:n.factors], method=distmeth)
 dist.file <- paste( file.stem, "-sample_distance_matrix-", plotstem, "-pca_euclidean.dist", sep="" )
 print( paste( "Write sample distance matrix to ", dist.file, sep="" ) )
 write.matrix( d, dist.file )
-if( length(colnames(d)) < 3 ){
+if( length(labels(d)) < 3 ){
     print( paste( "You don't have enough samples to conduct PAM clustering. Skiping this step." ) )
 } else {
     ##cluster and look for support
     pamk.best <- pamk(d)
     ##print results
-    sil.plot  <- paste( file.stem, "-pam_clusters-pca_euclidean-silhouettes.pdf" )
+    sil.plot  <- paste( file.stem, "-pam_clusters-", plotstem, "-", distmeth, "-silhouettes.pdf", sep="" )
     print( paste( "Printing silhouette plot to ", sil.plot, sep="") )
     pdf( file = sil.plot )
     plot(pam(d, pamk.best$nc))
     dev.off()
-    sil.file  <- paste( file.stem, "pam_clusters-pca_euclidean-data.tab" )
+    sil.file  <- paste( file.stem, "-pam_clusters-", plotstem, "-", distmeth, "-data.pdf", sep="" )
+    #sil.file  <- paste( file.stem, "pam_clusters-pca_euclidean-data.tab", sep="" )
     pam.dat   <- pamk.best$pamobject #push into this var in case we want to do anything else in future
     print(paste( "Writing cluster support data to ", sil.file, sep="" ) )
     write.table( pam.dat$silinfo$widths, sil.file )

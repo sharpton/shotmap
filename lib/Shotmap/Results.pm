@@ -150,7 +150,9 @@ sub calculate_abundances{
 	}
     }
     foreach my $sample_id( @{ $self->get_sample_ids() } ){
-	next unless( $self->Shotmap::Run::check_sample_rarefaction_depth( $sample_id ) ); #NEW FUNCTION
+	if( defined( $self->postrarefy_samples ) ){
+	    next unless( $self->Shotmap::Run::get_post_rarefied_reads_flatfile( $sample_id, $self->rarefaction_type, 1 ) );
+	}
 	my $outdir         = File::Spec->catfile($self->project_dir . "/output" );
 	my $class_map      = $outdir . "/ClassificationMap_Sample_${sample_id}_cid_${class_id}.tab";
 	#do some preprocessing for database-free analysis

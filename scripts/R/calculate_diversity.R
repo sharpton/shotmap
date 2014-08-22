@@ -28,10 +28,11 @@ if( verbose ) {
 }
 
 #For testing purposes only
-#samp.abund.map <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Abundance_Map_cid_54_aid_1.tab"
-#metadata.tab <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/sample_metadata.tab"
-#sample.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Sample_Diversity_cid_54_aid_1"
-#compare.stem <- "/mnt/data/work/pollardlab/sharpton/MRC_ffdb/projects/SFams_english_channel_L4/90/output/Compare_samples_cid_54_aid_1"
+#samp.abund.map <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/KO/stats/no_ags//metahit.ibd-abundance-tables.tab"
+#metadata.tab <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/metadata/metahit.ibd-metadata-fmt.ags-updated.tab"
+#sample.stem  <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/KO/stats/no_ags/diversity//Sample_Diversity"
+#compare.stem <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/KO/stats/no_ags/diversity//Sample_Comparison"
+#verbose = 1
 
 print.log = 0   #should rank abundance curves be plotted in log space?
 topN      = 100 #how many of the most abundant families should be plotted in rank abundance curves?
@@ -87,8 +88,8 @@ if( verbose ){
     print( "Grabbing family abundance data..." )
 }
 abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
-abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE" ) #could try to do all work in the .df object instead, enables ggplot
-count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS" ) #could try to do all work in the .df object instead, enables ggplot
+abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
+count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) ) )
 class.df   <- class.df[ order( class.df[,1] ), ]
 class.map  <- class.df$V2
@@ -109,7 +110,7 @@ famids     <- colnames(abund.map)
 if( verbose ){
     print( "Grabbing relative abundance data..." )
 }
-ra.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND" ) #could try to do all work in .df object, enables ggplot
+ra.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND", fill=0 ) #could try to do all work in .df object, enables ggplot
 
 ###calculate various types of diversity
 if( verbose ){
@@ -126,7 +127,7 @@ class.rate <- class.map / seq.map
 div.map    <- cbind( shannon, richness, goods, class.rate )
 div.file   <- paste( sample.stem, ".tab", sep="" )
 print( paste( "Producing diversity map file here: ", div.file, sep="") )
-write.table( div.map, file = div.file )
+write.table( div.map, file = div.file, quote=FALSE )
 
 ###Make per-Sample Rank Abundance Plots
 if( verbose ){ print( "Plotting rank abundance curves..." ) }
@@ -270,7 +271,7 @@ if( print.log ){
 
 ###Plot per sample diversity statistics
 ###prepare div.map for plotting
-tmp.map <- cbind( as.data.frame( as.integer(rownames(div.map))), div.map ) 
+tmp.map <- cbind( as.data.frame( rownames(div.map)), div.map ) 
 colnames(tmp.map) <- c( "SAMPLE.ID", colnames(div.map) )
 tmp.map$SAMPLE.ORDERED <- factor( tmp.map$SAMPLE.ID, sort( tmp.map$SAMPLE.ID) )
 div.map <- tmp.map
@@ -314,8 +315,10 @@ if( is.null( meta ) ){
   meta.div   <- merge( div.map, meta, by = "SAMPLE.ID" )
  ##print out meta.div so users can do custom plotting
   out.tab <- paste(sample.stem, "-diversity-metadata-table.tab", sep="")
-  print( paste( "Writing metadata by diversity table. Using this for custom plotting: ", out.tab, sep="") ) 
-  write.table( meta.div, file=out.tab )
+  print( paste( "Writing metadata by diversity table. Use this for custom plotting: ", out.tab, sep="") ) 
+  write.table( meta.div, file=out.tab, quote=FALSE )
+  corr.tests <- NULL
+  kw.tests   <- NULL
 ###Compare diversity statistics between metadata groups
 ##differences in diversity across distinct types of metadata classes
   for( b in 1:length( meta.names ) ){
@@ -336,9 +339,13 @@ if( is.null( meta ) ){
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-boxes.pdf", sep="" )
       if( verbose ){ print(file) }
       ggsave( filename = file, plot = last_plot(), width=7, height=7  )
+      pval <- kruskal.test( meta.div[,meta.type], meta.div[,div.type])$p.value
+      tmp.stats <- data.frame( meta.field = meta.type, div.field = div.type, pvalue=pval )
+      kw.tests  <- rbind( kw.tests, tmp.stats )
     }
   }
-###build scatter plots, grouping by metadata fields. Not always informative (e.g., when field is discrete)
+
+ ###build scatter plots, grouping by metadata fields. Not always informative (e.g., when field is discrete)
 ##relationship between diversity and metadata type?
   for( b in 1:length( meta.names ) ){
     for( d in 1:length( colnames(div.map) ) ){
@@ -358,8 +365,14 @@ if( is.null( meta ) ){
       file <- paste( compare.stem, "-", meta.type, "-", div.type, "-scatter.pdf", sep="" )
       if( verbose ){ print(file) }
       ggsave( filename = file, plot = last_plot(), width=7, height=7 )
+      if( is.numeric( meta.div[,meta.type] ) ){
+            corr <- cor.test( meta.div[,meta.type], meta.div[,div.type], method="spearman" )
+      	    tmp.stats <- data.frame( meta.field = meta.type, div.field = div.type, rho=corr$estimate, pvalue=corr$p.value )      
+	    corr.tests  <- rbind( corr.tests, tmp.stats )		
+      }
     }
   }
+
 ###build line plots between types
 ###the change in diversity over metadata space
 ### OFF FOR NOW - need efficient way to select how samples are grouped within a metadata type (richness for mg v. mt across time) for this to be meaningful
@@ -385,5 +398,9 @@ if( is.null( meta ) ){
       }
     }
   }
+  kw.tab <- paste(sample.stem, "-kruskal-wallis_stats.tab", sep="")
+  write.table( kw.tests, file=kw.tab, quote=FALSE )
+  corr.tab <- paste(sample.stem, "-spearman_stats.tab", sep="")
+  write.table( corr.tests, file=corr.tab, quote=FALSE )
 }
 

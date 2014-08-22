@@ -10,19 +10,6 @@
 options(error=traceback)
 options(error=recover)
 
-norm.abunds <- function( abund.df, meta ) {	   
-  #meta must have cols named "tot_bp" and "avg_size"
-  #load microbe census results	       
-  #do the normalization
-  norm.abunds <- abund.df$ABUNDANCE / ( tmp3$size / tmp3$avg_size )
-  abund.df.n <- cbind( abund.df, norm.abunds )
-  colnames( abund.df.n ) <- c( colnames(abund.df), "NORM.ABUND" )
-  remove(tmp)
-  remove(tmp2)
-  remove(tmp3)
-  return( abund.df.n )
-}
-
 Args              <- commandArgs()
 in.dir            <- Args[4]
 metadata.tab      <- Args[5]
@@ -81,8 +68,11 @@ for ( z in 1:length(sample.alt.ids) ){
   if( !is.na( ags.normalize ) ) {
     if( ags.normalize == 1 ){  
       meta.sub <- subset( meta, meta$SAMPLE.ID == alt.id )
-      ags.norm.abund <- tmp.map$REL.ABUND / ( meta.sub$total_bp / meta.sub$avg_size )  #Or is it ABUNDANCE / TOT.ABUND?    
+      ags.norm.abund <- tmp.map$ABUNDANCE / ( meta.sub$total_bp / meta.sub$avg_size )      
       tmp.map$ABUNDANCE <- ags.norm.abund
+      #MicrobeCensus recommends NOT correcting REL.ABUND given biases due to classification rate
+      #ags.norm.abunb <- tmp.map$REL.ABUND / ( meta.sub$total_bp / meta.sub$avg_size )      
+      #tmp.map$REL.ABUND <- ags.norm.abund
     }
   }
   #append tmp.map to abund.map
