@@ -7,8 +7,8 @@ use File::Basename;
 my $testing = 1;
 
 my $perlmods  = 0; #should we install perl modules
-my $rpackages = 0; #should we install R modules
-my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
+my $rpackages = 1; #should we install R modules
+my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
 my $clean     = 1; #wipe old installations of algs?
 my $get       = 1; #download alg source code?
 my $build     = 0; #build alg source code?
@@ -108,7 +108,7 @@ if( $algs ){
     my $transeq   = "${pkg}/${transeq_stem}/";
     my $prodigal  = "${pkg}/${prodigal_stem}/";
     my $microbecensus = "${pkg}/${mbcensus_stem}/";
-    my $metatrans     = "${pgk}/${metatrans_stem}/";
+    my $metatrans     = "${pkg}/${metatrans_stem}/";
 
     my $algs = {
         "rapsearch" => $rapsearch,
@@ -275,7 +275,7 @@ if( $algs ){
     ######################
     # MICROBECENSUS
     
-    my $alg = "microbecensus";
+    $alg = "microbecensus";
     print "Installing ${alg}...\n";
     if( $clean ){
 	clean_src( "bin/microbe_census.py;" .
@@ -298,7 +298,7 @@ if( $algs ){
     ######################
     # METATRANS
 
-    my $alg = "metatrans";
+    $alg = "metatrans";
     print "Installing ${alg}...\n";
     if( $clean ){
 	clean_src( "bin/metatrans.py;" ,
