@@ -1236,17 +1236,17 @@ sub build_search_db{
     #get some db properties
     #where is the hmmdb going to go? each hmmdb has its own dir
     my $raw_db_path = undef;
-    my $split_size  = undef; #only used if a remote process
+    my $split_size  = undef; #only used if a remote process and then only optionally
     my $length      = 0;
     if ($type eq "hmm")   { 
 	$raw_db_path = $self->search_db_path("hmm"); 
-	if( $self->remote ){
+	if( $self->remote && defined( $self->search_db_split_size("hmm") ){	    
 	    $split_size = $self->search_db_split_size("hmm")
 	}
     }
     if ($type eq "blast") { 
 	$raw_db_path = $self->search_db_path("blast"); 
-	if( $self->remote ){
+	if( $self->remote && defined( $self->search_db_split_size("blast") ) ){
 	    $split_size = $self->search_db_split_size("blast")
 	}
     }
@@ -1320,7 +1320,7 @@ sub build_search_db{
 	    $count++;
 	    #if we've hit our split size, process the split
 	    if( $self->remote ){
-		if($count >= $split_size || $family eq $families[-1]) {
+		if( ( defined( $split_size ) && $count >= $split_size ) || $family eq $families[-1]) {
 		    $n_proc++; 	    #build the DB
 		    my $split_db_path;
 		    if( $type eq "hmm" ){
@@ -1430,7 +1430,7 @@ sub build_search_db{
 		}
 		if( $self->remote ){
 		    #we've hit our desired size (or at the end). Process the split		    
-		    if( ( scalar( keys( %$seqs ) ) >= $split_size ) || ( $family eq $families[-1] && eof )) {
+		    if( ( defined( $split_size) && ( scalar( keys( %$seqs ) ) >= $split_size ) ) || ( $family eq $families[-1] && eof )) {
 			foreach my $id( keys( %$seqs ) ){
 			    print $tmp $id;
 			    print $tmp $seqs->{$id};

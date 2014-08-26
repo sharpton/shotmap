@@ -165,7 +165,7 @@ OPTIONS
 
 ###SHOTMAP DATA REPOSITORY ARGUMENTS:
 
-* **--ffdb=/PATH/TO/FLATFILES** (REQUIRED argument) NO DEFAULT VALUE
+* **--ffdb=/PATH/TO/FLATFILES** (REQUIRED argument) DEFAULT: --ffdb=<path_to_raw_data>/shotmap_ffdb/
   
     Location of the flat file shotmap data repository. Shotmap creates this location and stores both
     the search database and the reads, orfs, search results, and statistical output. Multiple projects
@@ -246,11 +246,12 @@ OPTIONS
   Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
   to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
 
-* **--dbuser=MYSQL_USERNAME** (REQUIRED IF --db=slim or --db=full) NO DEFAULT VALUE
+* **--dbuser=MYSQL_USERNAME** (REQUIRED IF --db=slim or --db=full) DEFAULT: --dbuser=<your_current_unix_username>
 
-  MySQL username for logging into mysql on the database server.
+  MySQL username for logging into mysql on the database server. Default assumes your current username is also your
+  database username, which it obtains via the LOGNAME bash environmental variable.
 
-* **--dbpass=MYSQL_PASSWORD** (REQUIRED IF --db=slim or --db=full) NO DEFAULT VALUE
+* **--dbpass=MYSQL_PASSWORD** (REQUIRED IF --db=slim or --db=full) DEFAULT: NONE
 
   The MySQL password for <dbuser>, on the remote database server.
   It is best to store this in a secure configuration file as calling this option on the command line will
@@ -300,10 +301,13 @@ OPTIONS
 
     Note that this machine must currently run SGE (i.e., qsub).
 
-* **--ruser=USERNAME** (REQUIRED IF --remote)
+* **--ruser=USERNAME** (REQUIRED IF --remote) DEFAULT: --ruser=<your_current_username>
 
     Your username for logging into the remote computational cluster / machine.
-    Note that you have to set up passphrase-less SSH for this to work.
+    Note that you have to set up passphrase-less SSH for this to work. 
+
+    Default assumes you are using the same username on the remote machine as your current login, which it identifies
+    using the LOGNAME variable.
 
 * **--rdir=/PATH/ON/REMOTE/SERVER** (REQUIRED IF --remote)
 
@@ -335,19 +339,15 @@ OPTIONS
     
 ###TRANSLATION/GENE CALLING METHODS:
 
-* **--trans-method=STRING** (REQUIRED) DEFAULT: --trans-method=transeq
+* **--trans-method=STRING** (REQUIRED) DEFAULT: --trans-method=prodigal
 
-    Determines the algorithm that should be used to convert metagenomic reads into protein coding space. Currently, only 
-    "transeq" is an accepted value, but future work will incorporate metagenomic gene calling tools.
+    Determines the algorithm that should be used to convert metagenomic reads into protein coding space. Currently, accepts
+    the options "6FT" (six-frame translation, via transeq), "6FT_split" (six-frame translation, splitting results on stops), 
+    and "prodigal" (gene prediction via the prodigal software). Future work may incorporate addtional tools.
 
-* **--split-orfs** (Optional) DEFAULT: ENABLED
+* **--orf-filter-len=INTEGER** (REQUIRED) DEFAULT=15
 
-    (disable with --noslit-orfs)
-    When set, translated orfs are split into sub-orfs on stop codons. Only works in conjunction with --trans-method=transeq
-
-* **--orf-filter-len=INTEGER** (REQUIRED) DEFAULT=14
-
-    Removes translated reads (orfs) shorter than or equal to this length (in bp) from all subsequent analyses. Set to 0 if you want no filtering.
+    Removes translated reads (orfs) shorter than this length (in amino acids) from all subsequent analyses. Set to 0 if you want no filtering.
 
 ###SEARCH METHOD ARGUMENTS (One or more MUST be set):
 

@@ -38,35 +38,7 @@ $pipe->Shotmap::Notify::pipeline_params();
 
 my $path_to_family_annotations;
 
-# What step of the pipeline are we running?
-## If the user has specified something in the --goto option, then we skip some parts of the analysis and go directly
-## to the "skip to this part" part.
-## Note that this is only useful if we have a process ID! 
-## block tries to jump to a module in handler for project that has already done some work
-if (defined($pipe->opts->{"goto"}) && $pipe->opts->{"goto"}) {
-    (defined($pipe->project_id) && $pipe->project_id) or die "You CANNOT specify --goto without also specifying an input PID (--pid=NUMBER).\n";
-    if (!$pipe->dryrun) {
-	$pipe->Shotmap::Run::back_load_project($pipe->project_id);
-	$pipe->Shotmap::Run::back_load_samples();
-    } else {
-	$pipe->Shotmap::Notify::dryNotify("Skipped loading samples.");
-    }
-    my $goto = $pipe->opts->{"goto"};
-    $goto = uc($goto); ## upper case it
-    if ($goto eq "T" or $goto eq "TRANSLATE"){    warn "Skipping to TRANSLATE READS step!\n";            goto TRANSLATE; }
-    if ($goto eq "O" or $goto eq "LOADORFS" ){    warn "Skipping to orf loading step!\n";                goto LOADORFS; }
-    if ($goto eq "B" or $goto eq "BUILD")   {     warn "Skipping to searchdb building step!\n";          goto BUILDSEARCHDB; }
-    if ($goto eq "R" or $goto eq "REMOTE")  {     warn "Skipping to staging remote server step!\n";      goto REMOTESTAGE; }
-    if ($goto eq "S" or $goto eq "SCRIPT")  {     warn "Skipping to building hmmscan script step!\n";    goto BUILDSEARCHSCRIPT; }
-    if ($goto eq "X" or $goto eq "SEARCH")  {     warn "Skipping to hmmscan step!\n";                    goto EXECUTESEARCH; }
-    if ($goto eq "P" or $goto eq "PARSE")   {     warn "Skipping to get remote hmmscan results step!\n"; goto PARSERESULTS; }
-    if ($goto eq "G" or $goto eq "GET")     {     warn "Skipping to get remote hmmscan results step!\n"; goto GETRESULTS; }
-    if ($goto eq "L" or $goto eq "LOADRESULTS"){  warn "Skipping to get remote hmmscan results step!\n"; goto LOADRESULTS; }
-    if ($goto eq "C" or $goto eq "CLASSIFY"){     warn "Skipping to classifying reads step!\n";          goto CLASSIFYREADS; }
-    if ($goto eq "A" or $goto eq "ABUNDANCE"){    warn "Skipping to calculating abundances step!\n";     goto ABUNDANCE; }
-    if ($goto eq "D" or $goto eq "DIVERSITY")  {  warn "Skipping to producing output step!\n";           goto CALCDIVERSITY; }
-    die "QUITTING DUE TO INVALID --goto OPTION: (specifically, the option was \"$goto\"). If we got to here in the code, it means there was an INVALID FLAG PASSED TO THE GOTO OPTION.";
-}
+
 
 # Load the project
 $pipe->Shotmap::Reads::load_project();
@@ -101,3 +73,79 @@ if( $pipe->remote ){
 # Calculate diversity
  CALCDIVERSITY: $pipe->Shotmap::Results::calculate_diversity();
 $pipe->Shotmap::Notify::printBanner("ANALYSIS COMPLETED!");
+
+sub goto_step{
+ # What step of the pipeline are we running?
+ ## If the user has specified something in the --goto option, then we skip some parts of the analysis and go directly
+ ## to the "skip to this part" part.
+ ## Note that this is only useful if we have a process ID! 
+ ## block tries to jump to a module in handler for project that has already done some work
+    if (defined($pipe->opts->{"goto"}) && $pipe->opts->{"goto"}) {
+	(defined($pipe->project_id) && $pipe->project_id) or die "You CANNOT specify --goto without also specifying an input PID (--pid=NUMBER).\n";
+	if (!$pipe->dryrun) {
+	    $pipe->Shotmap::Run::back_load_project($pipe->project_id);
+	    $pipe->Shotmap::Run::back_load_samples();
+	} else {
+	    $pipe->Shotmap::Notify::dryNotify("Skipped loading samples.");
+	}
+	
+	my $goto = $pipe->opts->{"goto"};
+	$goto = uc($goto); ## upper case it
+	if ($goto eq "T" or $goto eq "TRANSLATE"){    
+	    warn "Skipping to TRANSLATE READS step!\n"; 
+	    $pipe->Shotmap::Load::stage_check;           
+	    goto TRANSLATE; 
+	}
+	if ($goto eq "O" or $goto eq "LOADORFS" ){    
+	    warn "Skipping to orf loading step!\n";
+	    $pipe->Shotmap::Load::stage_check;
+	    goto LOADORFS;
+	}
+	if ($goto eq "B" or $goto eq "BUILD")   {     
+	    warn "Skipping to searchdb building step!\n";
+	    $pipe->Shotmap::Load::stage_check; 
+	    goto BUILDSEARCHDB; 
+	}
+	if ($goto eq "R" or $goto eq "REMOTE")  {     
+	    warn "Skipping to staging remote server step!\n"; 
+	    $pipe->Shotmap::Load::stage_check; 
+	    goto REMOTESTAGE; 
+	}
+	if ($goto eq "S" or $goto eq "SCRIPT")  {     
+	    warn "Skipping to building hmmscan script step!\n"; 
+	    $pipe->Shotmap::Load::stage_check; 
+	    goto BUILDSEARCHSCRIPT; 
+	}
+	if ($goto eq "X" or $goto eq "SEARCH")  {     
+	    warn "Skipping to hmmscan step!\n"; 
+	    $pipe->Shotmap::Load::stage_check; 
+	    goto EXECUTESEARCH; 
+	}
+	if ($goto eq "P" or $goto eq "PARSE")   {     
+	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    goto PARSERESULTS; 
+	}
+	if ($goto eq "G" or $goto eq "GET")     {     
+	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    goto GETRESULTS; 
+	}
+	if ($goto eq "L" or $goto eq "LOADRESULTS"){  
+	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    goto LOADRESULTS; 
+	}
+	if ($goto eq "C" or $goto eq "CLASSIFY"){     
+	    warn "Skipping to classifying reads step!\n"; 
+	    goto CLASSIFYREADS; 
+	}
+	if ($goto eq "A" or $goto eq "ABUNDANCE"){    
+	    warn "Skipping to calculating abundances step!\n"; 
+	    goto ABUNDANCE; 
+	}
+	if ($goto eq "D" or $goto eq "DIVERSITY")  {  
+	    warn "Skipping to producing output step!\n";           
+	    goto CALCDIVERSITY;
+	}
+	die "QUITTING DUE TO INVALID --goto OPTION: (specifically, the option was \"$goto\"). " . 
+	    "If we got to here in the code, it means there was an INVALID FLAG PASSED TO THE GOTO OPTION.";
+    }
+}

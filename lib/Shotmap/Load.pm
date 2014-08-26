@@ -18,6 +18,7 @@ use Data::Dumper;
 
 sub check_vars{
     my $self = shift;
+    my $method_str = shift;
      if( $self->opts->{"remote"} ){
 	 (defined($self->opts->{"rhost"}))      
 	     or $self->Shotmap::Notify::dieWithUsageError(
@@ -177,13 +178,15 @@ sub check_vars{
 	    or $self->Shotmap::Notify::dieWithUsageError(
 		"--dbuser (remote database mysql username: example --dbuser='dataperson') MUST be specified!"
 	    );
-	(defined($self->opts->{"dbpass"}) || defined($self->opts->{"conf-file"})) 
-	    or $self->Shotmap::Notify::dieWithUsageError(
-		"--dbpass (mysql password for user --dbpass='" . $self->opts->{"dbuser"} . 
-		"') or --conf-file (file containing password) MUST be specified here in super-insecure plaintext, " .
-		"unless your database does not require a password, which is unusual. If it really is the case that you require NO password, " .
-		"you should specify --dbpass='' OR include a password in --conf-file ...."
-	    );
+	unless( $method_str eq "build_conf_file" ){
+	    (defined($self->opts->{"dbpass"}) || defined($self->opts->{"conf-file"})) 
+		or $self->Shotmap::Notify::dieWithUsageError(
+		    "--dbpass (mysql password for user --dbpass='" . $self->opts->{"dbuser"} . 
+		    "') or --conf-file (file containing password) MUST be specified here in super-insecure plaintext, " .
+		    "unless your database does not require a password, which is unusual. If it really is the case that you require NO password, " .
+		    "you should specify --dbpass='' OR include a password in --conf-file ...."
+		);
+	}
 	if (!defined($self->opts->{"dbname"})) {
 	    $self->Shotmap::Notify::dieWithUsageError(
 		"Note: --dbname=NAME was not specified on the command line, so I don't know which mysql database to talk to. Exiting\n"
@@ -200,12 +203,6 @@ sub check_vars{
 	or $self->Shotmap::Notify::dieWithUsageError( 
 	    "Note: You must name your search database using the --searchdb-name option. Exiting\n" 
 	);
-    if( $self->remote ){ #local runs don't split the search database
-	(defined($self->opts->{"searchdb-split-size"})) 
-	    or  $self->Shotmap::Notify::dieWithUsageError( 
-		"You must specify the partition size for the search database that Shotmap will build with the --searchdb-split-size option. Exiting\n"
-	    );
-    }
     (defined($self->opts->{"normalization-type"})) 
 	or  $self->Shotmap::Notify::dieWithUsageError( 
 	    "You must provide a proper abundance normalization type on the command line (--normalization-type)"
@@ -628,16 +625,9 @@ sub set_params{
 	$self->remote_ffdb(    $self->remote_master_dir . "/shotmap_ffdb" ); 
 	$self->Shotmap::Notify::warn_ssh_keys();	
 	#if we aren't staging, does the database exist on the remote server?
-	if( !$self->stage ){
-	    my $remote_db_dir = $self->remote_search_db;
-	    my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
-	    my $results = `$command`;
-	    if( $results == 0 ){ 
-		$self->Shotmap::Notify::dieWithUsageError( 
-		    "You are trying to search against a remote database that hasn't been staged. " . 
-		    "Run with --stage to place the db ${db_name} on the remote server " . $self->remote_host . "\n"
-		    );
-	    }
+	#skip for now if goto is invoked.
+	if( !$self->stage && !(defined( $self->{"opts"}->{"goto"} ) ) ){
+	    $self->Shotmap::Load::stage_check();
 	}
     }
     
@@ -714,36 +704,81 @@ sub load_defaults{
 	    # db settings
   	    "db" => "none"
 	    # FFDB Search database related options
-	    , "reps-only"        => 0
-	    , "nr"               => 1
-	    , "db-suffix"        => 'rsdb'
-	    , "verbose"          => 0
+	    ,    "ffdb"             => $options->{"rawdata"} . "/shotmap_ffdb/"
+	    ,    "nr"               => 1
+	    ,    "db-suffix"        => 'rsdb'
+	    ,    "verbose"          => 0
 	    # Remote computational cluster server related variables
-	    , "scratch"    => 1
-	    , "wait"       => 30
+	    ,        "ruser"        => $ENV{"LOGNAME"}
+	    ,        "scratch"      => 1
+	    ,        "wait"         => 30
 	    #db communication method (NOTE: use EITHER multi OR bulk OR neither)
-	    ,    "dbschema"     => "Shotmap::Schema"
-	    ,    "bulk"         => 1
-	    ,    "bulk-count"   => 1000	
+	    ,        "dbuser"       => $ENV{"LOGNAME"}
+	    ,        "dbschema"     => "Shotmap::Schema"
+	    ,        "bulk"         => 1
+	    ,        "bulk-count"   => 1000	
 	    # search methods 
-	    ,    "search-method" => 'rapsearch'
+	    ,       "search-method" => 'rapsearch'
 	    # general options
-	    ,    "seq-split-size" => 100000
+	    ,      "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
 	    # translation options
-	    ,    "trans-method"   => 'transeq'
-	    ,    "split-orfs"     => 1
-	    ,    "orf-len-filter" => 14
+	    ,      "trans-method"   => 'prodigal'
+	    ,      "orf-len-filter" => 14
 	    # search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
-	    ,    "parse-score"    => 28
+	    ,      "parse-score"    => 29
 	    # family classification thresholds (more stringent)
-	    ,    "top-hit"        => 1
-	    ,    "hit-type"       => 'best_hit'
-	    ,    "class-level"    => 'read'
+	    ,      "top-hit"        => 1
+	    ,      "hit-type"       => 'best_hit'
+	    ,      "class-level"    => 'read'
 	    # abundance claculation parameters
-	    ,    "abundance-type"     => 'coverage'
-	    ,    "normalization-type" => 'target_length'
+	    ,      "abundance-type"     => 'coverage'
+	    ,      "normalization-type" => 'target_length'
     };
+    
+    #############
+    # Set configuration-specific defaults here
+
+    #PLATFORMS
+    #may move read length specific to autodetect, but this is here in case we 
+    #ever need platform specific settings
+    my $config_count; 
+
+
+    if( defined( $options->{"hiseq-101"} ) ){
+	$defaults->{"class-score"} = 31;
+	$config_count++;
+    }
+    if( defined( $options->{"miseq-300"} ) ){
+	defaults->{"class-score"} = 42;
+	$config_count++;
+    }
+    if( defined( $options->{"454"} ) ) {
+	defaults->{"class-score"} = 42;
+	$config_count++;
+    }
+    if( $config_count > 1 ){
+       $self->Shotmap::Notify::dieWithUsageError(
+	   "You can only specify either --hiseq-101, OR --miseq-300, OR --454"
+	   );
+    }
+    
+    # RAPID v. MAXACC
+    if( defined( $options->{"rapid"} ) && defined( $options->{"maxacc"} )){
+	$self->Shotmap::Notify::dieWithUsageError(
+	    "You can only invoke either --rapid or --maxacc!"
+	    );	
+    }
+    if( defined( $options->{"rapid"} ) ){
+	$defaults->{"prerare-samps"} = 1500000;
+	$defaults->{"search-method"} = "rapsearch_accelerated";	
+    }
+    if( defined( $options->{"maxacc"} ) ){
+	$defaults->{"search-method"} = "blast"; #note, should have switch to hmm on sequence length
+	$defaults->{"trans-method"}  = "6FT_split";
+    }
+
+    #Overwrite defaults with user-defined variables
     foreach my $opt( keys( %$options ) ){
 	next if defined $options->{$opt}; #user provided a variable, which we want
 	$options->{$opt} = $defaults->{$opt};
@@ -751,5 +786,18 @@ sub load_defaults{
     return $options;
 }
 
+sub stage_check{
+    my $self    = shift;
+    my $remote_db_dir = $self->remote_search_db;
+    my $command = "if ssh " . $self->remote_user . "\@" . $self->remote_host . " \"[ -d ${remote_db_dir} ]\"; then echo \"1\"; else echo \"0\"; fi";
+    my $results = `$command`;
+    if( $results == 0 ){ 
+	$self->Shotmap::Notify::dieWithUsageError( 
+	    "You are trying to search against a remote database that hasn't been staged. " . 
+	    "Run with --stage to place the db ${db_name} on the remote server " . $self->remote_host . "\n"
+	    );
+    }
+    return;
+}
     
 1;
