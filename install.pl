@@ -23,7 +23,8 @@ if( $testing ){
 my $root = $ROOT;
 
 
-my $inc = "${root}/inc/"; #location of included source code
+my $inc = "${root}/inc/"; #location of included source code (cpanm)
+my $pkg = "${root}/pkg/"; #location that we'll place algorithms
 my $ext = "${root}/ext/"; #location of installed external perl modules (separate so we can wipe)
 my $bin = "${root}/bin/"; #location of installed executables (symlinks)
 
@@ -32,6 +33,7 @@ my $rlib   = "${ext}/R/";
 my $mirror = "http://ftp.osuosl.org/pub/cran/"; # Pick yours from this list: http://cran.r-project.org/mirrors.html
 
 system( "mkdir -p $rlib" );
+system( "mkdir -p $pkg" );
 
 ######################
 # Install Perl Module Dependencies using cpanm
@@ -99,14 +101,14 @@ if( $algs ){
     my $mbcensus_stem  = "MicrobeCensus";
     my $metatrans_stem = "metatrans";
 
-    my $rapsearch = "${inc}/${rapsearch_stem}/";
-    my $hmmer     = "${inc}/${hmmer_stem}/";
-    my $blast     = "${inc}/${blast_stem}/c++/";
-    my $last      = "${inc}/${last_stem}/";
-    my $transeq   = "${inc}/${transeq_stem}/";
-    my $prodigal  = "${inc}/${prodigal_stem}/";
-    my $microbecensus = "${inc}/${mbcensus_stem}/";
-    my $metatrans     = "${inc}/${metatrans_stem}/";
+    my $rapsearch = "${pkg}/${rapsearch_stem}/";
+    my $hmmer     = "${pkg}/${hmmer_stem}/";
+    my $blast     = "${pkg}/${blast_stem}/c++/";
+    my $last      = "${pkg}/${last_stem}/";
+    my $transeq   = "${pkg}/${transeq_stem}/";
+    my $prodigal  = "${pkg}/${prodigal_stem}/";
+    my $microbecensus = "${pkg}/${mbcensus_stem}/";
+    my $metatrans     = "${pgk}/${metatrans_stem}/";
 
     my $algs = {
         "rapsearch" => $rapsearch,
@@ -139,7 +141,7 @@ if( $algs ){
 	clean_src( "bin/prerapsearch;bin/rapsearch", $algs->{$alg} );
     }
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "git" );
+	get_src( $srcs->{$alg}, $pkg, "git" );
     }
     if( $build ){
 	build_src( $algs->{$alg}, "./install" );
@@ -158,11 +160,11 @@ if( $algs ){
 	clean_src( "bin/hmmsearch;" . 
 		   "bin/hmmscan", 
 		   $algs->{$alg}, 
-		   "${inc}" . basename( $srcs->{$alg})  );
+		   "${pkg}" . basename( $srcs->{$alg})  );
     }    
     if( $get ){
 	get_src( $srcs->{$alg}, $inc, "wget" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	if( $test ){
@@ -185,11 +187,11 @@ if( $algs ){
 	clean_src( "bin/blastp;"    .
 		   "bin/makeblastdb", 
 		   $algs->{$alg}, 
-		   "${inc}" . basename( $srcs->{$alg})  ); 
+		   "${pkg}" . basename( $srcs->{$alg})  ); 
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "wget" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "wget" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	if( $test ){
@@ -211,11 +213,11 @@ if( $algs ){
     if( $clean ){
 	clean_src( "bin/lastal;" . 
 		   "bin/lastdb"  , 
-		   $algs->{$alg}, "${inc}" . basename( $srcs->{$alg} )  );
+		   $algs->{$alg}, "${pkg}" . basename( $srcs->{$alg} )  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "wget" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "wget" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	build_src( $algs->{$alg}, "make" );	    	
@@ -233,11 +235,11 @@ if( $algs ){
     if( $clean ){
 	clean_src( "bin/transeq", 
 		   $algs->{$alg},
-		   "${inc}" . basename( $srcs->{$alg} )  );
+		   "${pkg}" . basename( $srcs->{$alg} )  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "wget" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "wget" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	if( $test ){
@@ -257,11 +259,11 @@ if( $algs ){
     if( $clean ){
 	clean_src( "bin/prodigal", 
 		   $algs->{$alg} , 
-		   "${inc}" . basename( $srcs->{$alg} )  );
+		   "${pkg}" . basename( $srcs->{$alg} )  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "wget" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "wget" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	build_src( $algs->{$alg}, "make install INSTALLDIR=./bin/" ); 
@@ -279,11 +281,11 @@ if( $algs ){
 	clean_src( "bin/microbe_census.py;" .
 		   "bin/ags_functions.py"   ,
 		   $algs->{$alg}, 
-		   "${inc}" . basename( $srcs->{$alg} )  );
+		   "${pkg}" . basename( $srcs->{$alg} )  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "git" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "git" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	#do nothing
@@ -301,11 +303,11 @@ if( $algs ){
     if( $clean ){
 	clean_src( "bin/metatrans.py;" ,
 		   $algs->{$alg}, 
-		   "${inc}" . basename( $srcs->{$alg} )  );
+		   "${pkg}" . basename( $srcs->{$alg} )  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "git" );
-	decompress_src( $inc, basename( $srcs->{$alg} ) );
+	get_src( $srcs->{$alg}, $pkg, "git" );
+	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
 	#do nothing
