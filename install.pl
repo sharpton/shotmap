@@ -163,7 +163,7 @@ if( $algs ){
 		   "${pkg}" . basename( $srcs->{$alg})  );
     }    
     if( $get ){
-	get_src( $srcs->{$alg}, $inc, "wget" );
+	get_src( $srcs->{$alg}, $pkg, "wget" );
 	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
