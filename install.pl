@@ -44,7 +44,6 @@ if( $perlmods ){
      "IPC::System::Simple",
      "IO::Uncompress::Gunzip",
      "IO::Compress::Gzip",
-     "Bio::SeqIO",
      "Carp",
      "File::Util",
      "File::Cat",

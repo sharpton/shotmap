@@ -17,7 +17,6 @@ use Shotmap::Search;
 use Shotmap::Results;
 use Getopt::Long qw(GetOptionsFromString);
 use Data::Dumper;
-use Bio::SeqIO;
 use File::Basename;
 use File::Spec;
 

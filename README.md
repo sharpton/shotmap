@@ -36,7 +36,6 @@ Requirements & Dependencies
 * IPC::System::Simple
 * IO::Uncompress::Gunzip
 * IO::Compress::Gzip
-* Bio::SeqIO 
 * Carp
 * File::Util
 * File::Cat
@@ -143,7 +142,7 @@ OPTIONS
 * **--rawdir=/PATH/TO/PROJECT/DIR** (REQUIRED argument) NO DEFAULT VALUE
 
   Location of the metagenomic sequences to be processed. Each metagenomic sample should be in a single
-  and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa or .fa.gz (if a gzipped compressed file) as the file suffix.
+  and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa, .fna, or .fa.gz or .fna.gz (if a gzipped compressed file) as the file suffix.
   Shotmap currently only accepts fasta formatted input sequence files.
 
   This directory can optionally contain a file that encodes sample metadata \(i.e., ecological conditions
@@ -237,6 +236,8 @@ OPTIONS
 
   To turn off the use of mysql, set --db=none. Note that we observe large improvements in analytical throughput
   when a database is not invoked, though there are data organizational and management benefits in using a database.
+
+  Also, if --db=full, we highly recommend setting --bulk.
 
 * **--dbhost=YOUR.DATABASE.SERVER.COM** (REQUIRED IF --db=slim or --db=full) DEFAULT: --db=none
 
@@ -351,7 +352,7 @@ OPTIONS
 
 ###SEARCH METHOD ARGUMENTS (One or more MUST be set):
 
-* **--search-method=rapsearch|last|blast|hmmscan|hmmersearch** (REQUIRED) DEFAULT: --search-method=rapsearch
+* **--search-method=rapsearch|rapsearch_acceleratedlast|blast|hmmscan|hmmersearch** (REQUIRED) DEFAULT: --search-method=rapsearch
 
    Determines which algorithm shotmap should use to compare orfs to protein families.
 

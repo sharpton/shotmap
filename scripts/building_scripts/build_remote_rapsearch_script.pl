@@ -23,6 +23,7 @@ my $db_name_stem     = ""; #what is the basename of the db splits, ignoring the 
 my $use_scratch      = 0; #should we use the local scratch directory?
 my $format           = 0; #last setting: -f optoin; 0=tab, 1=maf
 my $db_suffix        = "rsdb";
+my $accelerate       = "F";
 
 GetOptions(
     "o=s"    => \$outfile,
@@ -34,6 +35,8 @@ GetOptions(
     "p=s"    => \$projectdir,
     "s=i"    => \$use_scratch,
     "suf=s"  => \$db_suffix,  #prerapsearch index can't point to seq file or will overwrite, so append to seq file name 
+    "t=f"    => \$score_threshold,
+    "a=s"    => \$accelerate, #either T or F
     );
 
 #prep the outfile for write
@@ -70,11 +73,11 @@ if( $use_bigmem ){
 print OUT "ulimit -c 0\n"; #suppress core dumps
 
 #GET VARS FROM COMMAND LINE
-print OUT join( "\n", "INPATH=\$1", "INPUT=\$2", "DBPATH=\$3", "OUTPATH=\$4", "OUTSTEM=\$5", "\n" );
+print OUT join( "\n", "INPATH=\$1", "INPUT=\$2", "DBPATH=\$3", "OUTPATH=\$4", "OUTSTEM=\$5", "PARSE_SCORE=\$6", "ACCELERATE=\$7", "\n" );
 if ($use_array){
     #if this is a reprocess job, need to map the splits that need to be rerun to array task ids
     print OUT join( "\n", 
-		    "SPLIT_REPROC_STRING=\$6\n",
+		    "SPLIT_REPROC_STRING=\$8\n",
 		    "if [[ \$SPLIT_REPROC_STRING && \${SPLIT_REPROC_STRING-x} ]]",
 #		    "if [ -z \"\$SPLIT_REPROC_STRING\" ]\;",
 		    "then",
@@ -89,22 +92,13 @@ if ($use_array){
     print OUT "OUTPUT=\${OUTSTEM}_" . "\${INT_TASK_ID}" . ".tab\n";
 
 } else {
-    print OUT "DB=\$6\n";
+    print OUT "DB=\$8\n";
     #print OUT "DB=\${DB}.${db_suffix}\n";
     print OUT "OUTPUT=\$OUTSTEM\n";
     #print OUT "SPLIT_REPOC_STRING=\$7\n"; Can't have an array-based reprocess job if not use_array. But, this might be a useful var at some point
 }
 #LAST BIT OF HEADER
 print OUT join( "\n", "PROJDIR=" . $projectdir, "LOGS=\${PROJDIR}/logs", "\n" );
-
-#CHECK TO SEE IF DATA ALREADY EXISTS IN OUTPUT LOCATION. IF SO, SKIP
-#Failed jobs means that we can't do this any more. Have to be intellegenet about how we restart jobs (see above block: INT_TASK_ID)
-#print OUT join( "\n",
-#		"if [ -e \${OUTPATH}/\${OUTPUT} ]",
-#		"then",
-#		"exit",
-#		"fi",
-#		"\n" );
 
 my $RAP_ALL;
 if( $use_array ){
@@ -123,9 +117,6 @@ print OUT join( "\n",
 		"echo \"INT_TASK_ID IS \${INT_TASK_ID}\"           >> ${RAP_ALL} 2>&1",
 		"date                                              >> ${RAP_ALL} 2>&1",
 		"\n" );
-
-
-
 
 if( $use_scratch ){
     #DO SOME ACTUAL WORK: Clean old files
@@ -152,8 +143,8 @@ if( $use_scratch ){
     #RUN
     print OUT "date                                                                                   >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just the statistics, so -b 0
-    print OUT "echo \"rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
-    print OUT "rapsearch -b 0 -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -i \${PARSE_SCORE} -a ${ACCELERATE} -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "rapsearch -b 0 -i \${PARSE_SCORE} -a ${ACCELERATE} -q /scratch/\${INPUT} -d /scratch/\${DB}.${db_suffix} -o /scratch/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                    >> ${RAP_ALL} 2>&1\n";
     #CLEANUP
     print OUT join( "\n",
@@ -170,8 +161,8 @@ if( $use_scratch ){
     print( "Not using scratch\n" );
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #we don't want alignments, just statistics, so -b 0
-    print OUT "echo \"rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
-    print OUT "rapsearch -b 0 -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
+    print OUT "echo \"rapsearch -b 0 -i \${PARSE_SCORE} -a ${ACCELERATE} -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}\" >> ${RAP_ALL} 2>&1\n";
+    print OUT "rapsearch -b 0 -i \${PARSE_SCORE} -a ${ACCELERATE} -q \${INPATH}/\${INPUT} -d \${DBPATH}/\${DB}.${db_suffix} -o \${OUTPATH}/\${OUTPUT}          >> ${RAP_ALL} 2>&1\n";
     print OUT "date                                                                                      >> ${RAP_ALL} 2>&1\n";
     #CLEANUP
     print OUT join( "\n",

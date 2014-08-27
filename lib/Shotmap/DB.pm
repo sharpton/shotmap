@@ -826,11 +826,6 @@ sub build_sample_ffdb{
     my $outDir  = "$projDir/output";
     my $logDir  = "$projDir/logs";
     my $searchlogs = "$logDir/" . $self->search_method;    
-    #my $hmmscanlogs      = "$logDir/hmmscan";
-    #my $hmmsearchlogs    = "$logDir/hmmsearch";
-    #my $blastlogs        = "$logDir/blast";
-    #my $lastlogs         = "$logDir/last";
-    #my $rapsearchlogs    = "$logDir/rapsearch";
     my $formatdblogs;
     if( $self->search_method eq "rapsearch" ){
 	$formatdblogs = "$logDir/prerapsearch";
@@ -841,9 +836,6 @@ sub build_sample_ffdb{
     if( $self->search_method eq "last" ){
 	$formatdblogs = "$logDir/lastdb";
     }   
-    #my $formatdblogs     = "$logDir/formatdb";
-    #my $lastdblogs       = "$logDir/lastdb";
-    #my $prerapsearchlogs = "$logDir/prerapsearch";
     my $transeqlogs      = "$logDir/transeq";
     my $parselogs        = "$logDir/parse_results";
     my @paths = ( $outDir, $logDir, $searchlogs, $transeqlogs, $parselogs );
@@ -863,12 +855,6 @@ sub build_sample_ffdb{
 
 	my $results_dir     = $search_res . "/" . $self->search_method;
 
-	#my $hmmscan_results   = "$search_res/hmmscan";
-	#my $hmmsearch_results = "$search_res/hmmsearch";
-	#my $blast_results     = "$search_res/blast";
-	#my $last_results      = "$search_res/last";
-	#my $rapsearch_results = "$search_res/rapsearch";
-
 	if (-d $raw_sample_dir) {
 	    warn("The directory \"$raw_sample_dir\" already existed!");
 	    if ($self->{"clobber"}) { warn("But you specified the CLOBBER option, so we will brutally overwrite it anyway!"); }
@@ -876,89 +862,11 @@ sub build_sample_ffdb{
 	}
 
 	foreach my $dirToMake ($sampDir, $search_res, $results_dir, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
-	#foreach my $dirToMake ($sampDir, $search_res, $hmmscan_results, $hmmsearch_results, $blast_results, $last_results, $rapsearch_results, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
-	    File::Path::make_path($dirToMake); # <-- make_path ALREADY dies on "severe" errors, so no need to check for them. See http://search.cpan.org/~dland/File-Path-2.09/Path.pm#ERROR_HANDLING
+	    File::Path::make_path($dirToMake);
 	}
 	my $nameprefix = "${sampleName}_raw_split_"; # the "base name" here.
-	$self->Shotmap::DB::split_sequence_file( $self->get_sample_hashref()->{$sampleName}->{"path"}, $raw_sample_dir, $nameprefix );
+	$self->Shotmap::Run::split_sequence_file( $self->get_sample_hashref()->{$sampleName}->{"path"}, $raw_sample_dir, $nameprefix );
     }
-}
-
-sub split_sequence_file{
-    my $self             = shift;
-    my $full_seq_file    = shift;
-    my $split_dir        = shift;
-    my $basename         = shift;
-    my $nseqs_per_split;
-    if( $self->remote ){
-	$nseqs_per_split  = $self->read_split_size();
-    } else {
-	my $total_reads;
-	if( defined( $self->Shotmap::prerarefy_samples() ) ){
-	    $total_reads = $self->Shotmap::prerarefy_samples();
-	} else {
-	    $total_reads = $self->Shotmap::Run::count_seqs_in_file( $full_seq_file );
-	}
-	$nseqs_per_split = ceil($total_reads / $self->nprocs()  ); #round up to nearest integer to be sure we get all reads
-    }
-    #a list of filenames
-    my @output_names = ();
-    open( SEQS, $full_seq_file ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";
-    my $counter  = 1;
-    my $outname  = $basename . $counter . ".fa";
-    my $splitout = $split_dir . "/" . $outname;
-    open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
-    push( @output_names, $outname );
-    $self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
-    my $seq_ct   = 0;
-    my $header   = ();
-    my $sequence = ();
-    my $seq_count_across_splits = 0;
-    while( <SEQS> ){
-	#have we reached the prerarefy sequence count, if that is set?
-	if( defined( $self->Shotmap::prerarefy_samples() ) && $seq_count_across_splits == $self->Shotmap::prerarefy_samples() ){
-	    last;
-	}	   
-	chomp $_;
-	if( $_ =~ m/^(\>.*)/ ){
-	    if( defined( $header ) ){
-		print OUT "$header\n$sequence\n";
-		$seq_ct++;
-		$seq_count_across_splits++;
-		$sequence = ();
-	    }
-	    $header = $1;
-	}
-	else{
-	    $sequence = $sequence . $_;
-	}
-	if( eof ) {
-	    print OUT "$header\n$sequence\n";	    
-	}
-	if( $seq_ct == $nseqs_per_split - 1 ){	
-	    close OUT;
-	    unless( $self->remote ){
-		Shotmap::Run::gzip_file( $splitout );
-		unlink( $splitout );
-	    }
-	    $counter++;
-	    my $outname  = $basename . $counter . ".fa";
-	    $splitout = $split_dir . "/" . $outname;
-	    unless( eof ){
-		open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
-		push( @output_names, $outname );
-		$self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
-		$seq_ct = 0;		
-	    }
-	}
-    }    
-    close OUT;
-    unless( $self->remote ){
-	Shotmap::Run::gzip_file( $splitout );
-	unlink( $splitout );
-    }
-    close SEQS;
-    return \@output_names;
 }
 
 sub get_split_sequence_paths {
@@ -1382,6 +1290,7 @@ sub get_classification_id_flatfile{
 	$doc->dispose;
 	$class_id = $new_id;
     }
+    _tidy_xml( $param_file );
     return $class_id;
 }
 
@@ -1427,6 +1336,7 @@ sub set_sample_parameters{
 	$doc->printToFile( $self->params_file() );
 	$doc->dispose;
     }   
+    _tidy_xml( $param_file );
     return $self;
 }
 
@@ -1459,6 +1369,7 @@ sub get_sample_by_id_flatfile{
     if( !defined( $sample_alt_id ) ){
 	die "Couldn't extract the sample_alt_id for sample id ${sample_id} from parameters file!\n";
     }
+    _tidy_xml( $param_file );
     return $sample;
 }
 
@@ -1537,9 +1448,9 @@ sub get_abundance_parameter_id_flatfile{
 	$doc->dispose;
 	$abund_id = $new_id;
     }
+    _tidy_xml( $param_file );
     return $abund_id;
 }
-
 
 sub _get_xml_value{
     my( $node, $name ) = @_;
@@ -1564,6 +1475,7 @@ sub initialize_parameters_file{
 	    ;
 	close OUT;
     }
+    _tidy_xml( $param_file );
     return $self;
 }
 
@@ -1578,5 +1490,12 @@ sub get_database_size_from_seqlen_table{
     return $count;
 }
 
+sub _tidy_xml{
+    my( $file ) = @_;
+    my $tidy = XML::Tidy->new( 'filename' => $file );
+    $tidy->tidy();
+    $tidy->write();
+    return $file;
+}
 
 1;

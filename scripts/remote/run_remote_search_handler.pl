@@ -16,6 +16,8 @@ my $loop_number  = 10; #how many times should we check that the data was run to 
 my $force_search = 0;
 my $compress     = 0; #compress output? Not for general use!
 my $bigsim       = 0; #Bigsim analysis. Not for general use!
+my $accelerate   = 0;
+my $parse_score  = 0;
 
 GetOptions("resultdir|o=s"  => \$result_dir,
 	   "dbdir|h=s"      => \$db_dir,
@@ -24,7 +26,9 @@ GetOptions("resultdir|o=s"  => \$result_dir,
 	   "scriptpath|s=s" => \$scriptpath,
 	   "w=i"            => \$waitTimeInSeconds,  # between 1 and 60. More than 60 is too long! Check more frequently than that. 1 is a good value.
 	   "nsplits=i"      => \$nsplits, #how many db splits? used to determine number of job arrays to set up.
-	   "forcesearch!"    => \$force_search
+	   "forcesearch!"   => \$force_search,
+	   "parse-score"    => \$parse_score, #rapsearch only
+	   "accelerate"     => \$accelerate,  #rapsearch only
     );
 
 (defined($result_dir) && (-d $result_dir)) or die "The result directory <$result_dir> was not valid on the REMOTE SERVER! Double check it.";
@@ -75,7 +79,7 @@ if( $force_search ){
 	print "         ARRAY STRING: $array_string\n";
 	print " SPLIT SUB RESULT DIR: $split_sub_result_dir\n";
 	print "-"x60 . "\n";
-	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $array_string);
+	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $parse_score, $accelerate, $array_string);
 	
 	if ($results =~ m/^Your job-array (\d+)\./) { #an array job
 	    my $job_id = $1;
@@ -221,7 +225,7 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 	print "          SPLIT ARRAY: $split_array\n";
 	print " SPLIT SUB RESULT DIR: $split_sub_result_dir\n";
 	print "-"x60 . "\n";
-	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $sub_array_string, $split_array);
+	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $parse_score, $accelerate, $sub_array_string, $split_array);
 	
 	if ($results =~ m/^Your job-array (\d+)\./) { #an array job
 	    my $job_id = $1;
@@ -255,7 +259,8 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 ###############
 
 sub run_remote_search {
-    my($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $result_dir, $array_string, $split_array) = @_;
+    my($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $result_dir, $parse_score, $accelerate, $array_string, $split_array) = @_;
+    
     warn "Processing <$query_seq_file>. Running with array jobs...";
 
     (defined($scriptpath) && (length($scriptpath) > 0)) or die "Script path ($scriptpath) was undefined or zero-len!";
@@ -271,13 +276,13 @@ sub run_remote_search {
 	$split_array = '';
     }
 
-    # Interestingly, we give "$scriptpath" as just a path, no need to say "perl ____" or anything.
-    # I guess 'qsub' is able to figure it out.
-
-    # Arg names as seen in "run_last.sh", below in all-caps:
-    #                          INPATH         INPUT           DBPATH     OUTPATH     OUTSTEM
     my $array_opt = "-t ${array_string}";
-    my @args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $split_array );
+    my @args;
+    if( $scriptpath =~ m/rapsearch/ ){ #has custom vars in submission script
+	@args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $parse_score, $accelerate, $split_array );
+    } else {
+	@args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $split_array );
+    }
     warn("We will attempt to execute the following job:\n qsub @args");
 
     (-d $query_seq_dir) or die "Query seq dir $query_seq_dir did not already exist on the REMOTE CLUSTER machine! It must be a DIRECTORY that already exists.";

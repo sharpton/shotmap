@@ -16,7 +16,6 @@ use Shotmap;
 use Shotmap::Run;
 use Shotmap::Notify;
 use File::Spec;
-use Bio::SeqIO;
 
 sub load_orfs{
     my( $self )    = @_;
@@ -33,7 +32,10 @@ sub load_orfs{
 		my $orfCount   = 0;
 		foreach my $in_orfs(@{ $self->Shotmap::DB::get_split_sequence_paths($in_orf_dir, 1) }){
 		    warn "Processing orfs in <$in_orfs>...";
+
+		    #Get out of Bioperl!
 		    my $orfs = Bio::SeqIO->new(-file => $in_orfs, -format => 'fasta'); #we should move this out of bioperl for speed...
+
 		    if( $self->bulk_load() ){
 			if( !$dryRun) { $self->Shotmap::Run::bulk_load_orf( $in_orfs, $sample_id, $self->trans_method ); }
 			else { $self->Shotmap::Notify::dryNotify(); }

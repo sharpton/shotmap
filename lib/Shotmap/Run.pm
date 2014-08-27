@@ -31,7 +31,6 @@ use File::Path;
 use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
-use Bio::SearchIO;
 #use DBIx::Class::ResultClass::HashRefInflator;
 use Benchmark;
 use File::Spec;
@@ -177,8 +176,8 @@ sub get_partitioned_samples{
     my @files = readdir(PROJ);
     closedir(PROJ);
     foreach my $file (@files) {
-	next if ( $file =~ m/^\./ || $file =~ m/hmmscan/ || $file =~ m/output/); 
-	next if ( -d "$path/$file" ); # skip directories, apparently
+	next if ( $file =~ m/^\./ );
+	next if ( -d "$path/$file" ); 
 	#if there's a project description file, grab the information
 	if($file =~ m/project_description\.txt/){ # <-- see if there's a description file
 	    my $text = '';
@@ -350,6 +349,7 @@ sub load_samples{
 	    my @cols = split( "\t", $row );
 	    my $samp_alt_id = $cols[0];
 	    $samp_alt_id =~ s/\.fa$//; #want alt_id in this file to match that in the database.
+	    $samp_alt_id =~ s/\.fna$//;
 	    my $metadata_string;
 	    for( my $i=1; $i < scalar(@cols); $i++){
 		my $key   = $colnames[$i];
@@ -374,7 +374,7 @@ sub load_samples{
 	    $samples{$samp}->{"metadata"} = $metadata_string;
 	}	
 	if( $self->use_db ){
-	    eval { # <-- this is like a "try" (in the "try/catch" sense)
+	    eval { 
 		$insert = $self->Shotmap::DB::create_sample($samp, $pid, $metadata_string );
 	    };
 	    if ($@) { # <-- this is like a "catch" block in the try/catch sense. "$@" is the exception message (a human-readable string).
@@ -404,7 +404,7 @@ sub load_samples{
 					   . qq{ --ffdb=}   . $self->ffdb()
 					   . qq{ --dbname=} . $self->get_db_name()
 					   . qq{ --schema=} . $self->{"schema_name"});
-		    print STDERR (" Option C: Run mrc_cleand_project.pl as follows:\n" );
+		    print STDERR (" Option C: Run mrc_clean_project.pl as follows:\n" );
 		    print STDERR ("$mrcCleanCommand\n");
 		    print STDERR ("*" x 80 . "\n");
 		    die "Terminating: Duplicate database entry error! See above for a possible solution.";
@@ -423,25 +423,16 @@ sub load_samples{
 		    $self->Shotmap::DB::bulk_import( $table, $samples{$samp}->{"path"}, $tmp, $nrows, $fks, \@fields );
 		}
 	    }
-	    else{
-		#could speed this up by getting out of bioperl...
-		my $seqs                = Bio::SeqIO->new( -file => $samples{$samp}->{"path"}, -format => 'fasta' );
-		my $numReads            = 0;
-		#unless( $self->is_slim() ){ #we require reads to be loaded so that we can scale rarefaction analysis later
-		if ($self->is_multiload()) {
-		    my @read_names = (); # empty list to start...
-		    while (my $read = $seqs->next_seq()) {
-			my $read_name = $read->display_id();
-			push( @read_names, $read_name );
-			$numReads++;
-		    }
-		    $self->Shotmap::DB::create_multi_metareads( $sid, \@read_names );
-		} else{
-		    while (my $read = $seqs->next_seq()) { ## If we AREN'T multi-loading, then do this...
-			my $read_name = $read->display_id();
-			$self->Shotmap::DB::create_metaread($read_name, $sid);
-			$numReads++;
-		    }
+	    else{ 
+		open( SEQS, $samples{$samp} ) || die "Can't open " . $samples{$samp} . " for read: $!\n";
+		while(<SEQS>){
+		    next unless $_ =~ m/^>/;
+		    my $read    = chomp( $_ );
+		    $read =~ s/^>//;    #get rid of header line description
+		    $read =~ s/\s.*$//; #get rid of description
+		    my $numReads            = 0;
+		    $self->Shotmap::DB::create_metaread($read, $sid);
+		    $numReads++;
 		}
 		$self->Shotmap::Notify::notify("Loaded $numReads reads for sample $sid into the database.");
 	    }
@@ -1561,7 +1552,7 @@ sub _build_family_ref_path_hash{
     #open the ref_ffdb and look for family-related files (hmms and seqs)
     my $family_paths = {};
     my $recurse_lvl = 1; #we use these two vars to limit the number of dirs we look into. Otherwise, code can get lost.
-    my $recurse_lim = 3; 
+    my $recurse_lim = 1; #turned to 1 from 3 to simplify structure - only work with the top level directory 
     $family_paths = _get_family_path_from_dir( $ref_ffdb, $type, $recurse_lvl, $recurse_lim, $family_paths ); 
     return $family_paths; #a hashref
 }
@@ -1579,7 +1570,60 @@ sub _get_family_path_from_dir{
     foreach my $p( @paths ){ #top level must be dirs. will skip any files here
 	next if ( $p =~ m/^\./ );
 	my $path = $dir . "/" . $p;
-	next unless( -d "${path}" );
+	#are the top level dirs what we're looking for?
+	#print "Looking in $path\n";
+	if( $type eq "hmm" ){ #find hmms and build the db		
+	    print( "Grabbing family paths from $path\n" );
+	    opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
+	    my @files = readdir( SUBDIR );
+	    closedir SUBDIR;
+	    foreach my $file( @files ){
+		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
+		next unless( -f $file ){
+		    my $hmm_path = "${path}/$file";
+		    $family_paths->{$type}->{$family} = $hmm_path;
+		}
+	    }
+	}
+	if( $type eq "blast" ){ #find the seqs and build the db
+	    print( "Grabbing family paths from $path\n" );
+	    opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
+	    my @files = readdir( SUBDIR );
+	    closedir SUBDIR;
+	    foreach my $file( @files ){
+		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
+		next unless( -f $file ){
+		    my $seq_path = "${path}/${file}";
+		    $family_paths->{$type}->{$family} = $seq_path;	    
+		}
+	    }  
+	}
+	else{ #don't have what we're looking for in the top level dirs, so let's recurse a level
+	    my $sub_recurse_lvl = $recurse_lvl + 1; #do this so that each of the sister subdirs get processed fairly
+	    if( $sub_recurse_lvl >= $recurse_lim ){
+		#print "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n";
+		next;
+	    }
+	    $family_paths = _get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
+	}
+    }
+    return $family_paths;
+}
+
+sub _get_family_path_from_dir_obsolete{
+    my $dir = shift;
+    my $type = shift;
+    my $recurse_lvl  = shift; #how many recursions are we on
+    my $recurse_lim  = shift; #how many total recursions do we allow?
+    my $family_paths = shift; #hashref
+    opendir( DIR, $dir ) || die "Can't opendir on $dir\n";
+#    my @paths = glob( "${path}/*" );
+    my @paths = readdir( DIR );
+    closedir DIR;
+    foreach my $p( @paths ){ #top level must be dirs. will skip any files here
+	next if ( $p =~ m/^\./ );
+	my $path = $dir . "/" . $p;
+	next unless( -d "${path}" ); 
 	#are the top level dirs what we're looking for?
 	#print "Looking in $path\n";
 	if( $path =~ m/hmms_full$/ ){
@@ -1640,7 +1684,7 @@ sub cat_db_split{
 	    #make a temp file for the nr 
 	    #append famids to seqids within this routine
 	    my $tmp = _build_nr_seq_db( $family, $suffix, $compressed ); #make a tmp file for the nr
-	    File::Cat::cat( $tmp, $fh ); # From the docs: "Copies data from EXPR to FILEHANDLE, or returns false if an error occurred. EXPR can be either an open readable filehandle or a filename to use as input."
+	    File::Cat::cat( $tmp, $fh ); 
 	    unlink( $tmp ); #delete the tmp file
 	}
 	#append famids to seqids, don't build NR database
@@ -1667,21 +1711,56 @@ sub _append_famids_to_seqids{
     my $suffix = shift;
     my $compressed = shift;
     my $family_tmp = $family . "_tmp";
-    my( $seqin );
+    my $fh;
     if( $compressed ){
-	$seqin  = Bio::SeqIO->new( -file => "zcat $family |", -format => 'fasta' );
+	open( SEQS, "zcat $family|" ) || die "Can't open $family for read: $!\n";
+	$fh     = *SEQS;
     } else {
-	$seqin  = Bio::SeqIO->new( -file => "$family", -format => 'fasta' );
+	open( SEQS, "$family" ) || die "Can't open $family for read: $!\n";
+	$fh     = *SEQS;
     }
-    my $seqout = Bio::SeqIO->new( -file => ">$family_tmp", -format => 'fasta' );
-    my $dict   = {};
+    open( OUT, ">$family_tmp" ) || die "Can't open $family_tmp for write: $!\n";
     my $famid =  _get_famid_from_familydb_path( $family, $suffix, $compressed );
-    while( my $seq = $seqin->next_seq ){
-	my $id       = $seq->display_id();
-	$seq->display_id( $id . "_" . $famid );
-	$seqout->write_seq( $seq );
-    }    
+    my $sequence;
+    my $header;
+    while( <$fh> ){
+	chomp $_;
+	if( eof ){
+	    my ( $id, $desc ) = _parse_seq_id( $header );
+	    my $new_header    = ">${id}_${famid} $desc";
+	    print OUT "${new_header}\n${sequence}\n";
+	}
+	if( $_ =~ m/^>/ ){
+	    if( defined( $header ) ){
+		my ( $id, $desc ) = _parse_seq_id( $header );
+		my $new_header    = ">${id}_${famid} $desc";
+		print OUT "${new_header}\n${sequence}\n";		
+	    }
+	    $header = $_;
+	    $sequence = ();
+	} else {
+	    $sequence .= $_;
+	}		
+    }
+    close $fh;
+    close OUT;
     return $family_tmp;    
+}
+
+sub _parse_seq_id{
+    my ( $header ) = @_;
+    my $header = ();
+    my $desc   = ()
+    if( $header =~ m/^>(.*?)\s(.*)/ ){
+	$header = $1;
+	$desc   = $2;
+    } elsif( $header =~ m/^>(.*?)/ ){
+	$header = $1;
+	$desc   = "";
+    } else {
+	die "Can't parse header data from $header\n";
+    }
+    return \( $id, $desc );
 }
 
 #Note heuristic here: builiding an NR version of each family_db rather than across the complete DB. 
@@ -1693,30 +1772,67 @@ sub _build_nr_seq_db{
     my $compressed = shift;
     my $dups_list_file = shift;
     my $family_nr  = $family . "_nr_tmp";
-    my $seqin;
+    my $fh;
     if( $compressed ){
-	$seqin   = Bio::SeqIO->new( -file => "zcat $family |", -format => 'fasta' );
+	open( SEQS, "zcat $family|" ) || die "Can't open $family for read: $!\n";
+	$fh     = *SEQS;
     } else {
-	$seqin   = Bio::SeqIO->new( -file => "$family", -format => 'fasta' );
+	open( SEQS, "$family" ) || die "Can't open $family for read: $!\n";
+	$fh     = *SEQS;
     }
-    my $seqout  = Bio::SeqIO->new( -file => ">$family_nr", -format => 'fasta' );
+    open( OUT, ">$family_tmp" ) || die "Can't open $family_tmp for write: $!\n";
     my $dict    = {};
     my $famid   =  _get_famid_from_familydb_path( $family, $suffix );
     my $baseid  = basename( $family, $suffix );
+
+    my $sequence;
+    my $header;
+    while( <$fh> ){
+	chomp $_;
+	if( eof ){
+	    my ( $id, $desc ) = _parse_seq_id( $header );
+	    my $new_id        = ">${id}_${famid}";
+	    my $new_header    = ">${id}_${famid} $desc";	    
+	    if( !defined( $dict->{$sequence} ) ){
+		print OUT "${new_header}\n${sequence}\n";	    
+		$dict->{$sequence} = $id;
+	    } else { #print out the duplicate sequence pairings
+		if( defined( $dups_list_file ) ){
+		    my $retained_id = $dict->{$sequence};
+		    print $dups_list_file join( "\t", $family, $retained_id, $id, "\n" );
+		}
+	    }
+	}
+	if( $_ =~ m/^>/ ){
+	    if( defined( $header ) ){
+		my ( $id, $desc ) = _parse_seq_id( $header );
+		my $new_id        = ">${id}_${famid}";
+		my $new_header    = ">${id}_${famid} $desc";	    
+		if( !defined( $dict->{$sequence} ) ){
+		    print OUT "${new_header}\n${sequence}\n";	    
+		    $dict->{$sequence} = $id;
+		} else { #print out the duplicate sequence pairings
+		    if( defined( $dups_list_file ) ){
+			my $retained_id = $dict->{$sequence};
+			print $dups_list_file join( "\t", $family, $retained_id, $id, "\n" );
+		    }
+		}
+	    }
+	    $header = $_;
+	    $sequence = ();
+	} else {
+	    $sequence .= $_;
+	}		
+    }
+    close $fh;
+    close OUT;
+
     while( my $seq = $seqin->next_seq ){
 	my $id       = $seq->display_id();
 #	$seq->display_id( $id . "_" . $famid ); We append earlier now with _append_famids_to_seqids
 	$seq->display_id( $id );
 	my $sequence = $seq->seq();
 	#if we haven't seen this seq before, print it out
-	if( !defined( $dict->{$sequence} ) ){
-	    $seqout->write_seq( $seq );
-	    $dict->{$sequence} = $id;
-	} else { #print out the duplicate sequence pairings
-	    if( defined( $dups_list_file ) ){
-		my $retained_id = $dict->{$sequence};
-		print $dups_list_file join( "\t", $family, $retained_id, $id, "\n" );
-	    }
 	}
     }    
     my $gzip_nr = $family_nr . ".gz";
@@ -1750,8 +1866,11 @@ sub _grab_seqs_from_lookup_list{
 	$lookup->{$_}++;
     }
     close LOOK;
-    my $seqs_in  = Bio::SeqIO->new( -file => "zcat $seq_file |", -format => 'fasta' );
-    my $seqs_out = Bio::SeqIO->new( -file => ">$out_seqs", -format => 'fasta' );
+    # turned off bioperl because this function is only used in representative selection, which is obsolete
+    # and we don't want to require bioperl just for this routine. If we ever turn rep selection on in the future
+    # consider a non-bioperl solution.
+    my $seqs_in  = ""; #Bio::SeqIO->new( -file => "zcat $seq_file |", -format => 'fasta' );
+    my $seqs_out = ""; #Bio::SeqIO->new( -file => ">$out_seqs", -format => 'fasta' );
     while(my $seq = $seqs_in->next_seq()){
 	my $id = $seq->display_id();
 	if( defined( $lookup->{$id} ) ){
@@ -1983,6 +2102,13 @@ sub run_search_remote {
 	. " --nsplits=$nsplits "
 	. " --scriptpath=${remote_script_path} "
 	. " -w $waitTimeInSeconds ";
+    if( $search_type =~ m/rapsearch/ ){
+	my $parse_score = $self->parse_score;
+	$remote_cmd .= "--parse-score=${parse_score}";
+    }
+    if( $search_type eq "rapsearch_accelerated" ){
+	$remote_cmd .= "--accelerate=T";
+    }
     if( $forcesearch ){
 	$remote_cmd .= " --forcesearch ";
     }
@@ -2054,6 +2180,13 @@ sub run_search{
             $cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
             $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
+	if( $type eq "rapsearch_accelerated" ){
+	    my $suffix = $self->search_db_name_suffix;
+	    my $parse_score = $self->parse_score;
+            $cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
+	}
+
         #ADD ADDITIONAL METHODS HERE    
         
 	#execute
@@ -3189,5 +3322,89 @@ sub parse_file_cols_into_hash{
     return $hash;
 }
 
+sub split_sequence_file{
+    my $self             = shift;
+    my $full_seq_file    = shift;
+    my $split_dir        = shift;
+    my $basename         = shift;
+    my $nseqs_per_split;
+    if( $self->remote ){
+	$nseqs_per_split  = $self->read_split_size();
+    } else {
+	my $total_reads;
+	if( defined( $self->Shotmap::prerarefy_samples() ) ){
+	    $total_reads = $self->Shotmap::prerarefy_samples();
+	} else {
+	    $total_reads = $self->Shotmap::Run::count_seqs_in_file( $full_seq_file );
+	}
+	$nseqs_per_split = ceil($total_reads / $self->nprocs()  ); #round up to nearest integer to be sure we get all reads
+    }
+    #a list of filenames
+    my @output_names = ();
+    my $compressed   = 0;
+    if( $full_seq_file =~ m/\.gz$/ ){
+	$compressed = 1;
+    }
+    if( $compressed ){
+	open( SEQS, "zcat $full_seq_file|" ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";
+    } else {
+	open( SEQS, $full_seq_file ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";
+    }
+    my $counter  = 1;
+    my $outname  = $basename . $counter . ".fa";
+    my $splitout = $split_dir . "/" . $outname;
+    open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
+    push( @output_names, $outname );
+    $self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
+    my $seq_ct   = 0;
+    my $header   = ();
+    my $sequence = ();
+    my $seq_count_across_splits = 0;
+    while( <SEQS> ){
+	#have we reached the prerarefy sequence count, if that is set?
+	if( defined( $self->Shotmap::prerarefy_samples() ) && $seq_count_across_splits == $self->Shotmap::prerarefy_samples() ){
+	    last;
+	}	   
+	chomp $_;
+	if( $_ =~ m/^(\>.*)/ ){
+	    if( defined( $header ) ){
+		print OUT "$header\n$sequence\n";
+		$seq_ct++;
+		$seq_count_across_splits++;
+		$sequence = ();
+	    }
+	    $header = $1;
+	}
+	else{
+	    $sequence = $sequence . $_;
+	}
+	if( eof ) {
+	    print OUT "$header\n$sequence\n";	    
+	    #unless( $self->remote ){
+	    Shotmap::Run::gzip_file( $splitout );
+	    unlink( $splitout );
+	    #}
+	}
+	if( $seq_ct == $nseqs_per_split - 1 ){	
+	    close OUT;
+	    #unless( $self->remote ){
+		Shotmap::Run::gzip_file( $splitout );
+		unlink( $splitout );
+	    #}
+	    $counter++;
+	    my $outname  = $basename . $counter . ".fa";
+	    $splitout = $split_dir . "/" . $outname;
+	    unless( eof ){
+		open( OUT, ">$splitout" ) || die "Can't open $splitout for write in Shotmap::DB::split_sequence_file_no_bp\n";
+		push( @output_names, $outname );
+		$self->Shotmap::Notify::print_verbose( "Will dump to split $splitout\n" );
+		$seq_ct = 0;		
+	    }
+	}
+    }    
+    close SEQS;
+    close OUT;
+    return \@output_names;
+}
 
 1;
