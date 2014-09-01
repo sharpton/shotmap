@@ -11,6 +11,8 @@ use warnings;
 
 package Shotmap;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext"); 
+
 use Shotmap::Load;
 use Shotmap::Notify;
 use Shotmap::DB;

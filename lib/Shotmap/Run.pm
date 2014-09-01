@@ -22,6 +22,7 @@ package Shotmap::Run;
 
 use strict;
 use Shotmap;
+
 use Shotmap::DB;
 use Data::Dumper;
 use File::Basename;

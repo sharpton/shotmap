@@ -2,8 +2,10 @@
 
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/scripts"); ## Allows shotmap scripts to be found in the SHOTMAP_LOCAL directory
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/lib"); ## Allows "Shotmap.pm and Schema.pm" to be found in the SHOTMAP_LOCAL directory. DB.pm needs this.
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext"); 
+
 ## Note: you may want to set SHOTMAP_LOCAL with the following commands in your shell:
-##       export SHOTMAP_LOCAL=/home/yourname/shotmap          (assumes your SHOTMAP directory is in your home directory!)
+##       export SHOTMAP_LOCAL=/home/yourname/shotmap          (assumes your SHOTMAP directory is in your home directory, change accordingly
 ##       You can also add that line to your ~/.bashrc so that you don't have ot set SHOTMAP_LOCAL every single time!
 
 use strict;
