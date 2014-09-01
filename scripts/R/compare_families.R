@@ -13,6 +13,9 @@ family.stem       <- Args[5]  #required
 metadata.tab      <- Args[6]  #required
 test.type         <- Args[7]  #optional, is auto set below if NA
 verbose           <- Args[8]
+r.lib             <- Args[9]
+
+.libPaths( r.lib )
 
 #for troubleshooting
 #samp.abund.map <- "/home/micro/sharptot/projects/shotmap_runs/MetaHIT_shotmap_output/MC/stats/no_ags/metahit-spain-abundance-tables.tab"

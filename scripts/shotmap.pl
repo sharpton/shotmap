@@ -2,7 +2,7 @@
 
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/scripts"); ## Allows shotmap scripts to be found in the SHOTMAP_LOCAL directory
 use lib ($ENV{'SHOTMAP_LOCAL'} . "/lib"); ## Allows "Shotmap.pm and Schema.pm" to be found in the SHOTMAP_LOCAL directory. DB.pm needs this.
-use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext"); 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
 
 ## Note: you may want to set SHOTMAP_LOCAL with the following commands in your shell:
 ##       export SHOTMAP_LOCAL=/home/yourname/shotmap          (assumes your SHOTMAP directory is in your home directory, change accordingly
@@ -17,14 +17,14 @@ use Shotmap::Reads;
 use Shotmap::Orfs;
 use Shotmap::Search;
 use Shotmap::Results;
-use Getopt::Long qw(GetOptionsFromString);
-use Data::Dumper;
-use File::Basename;
-use File::Spec;
 
 use Benchmark;
 use Carp;
+
 $SIG{ __DIE__ } = sub { Carp::confess( @_ ) }; # prints a STACK TRACE whenever there is a fatal error! Very handy
+
+#update $PATH to place shotmap installed binaries at the front. This can be turned off or amended per user needs
+local $ENV{'PATH'} = $ENV{'SHOTMAP_LOCAL'} . "/bin/" . ":" . $ENV{'PATH'};
 
 print STDERR ">> ARGUMENTS TO shotmap.pl: perl shotmap.pl @ARGV\n";
 
@@ -38,8 +38,6 @@ $pipe->Shotmap::Load::set_params();
 $pipe->Shotmap::Notify::pipeline_params();
 
 my $path_to_family_annotations;
-
-
 
 # Load the project
 $pipe->Shotmap::Reads::load_project();

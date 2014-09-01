@@ -6,8 +6,8 @@ use File::Basename;
 
 my $testing = 1;
 
-my $perlmods  = 1; #should we install perl modules
-my $rpackages = 1; #should we install R modules
+my $perlmods  = 0; #should we install perl modules
+my $rpackages = 0; #should we install R modules
 my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
 my $clean     = 0; #wipe old installations of algs?
 my $get       = 0; #download alg source code?
@@ -54,12 +54,13 @@ if( $perlmods ){
      "Parallel::ForkManager",
      "DBI",
      "DBD::mysql", #if mysql server is on foreign machine, install by hand
-                   #see http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod     
+                   #see http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod 
      "File::Basename",
      "File::Copy",
      "File::Path",
      "File::Spec",
-     "Getopt::Long"
+     "Getopt::Long",
+     "Capture::Tiny",
      );
  foreach my $mod( @mods ){
      my $cmd = "perl ${bin}/cpanm -L ${ext} ${mod}";
@@ -199,8 +200,8 @@ if( $algs ){
 	    build_src( $algs->{$alg}, "./configure;make" );	    
 	}
     }
-    link_src( $algs->{$alg} . "/bin/blastp;" . 
-	      $algs->{$alg} . "/bin/makeblasatdb", 
+    link_src( $algs->{$alg} . "/ReleaseMT/bin/blastp;" . 
+	      $algs->{$alg} . "/ReleaseMT/bin/makeblasatdb", 
 	      $bin );
     print "\t...done with ${alg}\n";
     
@@ -221,8 +222,8 @@ if( $algs ){
     if( $build ){
 	build_src( $algs->{$alg}, "make" );	    	
     }
-    link_src( $algs->{$alg} . "/bin/lastal;" . 
-	      $algs->{$alg} . "/bin/lastdb" , 
+    link_src( $algs->{$alg} . "/src/lastal;" . 
+	      $algs->{$alg} . "/src/lastdb" , 
 	      $bin );
     print "\t...done with ${alg}\n";
     
@@ -316,15 +317,15 @@ if( $algs ){
     print "\t...done with ${alg}\n";
 
 }
- 
     
-    sub link_src{
-	my $targets = shift; #must be path to target relative to shotmap root, semicolon sep list
-	my $linkdir = shift;
-	
+sub link_src{
+    my $targets = shift; #must be path to target relative to shotmap root, semicolon sep list
+    my $linkdir = shift;
+    
     print "creating symlinks...\n";
     chdir( $linkdir );
     foreach my $target( split( "\;", $targets ) ){
+	system( "chmod a+x ${target}" );
 	system( "ln -s ${target}" );
     }
     chdir( $ROOT );

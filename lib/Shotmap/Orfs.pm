@@ -12,6 +12,8 @@ use warnings;
 
 package Shotmap::Orfs;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
+
 use Shotmap;
 use Shotmap::Run;
 use Shotmap::Notify;

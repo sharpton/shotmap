@@ -24,8 +24,9 @@ if( !defined( $pipe->db_pass ) ){
     chomp( $db_pass );
 }
 
-my $dbh = DBI->connect( $pipe->dbi_connection, $pipe->dbuser, $db_pass )
-    or die "Connection Error: $DBI::errstr\n";
+my $DBIstring = "DBI:mysql:host=" . $self->db_host; #don't want dbname in string for subsequent autocreate
+my $dbh = DBI->connect( $DBIstring, $pipe->dbuser, $db_pass )
+	or die "Connection Error: $DBI::errstr\n";
 
 print "Looks like we can connect with these database settings. Building conf-file...\n";
 open( OUT, ">$conf_file" ) || die "Can't open $conf_file for write: $!\n";

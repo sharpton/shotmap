@@ -11,7 +11,7 @@ use warnings;
 
 package Shotmap;
 
-use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext"); 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
 
 use Shotmap::Load;
 use Shotmap::Notify;
@@ -917,6 +917,13 @@ sub params_dir{
 sub params_file{
     my( $self, $value ) = @_;
     my $key = "parameters_file";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}   
+
+sub is_test{
+    my( $self, $value ) = @_;
+    my $key = "is_test";
     $self->set_value( $key, $value );
     return $self->{ $key };
 }   

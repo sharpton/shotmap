@@ -20,6 +20,8 @@
 
 package Shotmap::Run;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
+
 use strict;
 use Shotmap;
 
@@ -218,7 +220,9 @@ sub get_partitioned_samples{
 	    undef $text if( $text eq '' );
 	    $self->sample_metadata($text);
 	}
-	else {
+	else { #is a sample sequence file
+	    #is it properly formatted?
+	    $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt" );
 	    #get sample name here, simple parse on the period in file name
     	    my $thisSample = basename($file, (".fa", ".fna"));
 	    $samples{$thisSample}->{"path"} = "$path/$file";
@@ -236,6 +240,39 @@ sub get_partitioned_samples{
     $self->set_samples( \%samples );
     #return $self;
 }
+
+sub check_fasta_file{
+    my( $self, $file, $type ) = @_;
+    open( FILE, $file ) || die "Can't open $file for read: $!\n";
+    my $is_fasta = 1;
+    my $line_ct  = 0;
+    my $line_lim = 100; #look at the first 100 lines to make a guess
+    while(<LINES>){
+	chomp $_;
+	my $line = $_;
+	$line_ct++;
+	last if( $line_ct == $line_lim );	
+	next if( $line =~ m/^\>/ );
+	$line = uc( $line );
+	#IUPAC requirements based on this: http://www.bioinformatics.org/sms/iupac.html
+	if( $type eq "nt" ){ #nucleotide check here
+	    if( $line =~ m/[^ACGTURYSWKMBDHVN]/ ){
+		$is_fasta = 0;
+	    }
+	} elsif( $type eq "aa" ){
+	    if( $line =~ m/[^ACDEFGHIKLMNPQRSTVWYX]/ ){ #added X for ambigious characters
+		$is_fasta = 0;
+	    }	    
+	} else {
+	    die "I received a value for type that I don't understand (<$type>)\n";
+	}
+    }
+    close FILE;
+    if( !$is_fasta ){
+	die( "$file doesn't look like a properly formatted fasta file\n" );
+    }    
+}
+
 
 sub load_project{
     my ($self, $path, $nseqs_per_samp_split) = @_;    # $nseqs_per_samp_split is how many seqs should each sample split file contain?

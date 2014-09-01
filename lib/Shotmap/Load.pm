@@ -6,11 +6,12 @@
 #This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #You should have received a copy of the GNU General Public License along with this program (see LICENSE.txt).  If not, see <http://www.gnu.org/licenses/>.
 
-use strict;
-use warnings;
-
 package Shotmap::Load;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
+
+use strict;
+use warnings;
 use Shotmap;
 use Getopt::Long qw(GetOptionsFromString GetOptionsFromArray);
 use File::Basename;

@@ -20,8 +20,9 @@
 
 package Shotmap::DB;
 
-use strict;
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
 
+use strict;
 use Data::Dumper;
 use File::Basename;
 use File::Copy;

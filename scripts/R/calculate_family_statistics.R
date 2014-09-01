@@ -1,9 +1,5 @@
 ###note: need a similar function that just plots functional data for each sample, not in a comparative context
 
-require(vegan)
-require(ggplot2)
-require(reshape2)
-
 options(error=traceback)
 options(error=recover)
 
@@ -13,6 +9,13 @@ samp.relabund.map <- Args[5]
 metadata.tab      <- Args[6]
 family.stem       <- Args[7]
 compare.stem      <- Args[8]
+r.lib             <- Args[9]
+
+.libPaths( r.lib )
+
+require(vegan)
+require(ggplot2)
+require(reshape2)
 
 ###Autodetect metadata variable type
 ###takes a list of values and determines if likely discrete or continuous. May not be perfect!

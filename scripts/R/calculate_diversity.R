@@ -9,7 +9,9 @@ sample.stem       <- Args[5]
 compare.stem      <- Args[6]
 metadata.tab      <- Args[7]
 verbose           <- Args[8]
+r.lib             <- Args[9]
 
+.libPaths( r.lib )
 
 if( is.na( verbose ) ){
     verbose = 0

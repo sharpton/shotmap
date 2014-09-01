@@ -12,6 +12,7 @@ use warnings;
 
 package Shotmap::Results;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
 use Shotmap;
 
 sub calculate_diversity{

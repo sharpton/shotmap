@@ -10,6 +10,9 @@ metadata.tab      <- Args[6]
 to.scale          <- Args[7]
 to.center         <- Args[8]
 verbose           <- Args[9]
+r.lib             <- Args[10]
+
+.libPaths( r.lib )
 
 col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
 

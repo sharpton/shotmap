@@ -12,6 +12,8 @@ use warnings;
 
 package Shotmap::Search;
 
+use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");     
+
 use Shotmap;
 use File::Basename;
 use File::Copy;
