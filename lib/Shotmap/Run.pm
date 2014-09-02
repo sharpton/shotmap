@@ -29,7 +29,7 @@ use Shotmap::DB;
 use Data::Dumper;
 use File::Basename;
 use File::Cat;
-use File::Copy qw( move );
+use File::Copy qw( move copy );
 use File::Path;
 use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
@@ -247,7 +247,7 @@ sub check_fasta_file{
     my $is_fasta = 1;
     my $line_ct  = 0;
     my $line_lim = 100; #look at the first 100 lines to make a guess
-    while(<LINES>){
+    while(<FILE>){
 	chomp $_;
 	my $line = $_;
 	$line_ct++;
@@ -463,14 +463,23 @@ sub load_samples{
 	    }
 	    else{ 
 		open( SEQS, $samples{$samp} ) || die "Can't open " . $samples{$samp} . " for read: $!\n";
+		my @read_names = ();
+		my $numReads   = 0;
 		while(<SEQS>){
 		    next unless $_ =~ m/^>/;
 		    my $read    = chomp( $_ );
 		    $read =~ s/^>//;    #get rid of header line description
 		    $read =~ s/\s.*$//; #get rid of description
-		    my $numReads            = 0;
-		    $self->Shotmap::DB::create_metaread($read, $sid);
+		    if( $self->is_multiload() ){
+			push( @read_names, $read );
+		    } else {
+			$self->Shotmap::DB::create_metaread($read, $sid);
+		    }
 		    $numReads++;
+		}		
+		close SEQS;
+		if( $self->is_multiload ){
+		    self->Shotmap::DB::create_multi_metareads( $sid, \@read_names );
 		}
 		$self->Shotmap::Notify::notify("Loaded $numReads reads for sample $sid into the database.");
 	    }
@@ -604,31 +613,63 @@ sub back_load_project(){
     if( ! -e $self->params_file ){
 	$self->Shotmap::DB::initialize_parameters_file( $self->params_file );
     }
-    my $search_type = $self->search_type;
+    $self->Shotmap::Run::cp_search_db_properties();
+}
+
+sub cp_search_db_properties{
+    my $self = shift;
+    my $search_type    = $self->search_type;
     my $raw_db_path    = $self->search_db_path( $search_type ); 
+    my $symlinks       = 0; #set to zero as cp gives us a single, contained directory
     my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
     my $ffdb_famlen_cp = $self->params_dir . "/family_lengths.tab";
     if( -e $famlen_tab && ! -e $ffdb_famlen_cp ){
-	my $symlink_exists = eval { symlink( $famlen_tab, $ffdb_famlen_cp ); 1 };
-	if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
-	    copy( $famlen_tab, $ffdb_famlen_cp );
-	}
 	if( ! -e $famlen_tab ){
-	    die "Can't seem to create a copy of the family length table located here:\n  $famlen_tab \n".
-		"Trying to place it here:\n  $ffdb_famlen_cp\n";
+	    die "Can't find family length table. Expected it here: $famlen_tab\n";
+	}
+	if( $symlinks ){
+	    my $symlink_exists = eval { symlink( $famlen_tab, $ffdb_famlen_cp ); 1 };
+	    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
+		copy( $famlen_tab, $ffdb_famlen_cp );
+		if( ! -e $ffdb_famlen_cp){
+		    die "Can't seem to create a copy of the family length table located here:\n  $famlen_tab \n".
+			"Trying to place it here:\n  $ffdb_famlen_cp\n";
+		}
+	    }
+	} else {
+	    copy( $famlen_tab, $ffdb_famlen_cp );
+	    if( ! -e $famlen_tab ){
+		die "Can't seem to create a copy of the family length table located here:\n  $famlen_tab \n".
+		    "Trying to place it here:\n  $ffdb_famlen_cp\n";
+	    }
 	}
     }
     my $seqlen_tab     = $self->search_db_path( $search_type ) . "/sequence_lengths.tab";
     my $ffdb_seqlen_cp = $self->params_dir . "/sequence_lengths.tab";
     if( $search_type eq "blast" && -e $seqlen_tab && ! -e $ffdb_seqlen_cp ){
-	my $symlink_exists    = eval { symlink( $seqlen_tab, $ffdb_seqlen_cp); 1 };
-	if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
-	    copy( $seqlen_tab, $ffdb_seqlen_cp );
-	}
 	if( ! -e $seqlen_tab ){
-	    die "Can't seem to create a copy of the family length table located here:\n  $seqlen_tab \n".
-		"Trying to place it here:\n  $ffdb_seqlen_cp\n";
-	}	    
+	    die "Can't find a sequence length table. Expected it here: $seqlen_tab";
+	}
+	if( $symlinks ){
+	    my $symlink_exists    = eval { symlink( $seqlen_tab, $ffdb_seqlen_cp); 1 };
+	    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
+		copy( $seqlen_tab, $ffdb_seqlen_cp );
+		if( ! -e $ffdb_seqlen_cp ){
+		    die "Can't seem to create a copy of the family length table located here:\n  $seqlen_tab \n".
+			"Trying to place it here:\n  $ffdb_seqlen_cp\n";
+		}	    
+	    } else {
+		if( ! -l $ffdb_seqlen_cp || ! -e readlink( $ffdb_seqlen_cp ) ){
+		    die "Broken symlink: $ffdb_seqlen_cp -> $seqlen_tab";
+		}
+	    }
+	} else {
+	    copy( $seqlen_tab, $ffdb_seqlen_cp );
+	    if( ! -e $ffdb_seqlen_cp ){
+		die "Can't seem to create a copy of the family length table located here:\n  $seqlen_tab \n".
+		    "Trying to place it here:\n  $ffdb_seqlen_cp\n";
+	    }	    
+	}
     }   
 }
 
@@ -667,6 +708,9 @@ sub translate_reads {
     my $to_split = $self->split_orfs();
     my $method   = $self->trans_method();
     my $nprocs   = $self->nprocs();
+    my $bin      = $ENV{"SHOTMAP_LOCAL"} . "/bin/";
+    my $length_cutoff = $self->orf_filter_length;
+
     (-d $input) or die "Unexpectedly, the input directory <$input> was NOT FOUND! Check to see if this directory really exists.";
     (-d $output) or die "Unexpectedly, the output directory <$output> was NOT FOUND! Check to see if this directory really exists.";
     my $inbasename  = $self->Shotmap::Run::get_file_basename_from_dir($input) . "split_"; 
@@ -680,6 +724,7 @@ sub translate_reads {
     }
     my( $parent, $ra_children );
     my @children = ();
+    my $errors   = "";
     my $pm = Parallel::ForkManager->new($nprocs);
     for( my $i=1; $i<=$nprocs; $i++ ){
 	my $pid = $pm->start and next;
@@ -689,20 +734,42 @@ sub translate_reads {
             my $infile   = "${input}/${inbasename}${i}.fa";
             my $outfile  = "${output}/${outbasename}${i}.fa";
 	    if( -e "${infile}.gz" ){
-		$cmd    = "zcat ${infile}.gz | transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson stdin $outfile > /dev/null 2>&1";
+		#$cmd    = "zcat ${infile}.gz | transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson stdin $outfile > /dev/null 2>&1";
+
 	    } else {
-		$cmd    = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
+		#$cmd    = "transeq -trim -frame=6 -sformat1 pearson -osformat2 pearson $infile $outfile > /dev/null 2>&1";
 	    }	    
         }
+	my $infile   = "${input}/${inbasename}${i}.fa";
+	my $outfile  = "${output}/${outbasename}${i}.fa";
+	if( -e "${infile}.gz" ){
+	    $infile = "${infile}.gz";
+	}
 	#ADD ADDITIONAL METHODS
+        if( $method eq '6FT' ){	   
+	    $cmd    = $self->python . " ${bin}/metatrans.py -m 6FT $infile $outfile";
+        } 
+        if( $method eq '6FT_split' ){
+	    $cmd    = $self->python . " ${bin}/metatrans.py -m 6FT-split -l $length_cutoff $infile $outfile";
+        } 
+        if( $method eq 'prodigal' ){
+	    $cmd    = $self->python . " ${bin}/metatrans.py -m Prodigal $infile $outfile";
+        } 
 	#execute
 	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
-	system( $cmd );
+	eval{ system( $cmd ) };
+	if( $@ ){
+	    print( "$!\n" );
+	    $errors .= "Error running $cmd: $!\n";
+	}
 	$pm->finish; # Terminates the child process
-
     }
     $self->Shotmap::Notify::print( "\tWaiting for all local jobs to finish...\n" );
     $pm->wait_all_children;
+    print "errors: $errors\n";
+    if( $errors ne "" ){
+	die( "Obtained errors: $errors\n" );
+    }
     #old code, no longer using, replaced with Parallel::Fork
     if( 0 ){
       TRANSLATEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
@@ -721,7 +788,7 @@ sub translate_reads {
         }
 	$self->Shotmap::Run::destroy_spawned_threads( $parent, \@children );
     }
-    $self->Shotmap::Notify::print( "\t...${method} has finished. Proceeding");
+    $self->Shotmap::Notify::print( "\t...metatrans (${method}) has finished. Proceeding");
     return $self;
 }
 
@@ -1267,16 +1334,16 @@ sub build_search_db{
     my $raw_db_path = undef;
     my $split_size  = undef; #only used if a remote process and then only optionally
     my $length      = 0;
-    if ($type eq "hmm")   { 
+    if ($type eq "hmm") { 
 	$raw_db_path = $self->search_db_path("hmm"); 
-	if( $self->remote && defined( $self->search_db_split_size("hmm") ){	    
-	    $split_size = $self->search_db_split_size("hmm")
+	if( $self->remote && defined( $self->search_db_split_size("hmm") ) ){	    
+	    $split_size = $self->search_db_split_size("hmm");
 	}
     }
     if ($type eq "blast") { 
 	$raw_db_path = $self->search_db_path("blast"); 
 	if( $self->remote && defined( $self->search_db_split_size("blast") ) ){
-	    $split_size = $self->search_db_split_size("blast")
+	    $split_size = $self->search_db_split_size("blast");
 	}
     }
     if( $self->remote ){
@@ -1417,16 +1484,18 @@ sub build_search_db{
 	    } else {
 		die ("I could not determine the suffix associated with $family_db_file\n" );
 	    }	   
-	    if( $nr_db ){				
+	    if( $nr_db ){	
 		my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
 		$family_db_file = $nr_tmp;
 	    }
-	    open( FILE, "zcat --force $family_db_file |") || die "Unable to open the file \"$family_db_file\" for reading: $! --"; # zcat --force can TRANSPARENTLY read both .gz and non-gzipped files!
+	    open( FILE, "zcat --force $family_db_file |") # zcat --force can TRANSPARENTLY read both .gz and non-gzipped files!
+		|| die "Unable to open the file \"$family_db_file\" for reading: $! --"; 
 	    my $fam_init_len = $length; #used to calculate $family_length
 	    my $fam_nseqs    = 0; #used to calculate $family_length	    
 	    my $seq_len      = 0;
 	    while(<FILE>){
-		if ( $_ =~ m/^\>(.*?)\s/ ){ #we have to do a greedy search for the seqid in case the header contains annotation, as rapsearch truncates to just seqid
+		#we have to do a greedy search for the seqid in case the header contains annotation, as rapsearch truncates to just seqid
+		if ( $_ =~ m/^\>(.*?)\s/ ){ 
 		    my $temporary = $1; #holds the seqid, drop into $id after checking if old $id is defined
 		    $total++;
 		    $fam_nseqs++;
@@ -1518,7 +1587,7 @@ sub build_search_db{
     #print out the database length
     open( LEN, ">${raw_db_path}/database_length.txt" ) || die "Can't open ${raw_db_path}/database_length.txt for write: $!\n";
     print LEN $length;
-    close LEN;
+    close LEN;    
 
     print STDERR "Build Search DB: $type DB was successfully built and compressed.\n";
 }
@@ -1540,7 +1609,7 @@ sub format_search_db{ #local process only
 	my $db_suffix = $self->search_db_name_suffix;
 	$cmd = "prerapsearch -d ${db_file} -n ${db_file}.${db_suffix}"; # > /dev/null 2>&1";
     }
-    warn( $cmd );
+    $self->Shotmap::Notify::print_verbose( $cmd );
     my $results = IPC::System::Simple::capture( $cmd );    
     (0 == $EXITVAL) or die("Error executing $cmd: $results\n");
     return $results
@@ -1617,10 +1686,13 @@ sub _get_family_path_from_dir{
 	    closedir SUBDIR;
 	    foreach my $file( @files ){
 		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		next unless( -f $file ){
-		    my $hmm_path = "${path}/$file";
-		    $family_paths->{$type}->{$family} = $hmm_path;
+		next unless( !-d $file );
+		my $family = $file; #we'll try to parse, but default to file name
+		if( $file =~ m/(.*)\.hmm/ ){
+		    $family = $1;
 		}
+		my $hmm_path = "${path}/$file";
+		$family_paths->{$type}->{$family} = $hmm_path;
 	    }
 	}
 	if( $type eq "blast" ){ #find the seqs and build the db
@@ -1630,10 +1702,16 @@ sub _get_family_path_from_dir{
 	    closedir SUBDIR;
 	    foreach my $file( @files ){
 		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		next unless( -f $file ){
-		    my $seq_path = "${path}/${file}";
-		    $family_paths->{$type}->{$family} = $seq_path;	    
+		next unless( !-d $file );
+		my $family = $file; #we'll try to parse, but default to file name
+		if( $file =~ m/(.*)\.fa/  || 
+		    $file =~ m/(.*)\.faa/ || 
+		    $file =~ m/(.*)\.pep/ ||
+		    $file =~ m/(.*)\.aa/ ){
+		    $family = $1;
 		}
+		my $seq_path = "${path}/${file}";
+		$family_paths->{$type}->{$family} = $seq_path;	    
 	    }  
 	}
 	else{ #don't have what we're looking for in the top level dirs, so let's recurse a level
@@ -1786,19 +1864,20 @@ sub _append_famids_to_seqids{
 }
 
 sub _parse_seq_id{
-    my ( $header ) = @_;
+    my ( $seq_id ) = @_;
     my $header = ();
-    my $desc   = ()
-    if( $header =~ m/^>(.*?)\s(.*)/ ){
+    my $desc   = ();
+    chomp( $seq_id );
+    if( $seq_id =~ m/^>(.*?)\s(.*)$/ ){
 	$header = $1;
 	$desc   = $2;
-    } elsif( $header =~ m/^>(.*?)/ ){
+    } elsif( $seq_id =~ m/^>(.*?)$/ ){
 	$header = $1;
 	$desc   = "";
     } else {
-	die "Can't parse header data from $header\n";
+	die "Can't parse header data from $seq_id\n";
     }
-    return \( $id, $desc );
+    return ( $header, $desc );
 }
 
 #Note heuristic here: builiding an NR version of each family_db rather than across the complete DB. 
@@ -1818,7 +1897,7 @@ sub _build_nr_seq_db{
 	open( SEQS, "$family" ) || die "Can't open $family for read: $!\n";
 	$fh     = *SEQS;
     }
-    open( OUT, ">$family_tmp" ) || die "Can't open $family_tmp for write: $!\n";
+    open( OUT, ">$family_nr" ) || die "Can't open $family_nr for write: $!\n";
     my $dict    = {};
     my $famid   =  _get_famid_from_familydb_path( $family, $suffix );
     my $baseid  = basename( $family, $suffix );
@@ -1826,7 +1905,7 @@ sub _build_nr_seq_db{
     my $sequence;
     my $header;
     while( <$fh> ){
-	chomp $_;
+	chomp $_;	
 	if( eof ){
 	    my ( $id, $desc ) = _parse_seq_id( $header );
 	    my $new_id        = ">${id}_${famid}";
@@ -1865,16 +1944,10 @@ sub _build_nr_seq_db{
     close $fh;
     close OUT;
 
-    while( my $seq = $seqin->next_seq ){
-	my $id       = $seq->display_id();
-#	$seq->display_id( $id . "_" . $famid ); We append earlier now with _append_famids_to_seqids
-	$seq->display_id( $id );
-	my $sequence = $seq->seq();
-	#if we haven't seen this seq before, print it out
-	}
-    }    
     my $gzip_nr = $family_nr . ".gz";
     gzip $family_nr => $gzip_nr || die "gzip failed for $family_nr: $GzipError\n";
+    unlink( $family_nr );
+    $family_nr = $gzip_nr;
     return $family_nr;
 }
 
@@ -2216,18 +2289,17 @@ sub run_search{
 
 	    #7-7-2014: The RAPsearch authors added an  option on our behalf to 2.19 that filters hits by minimum score. So, let's use that instead:
             $cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
         }
 	if( $type eq "rapsearch_accelerated" ){
 	    my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
             $cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-            $self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	}
 
         #ADD ADDITIONAL METHODS HERE    
         
 	#execute
+	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
 	system( $cmd );
 	#compress results
 	if( $type eq "rapsearch" ){

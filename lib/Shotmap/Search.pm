@@ -63,30 +63,8 @@ sub build_search_db{
 	    }
 	}
     }
-    #we always want to symlink these files to the params directory now
-    my $raw_db_path    = $self->search_db_path( $search_type ); 
-    my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
-    my $ffdb_famlen_cp = $self->params_dir . "/family_lengths.tab";
-    my $symlink_exists = eval { symlink( $famlen_tab, $ffdb_famlen_cp ); 1 };
-    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
-	copy( $famlen_tab, $ffdb_famlen_cp );
-    }
-    if( ! -e $famlen_tab ){
-	die "Can't seem to create a copy of the family length table located here:\n  $famlen_tab \n".
-	    "Trying to place it here:\n  $ffdb_famlen_cp\n";
-    }
-    if( $search_type eq "blast" ){
-	my $seqlen_tab     = $self->search_db_path( $search_type ) . "/sequence_lengths.tab";
-	my $ffdb_seqlen_cp = $self->params_dir . "/sequence_lengths.tab";
-	$symlink_exists    = eval { symlink( $seqlen_tab, $ffdb_seqlen_cp); 1 };
-	if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
-	    copy( $seqlen_tab, $ffdb_seqlen_cp );
-	}
-	if( ! -e $seqlen_tab ){
-	    die "Can't seem to create a copy of the family length table located here:\n  $seqlen_tab \n".
-		"Trying to place it here:\n  $ffdb_seqlen_cp\n";
-	}	    
-    }
+    #we always want to copy these searchdb prop files files to the params directory now
+    $self->Shotmap::Run::cp_search_db_properties();
     return $self;
 }
 

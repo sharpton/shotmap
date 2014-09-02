@@ -928,6 +928,27 @@ sub is_test{
     return $self->{ $key };
 }   
 
+sub auto{
+    my( $self, $value ) = @_;
+    my $key = "auto";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+sub python{ 
+    my( $self, $value ) = @_;
+    my $key = "python";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+sub perl{
+    my( $self, $value ) = @_;
+    my $key = "perl";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
 sub set_value{
     my( $self, $key, $value ) = @_;
     if( defined( $value ) ){
@@ -938,6 +959,8 @@ sub set_value{
     }
     return $value
 }
+
+
 
 1;
 

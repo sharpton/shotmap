@@ -32,7 +32,9 @@ use DBI; #used only for DBIx::BulkLoader::Mysql
 use DBD::mysql;
 use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
 use POSIX qw(ceil);
+#use XML::Tidy;
 use XML::DOM;
+
 
 #
 # CONNECTION
@@ -1291,7 +1293,7 @@ sub get_classification_id_flatfile{
 	$doc->dispose;
 	$class_id = $new_id;
     }
-    _tidy_xml( $param_file );
+    _tidy_xml( $self->params_file );
     return $class_id;
 }
 
@@ -1337,7 +1339,7 @@ sub set_sample_parameters{
 	$doc->printToFile( $self->params_file() );
 	$doc->dispose;
     }   
-    _tidy_xml( $param_file );
+    _tidy_xml( $self->params_file );
     return $self;
 }
 
@@ -1370,7 +1372,7 @@ sub get_sample_by_id_flatfile{
     if( !defined( $sample_alt_id ) ){
 	die "Couldn't extract the sample_alt_id for sample id ${sample_id} from parameters file!\n";
     }
-    _tidy_xml( $param_file );
+    _tidy_xml( $self->params_file );
     return $sample;
 }
 
@@ -1449,7 +1451,7 @@ sub get_abundance_parameter_id_flatfile{
 	$doc->dispose;
 	$abund_id = $new_id;
     }
-    _tidy_xml( $param_file );
+    _tidy_xml( $self->params_file );
     return $abund_id;
 }
 
@@ -1493,9 +1495,10 @@ sub get_database_size_from_seqlen_table{
 
 sub _tidy_xml{
     my( $file ) = @_;
-    my $tidy = XML::Tidy->new( 'filename' => $file );
-    $tidy->tidy();
-    $tidy->write();
+    my $tidy_bin = $ENV{"SHOTMAP_LOCAL"} . "/ext/bin/xmltidy";
+    my $tidy_lib = $ENV{"SHOTMAP_LOCAL"} . "/ext/lib/perl5/";
+    my $cmd = "perl -I${tidy_lib} $tidy_bin $file ' '"; 
+    system( $cmd );
     return $file;
 }
 

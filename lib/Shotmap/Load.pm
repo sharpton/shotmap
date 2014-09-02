@@ -54,11 +54,16 @@ sub check_vars{
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo"
 	);
+    if( ! -d $self->opts->{"ffdb"} ){
+	$self->Shotmap::Notify::warn(
+	    "I don't see a previously created ffdb at " . $self->opts->{"ffdb"} . " so I will try to create it." );
+	mkdir( $self->opts->{"ffdb"} );
+    }
     (-d $self->opts->{"ffdb"} ) 
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "--ffdb (local flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . 
-	    "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, " .
-	    "so please specify the full path in that case. You must specify a directory that already exists."
+	    "', but I can't find that directory, even after trying to create it. Please check that you have " . 
+	    "permission to write this directory."
 	);
     
     (defined($self->opts->{"refdb"})) 
@@ -135,11 +140,19 @@ sub check_vars{
      #try to detect if we need to stage the database or not on the remote server based on runtime options
      if ($self->opts->{"remote"} and 
 	 ($self->opts->{"hdb"} or $self->opts->{"bdb"} and !$self->opts->{"stage"}) ){	
-	 #This error is problematic in the case that we reclassify old search results, need to create a better check that
-	 #considers goto variable.
-	 $self->Shotmap::Notify::dieWithUsageError(
-	     "If you want to build a search database and if you are using a remote server, you MUST specify the --stage option to copy/re-stage the database on the remote machine!"
-	     );
+	 if( $self->auto() ){
+	     $self->Shotmap::Notify::warn(	     
+		 "If you want to build a search database and if you are using a remote server, " .
+		 "you MUST specify the --stage option to copy/re-stage the database on the remote machine!" . 
+		 "I will be nice and automatically set --stage for you"
+		 );
+	     $self->opts->{"stage"} = 1;
+	 } else {
+	     $self->Shotmap::Notify::dieWithUsageError( 
+		 "If you want to build a search database and if you are using a remote server, " .
+		 "you MUST specify the --stage option to copy/re-stage the database on the remote machine!"
+		 );	
+	 }
      }     
      if( $self->opts->{"forcedb"} && 
 	 ( !$self->opts->{"hdb"} && !$self->opts->{"bdb"} ) ){
@@ -304,8 +317,8 @@ sub get_options{
 	$build_search_db,      $force_db_build,       $force_search,        $small_transfer,
 	$normalization_type,   $abundance_type,
 	#vars being tested
-	$nprocs,
-	#non conf-file vars
+	$nprocs, $auto, $python, $perl,
+	#non conf-file vars	
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
 	$dryRun,
@@ -383,8 +396,11 @@ sub get_options{
 	, "conf-file"         => \$conf_file
 	, "pid"               => \$input_pid          
 	, "goto"              => \$goto     
+	, "auto"              => \$auto
+	, "python"            => \$python
+	, "perl"              => \$perl
 	#forcing statements
-	,    "stage"       => \$stage # should we "stage" the database onto the remote machine?
+	,    "stage"          => \$stage # should we "stage" the database onto the remote machine?
 	,    "build-searchdb" => \$build_search_db
 	,    "hdb"            => \$hmmdb_build #obsolete
 	,    "bdb"            => \$blastdb_build #obsolete
@@ -465,6 +481,9 @@ sub get_options{
 			  , "conf-file|c=s" 
 			  , "pid=i"
 			  , "goto|g=s"			  
+			  , "auto"
+			  , "python=s"
+			  , "perl=s"
 			  #forcing statements
 			  , "stage!"
 			  , "build-searchdb!"
@@ -481,14 +500,16 @@ sub get_options{
 
     GetOptionsFromArray( \@args, \%options, @opt_type_array );
     if( defined( $conf_file ) ){
-	if( ! -e $conf_file ){ $self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); }
+	if( ! -e $conf_file ){ 
+	    $self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); 
+	}
 	my $opt_str = get_conf_file_options( $conf_file, \%options );
 	GetOptionsFromString( $opt_str, \%options, @opt_type_array );
 
     }
     #getopts keeps the values referenced, so we have to dereference them if we want to directly call. Note: if we ever add hash/array vals, we'll have to reconsider this function
     %options = %{ dereference_options( \%options ) };
-    %options = %{ load_defaults( \%options ) };
+    %options = %{ $self->Shotmap::Load::load_defaults( \%options ) };
     $self->opts( \%options );    
 }
 
@@ -509,6 +530,9 @@ sub get_password_from_file{
 
 sub set_params{
     my ( $self ) = @_;
+    
+    #set automator
+    $self->auto( $self->opts->{"auto"} );
 
     # Some run time parameters
     $self->verbose( $self->opts->{"verbose"} );
@@ -593,11 +617,20 @@ sub set_params{
 	}
 	$self->search_db_name( $self->search_type, $db_name );
 	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
-	$self->Shotmap::Notify::dieWithUsageError(
-	    "You are apparently trying to conduct a pairwise sequence search, " .
-	    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
-	    "<${db_name}>. As a result, you must use the --build-searchdb option to build a new blast database"
-	    );
+	    if( $self->auto() ){
+		$self->Shotmap::Notify::warn(
+		    "You are apparently trying to conduct a pairwise sequence search, " .
+		    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
+		    "<${db_name}>. I will build one for you."
+		    );
+		$self->build_search_db( $self->search_type, 1 );
+	    } else {
+		$self->Shotmap::Notify::dieWithUsageError(
+		    "You are apparently trying to conduct a pairwise sequence search, " .
+		    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
+		    "<${db_name}>. As a result, you must use the --build-searchdb option to build a new blast database"
+		    );	    
+	    }
 	}
     }
     if( $self->search_type eq "hmm" ){
@@ -607,10 +640,21 @@ sub set_params{
 	    $db_name = $db_prefix_basename;
 	    $self->search_db_name( $self->search_type, $db_name );
 	    if ( !$self->build_search_db( $self->search_type ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
-		$self->Shotmap::Notify::dieWithUsageError(
-		    "You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
-		    "and I can't find one that already exists with your requested name. As a result, you must use the --build-searchdb option to build a new blast database"
-		    );
+		if( $self->auto() ){
+		    $self->Shotmap::Notify::warn(
+			"You are apparently trying to conduct a HMMER related search, " .
+			"but aren't telling me to build a database and I can't find one " .
+			"that already exists with your requested name " . 
+			"<${db_name}>. I will build one for you."
+			);
+		    $self->build_search_db( $self->search_type, 1 );
+		} else {
+		    $self->Shotmap::Notify::dieWithUsageError(
+			"You are apparently trying to conduct a HMMER related search, but aren't telling me to build an HMM database " . 
+			"and I can't find one that already exists with your requested name. As a result, you must use the " . 
+			"--build-searchdb option to build a new blast database"
+			);
+		}
 	    }
 	}
     }
@@ -696,11 +740,25 @@ sub set_params{
 	$self->postrarefy_samples( $self->opts->{"postrare-samps"} );
 	$self->rarefaction_type( $self->opts->{"rarefaction-type"} );
     };
+
+    ## some system level settings
+    # PYTHON
+    if( defined( $self->opts->{"python"} ) ){
+	$self->python( $self->opts->{"python"} );
+    } else {
+	$self->python( "python" );
+    }
+    # PERL
+    if( defined( $self->opts->{"perl"} ) ){
+	$self->perl( $self->opts->{"perl"} );
+    } else {
+	$self->perl( "perl" );
+    }
     return $self;
 }
 
 sub load_defaults{
-    my ( $options ) = shift; #options is a hashref
+    my ( $self, $options ) = @_; #options is a hashref    
     my $defaults = {
 	    # db settings
   	    "db" => "none"
@@ -723,6 +781,7 @@ sub load_defaults{
 	    # general options
 	    ,      "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
+	    ,    "auto"             => 1
 	    # translation options
 	    ,      "trans-method"   => 'prodigal'
 	    ,      "orf-len-filter" => 14
@@ -745,17 +804,16 @@ sub load_defaults{
     #ever need platform specific settings
     my $config_count; 
 
-
     if( defined( $options->{"hiseq-101"} ) ){
 	$defaults->{"class-score"} = 31;
 	$config_count++;
     }
     if( defined( $options->{"miseq-300"} ) ){
-	defaults->{"class-score"} = 42;
+	$defaults->{"class-score"} = 42;
 	$config_count++;
     }
     if( defined( $options->{"454"} ) ) {
-	defaults->{"class-score"} = 42;
+	$defaults->{"class-score"} = 42;
 	$config_count++;
     }
     if( $config_count > 1 ){
@@ -795,7 +853,7 @@ sub stage_check{
     if( $results == 0 ){ 
 	$self->Shotmap::Notify::dieWithUsageError( 
 	    "You are trying to search against a remote database that hasn't been staged. " . 
-	    "Run with --stage to place the db ${db_name} on the remote server " . $self->remote_host . "\n"
+	    "Run with --stage to place the db " . $self->search_db_name . " on the remote server " . $self->remote_host . "\n"
 	    );
     }
     return;
