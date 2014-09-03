@@ -92,6 +92,16 @@ if( verbose ){
 abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
 abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
+ra.map     <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="RELATIVE_ABUNDANCE", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
+
+# write the sample-by-data matrices
+samp.abund.file = paste( samp.abund.map, ".abund.map" )
+write.table( abund.map, file = samp.abund.file )
+samp.count.file = paste( samp.abund.map, ".counts.map" )
+write.table( count.map, file = samp.count.file )
+samp.ra.file    = paste( samp.abund.map, ".ra.map" )
+write.table( ra.map, file = samp.ra.file )
+
 class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) ) )
 class.df   <- class.df[ order( class.df[,1] ), ]
 class.map  <- class.df$V2

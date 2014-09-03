@@ -1510,7 +1510,11 @@ sub build_search_db{
 			$seq = '';
 			$seq_len = 0;
 		    }
-		    $id = ">" . $temporary . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
+		    if( $nr_db ){ #we cat famid to id in _build_nr_seq_db
+			$id = ">" . $temporary . "\n";
+		    } else {
+			$id = ">" . $temporary . "_" . $family . "\n"; #note that this may break families that have more than seqid on the header line
+		    }
 		} else{
 		    chomp $_; # remove the newline
 		    $length += length($_);
@@ -3344,6 +3348,7 @@ sub check_sample_rarefaction_depth{
 
 sub calculate_diversity{
     my( $self, $class_id, $abund_param_id ) = @_; #abundance type is "abundance" or "relative_abundance"
+    my $r_lib = $ENV{"SHOTMAP_LOCAL"} . "/ext/R/";
     #set output directory
     my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output/", "cid_${class_id}_aid_${abund_param_id}" );
     File::Path::make_path($outdir);
@@ -3370,9 +3375,11 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} < ${script}";
+    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} 0 $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
+
+    die;
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
 

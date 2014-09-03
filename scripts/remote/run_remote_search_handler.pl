@@ -53,7 +53,7 @@ if( $force_search ){
 	    next; #this is safer than unlink; what if user has strange file extention? let's just pass. can delete by hand if abs. necessary
 	    #unlink( $query_seq_file );
 	}
-	#modify result_dir here such that the output is placed into each split's subdir w/in $result_dir
+	#modify result_dir here such that the output is placed into each split's subdir w/in $result_dir-
 	my $split_sub_result_dir = File::Spec->catdir($result_dir, $query_seq_file);
 	if( -d $split_sub_result_dir && !$force_search ){
 	    warn( "I found results in $split_sub_result_dir. I will not overwrite them without the --forcesearch option!\n");
@@ -79,7 +79,7 @@ if( $force_search ){
 	print "         ARRAY STRING: $array_string\n";
 	print " SPLIT SUB RESULT DIR: $split_sub_result_dir\n";
 	print "-"x60 . "\n";
-	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $parse_score, $accelerate, $array_string);
+	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $array_string);
 	
 	if ($results =~ m/^Your job-array (\d+)\./) { #an array job
 	    my $job_id = $1;
@@ -183,7 +183,7 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 		if( $count == $loop_number + 1 ){
 		    print "Despite $loop_number tries, I can't generate results for ${split_sub_result_dir}/${query_seq_file}-${db_name}_${i}.tab\n";
 		}
-		print "Looks like we need to retry ${query_seq_file} against database split ${i}...\n";
+		print "Looks like we need to retry ${query_seq_file} against database split ${i}, adding it to the split_array...\n";
 		$split_array .= "${i},";
 		$task_count++;
 		$empty_batches = 0;
@@ -205,7 +205,6 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 		}
 		else{
 		    print "can't find the compressed archive on shattuck, so I won't delete! Was looking for this:\n";
-		    print "/pollard/shattuck0/sharpton/MRC_ffdb/projects/3/21/search_results/rapsearch/${tmp}.tar.gz\n";
 		}
 	    }
 	    next;
@@ -225,7 +224,7 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 	print "          SPLIT ARRAY: $split_array\n";
 	print " SPLIT SUB RESULT DIR: $split_sub_result_dir\n";
 	print "-"x60 . "\n";
-	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $parse_score, $accelerate, $sub_array_string, $split_array);
+	my $results = run_remote_search($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $split_sub_result_dir, $sub_array_string, $split_array);
 	
 	if ($results =~ m/^Your job-array (\d+)\./) { #an array job
 	    my $job_id = $1;
@@ -259,9 +258,9 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 ###############
 
 sub run_remote_search {
-    my($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $result_dir, $parse_score, $accelerate, $array_string, $split_array) = @_;
+    my($scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $db_name, $result_dir, $array_string, $split_array) = @_;
     
-    warn "Processing <$query_seq_file>. Running with array jobs...";
+    print "Processing <$query_seq_file>";
 
     (defined($scriptpath) && (length($scriptpath) > 0)) or die "Script path ($scriptpath) was undefined or zero-len!";
     (defined($query_seq_dir) && (length($query_seq_dir) > 0)) or die "Query seq dir ($query_seq_dir) was undefined or zero-len!";
@@ -277,13 +276,17 @@ sub run_remote_search {
     }
 
     my $array_opt = "-t ${array_string}";
-    my @args;
-    if( $scriptpath =~ m/rapsearch/ ){ #has custom vars in submission script
-	@args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $parse_score, $accelerate, $split_array );
-    } else {
-	@args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $split_array );
+    my @args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $split_array );
+
+    if( 0 ){
+	if( $scriptpath =~ m/rapsearch/ ){ #has custom vars in submission script
+	    @args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $parse_score, $accelerate, $split_array );
+	} else {
+	    @args = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $db_dir, $result_dir, $out_stem, $split_array );
+	}
     }
-    warn("We will attempt to execute the following job:\n qsub @args");
+
+    print("We will attempt to execute the following job:\n qsub @args");
 
     (-d $query_seq_dir) or die "Query seq dir $query_seq_dir did not already exist on the REMOTE CLUSTER machine! It must be a DIRECTORY that already exists.";
     (-e "${query_seq_dir}/${query_seq_file}") or die "Query seq file in ${query_seq_dir}/${query_seq_file} did not already exist on the REMOTE CLUSTER machine!";

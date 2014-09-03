@@ -89,11 +89,14 @@ sub translate_reads{
 		$self->Shotmap::Notify::notify("Translating reads for sample ID $sampleID\n");
 		$self->Shotmap::Notify::print_verbose( "$raw_reads_dir -> $orfs_output_dir\n");
 		$self->Shotmap::Run::translate_reads($raw_reads_dir, $orfs_output_dir, $waittime); #make this function work...
-		if( $should_split_orfs ){
-		    my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
-		    $self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID");
-		    $self->Shotmap::Notify::print_verbose( "$orfs_output_dir -> $split_out");
-		    $self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out);
+		#no longer need the function below (or --split-orfs), as metatrans handles this set of functions internally
+		if( 0 ){
+		    if( $should_split_orfs ){
+			my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
+			$self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID");
+			$self->Shotmap::Notify::print_verbose( "$orfs_output_dir -> $split_out");
+			$self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out);
+		    }
 		}
 	    }
 	}

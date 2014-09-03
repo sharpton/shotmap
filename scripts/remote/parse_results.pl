@@ -218,23 +218,14 @@ close OUT;
     
 sub parse_orf_id{
     my $orfid  = shift;
-    my $method = shift;
+    my $method = shift; #we used to use this to customize how to parse id; metatrans standardizes
     my $read_id = ();
-    if( $method eq "transeq" ){
-	if( $orfid =~ m/^(.*?)\_\d$/ ){
-	    $read_id = $1;
-	}
-	else{
-	    die "Can't parse read_id from $orfid\n";
-	}
+    #assumes that orfs will all have this format.
+    if( $orfid =~ m/^(.*?)\_\d_\d+$/ ){
+	$read_id = $1;
     }
-    if( $method eq "transeq_split" ){
-	if( $orfid =~ m/^(.*?)\_\d_\d+$/ ){
-	    $read_id = $1;
-	}
-	else{
-	    die "Can't parse read_id from $orfid\n";
-	}
+    else{
+	die "Can't parse read_id from $orfid\n";
     }
     return $read_id;
 }
