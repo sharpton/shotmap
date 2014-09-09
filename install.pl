@@ -3,25 +3,43 @@
 use strict;
 use File::Path;
 use File::Basename;
+use Cwd;
+use Getopt::Long;
 
-my $testing = 1;
+my $testing = 0;
 
-my $perlmods  = 0; #should we install perl modules
+my $perlmods  = 1; #should we install perl modules
 my $rpackages = 1; #should we install R modules
-my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 0; #wipe old installations of algs?
-my $get       = 0; #download alg source code?
-my $build     = 0; #build alg source code?
-my $test      = 0; #should we run make checks during build?
+my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
+my $clean     = 1; #wipe old installations of algs?
+my $get       = 1; #download alg source code?
+my $build     = 1; #build alg source code?
+my $test      = 1; #should we run make checks during build?
+
+#see if env var is defined. If not, try to add it.
+if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
+    my $dir = getcwd;
+    system( echo 'export SHOTMAP_LOCAL=${dir} >> ~/.bash_profile' );
+    #we still need to load into current shell
+    $ENV{'SHOTMAP_LOCAL'} = $dir;
+    my $shotmap = $ENV{'SHOTMAP_LOCAL'} . "/scripts/shotmap.pl";
+    unless( -e $shotmap ){
+        die( "You haven't set the bash environmental variable $SHOTMAP_LOCAL. " .
+	     "I tried to set it for you, but failed (using your current directory " .
+	     "I found ${dir}, which doesn't seem correct). Please either execute this " .
+	     "installation script from the root shotmap repository directory, or add " .
+	     "the variable to your ~/.bash_profile yourself. You should probably add " .
+	     "something like the following:\n\n" .
+	     "export SHOTMAP_LOCAL=<path_to_shotmap_repository>\n" );
+    }
+}
 
 our $ROOT = $ENV{'SHOTMAP_LOCAL'}; #top level of shotmap directory
-
 
 if( $testing ){
     $ROOT = "/home/micro/sharptot/projects/shotmap-dev/shotmap/";
 }
 my $root = $ROOT;
-
 
 my $inc = "${root}/inc/"; #location of included source code (cpanm)
 my $pkg = "${root}/pkg/"; #location that we'll place algorithms
