@@ -19,7 +19,7 @@ my $test      = 1; #should we run make checks during build?
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
     my $dir = getcwd;
-    system( echo 'export SHOTMAP_LOCAL=${dir} >> ~/.bash_profile' );
+    system( "echo 'export SHOTMAP_LOCAL=${dir} >> ~/.bash_profile'" );
     #we still need to load into current shell
     $ENV{'SHOTMAP_LOCAL'} = $dir;
     my $shotmap = $ENV{'SHOTMAP_LOCAL'} . "/scripts/shotmap.pl";
@@ -28,7 +28,8 @@ if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
 	     "I tried to set it for you, but failed (using your current directory " .
 	     "I found ${dir}, which doesn't seem correct). Please either execute this " .
 	     "installation script from the root shotmap repository directory, or add " .
-	     "the variable to your ~/.bash_profile yourself. You should probably add " .
+	     "the variable to your ~/.bash_profile (or ~/.profile or ~/.bashrc, depending " .
+	     "on what exists in your home directory) yourself. You should probably add " .
 	     "something like the following:\n\n" .
 	     "export SHOTMAP_LOCAL=<path_to_shotmap_repository>\n" );
     }
