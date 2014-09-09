@@ -24,7 +24,7 @@ if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
     $ENV{'SHOTMAP_LOCAL'} = $dir;
     my $shotmap = $ENV{'SHOTMAP_LOCAL'} . "/scripts/shotmap.pl";
     unless( -e $shotmap ){
-        die( "You haven't set the bash environmental variable $SHOTMAP_LOCAL. " .
+        die( "You haven't set the bash environmental variable \$SHOTMAP_LOCAL. " .
 	     "I tried to set it for you, but failed (using your current directory " .
 	     "I found ${dir}, which doesn't seem correct). Please either execute this " .
 	     "installation script from the root shotmap repository directory, or add " .
