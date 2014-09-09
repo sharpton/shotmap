@@ -707,6 +707,7 @@ sub set_params{
     $self->db_type( $self->opts->{"db"} );
     if( $self->db_type ne "none" ){
 	$self->use_db( 1 );
+	$self->Shotmap::DB::load_db_libs();
 	$self->db_name( $self->opts->{"dbname"} );
 	$self->db_host( $self->opts->{"dbhost"} );
 	$self->db_user( $self->opts->{"dbuser"} );

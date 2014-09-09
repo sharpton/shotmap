@@ -28,17 +28,32 @@ use File::Basename;
 use File::Copy;
 use File::Path qw(make_path rmtree);
 #use DBIx::Class::ResultClass::HashRefInflator;
-use DBI; #used only for DBIx::BulkLoader::Mysql
-use DBD::mysql;
-use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
 use POSIX qw(ceil);
 #use XML::Tidy;
 use XML::DOM;
+
+#called below if and only if use_db()
+#use DBI; #used only for DBIx::BulkLoader::Mysql
+#use DBD::mysql;
+#use DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
 
 
 #
 # CONNECTION
 #
+
+sub load_db_libs{
+    my( $self ) = @_;
+    $self->Shotmap::Notify::notify( "You are requesting that I use a mysql db, " .
+				    "so I'm going to attempt to load the relevant " .
+				    "modules...\n"
+	);
+    require DBI; #used only for DBIx::BulkLoader::Mysql
+    require DBD::mysql;
+    require DBIx::BulkLoader::Mysql; #Used only for multi-row inserts
+    return $self;
+}
+    
 
 #some DBI for speed
 sub build_dbh{

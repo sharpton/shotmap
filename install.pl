@@ -15,6 +15,11 @@ my $clean     = 1; #wipe old installations of algs?
 my $get       = 1; #download alg source code?
 my $build     = 1; #build alg source code?
 my $test      = 1; #should we run make checks during build?
+my $db        = 0;
+
+GetOptions(
+    "use-db!" => \$db, #try to build the libraries needed for mysql communication
+    );
 
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
@@ -58,8 +63,6 @@ system( "mkdir -p $pkg" );
 # Install Perl Module Dependencies using cpanm
 if( $perlmods ){
  my @mods = (
-     "DBIx::Class",
-     "DBIx::BulkLoader::Mysql",
      "IPC::System::Simple",
      "IO::Uncompress::Gunzip",
      "IO::Compress::Gzip",
@@ -71,9 +74,6 @@ if( $perlmods ){
      "XML::Tidy",
      "Math::Random",
      "Parallel::ForkManager",
-     "DBI",
-     "DBD::mysql", #if mysql server is on foreign machine, install by hand
-                   #see http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod 
      "File::Basename",
      "File::Copy",
      "File::Path",
@@ -81,6 +81,25 @@ if( $perlmods ){
      "Getopt::Long",
      "Capture::Tiny",
      );
+ if( $db ){
+     print( "\n\nYou are asking me to build the mysql database communication " .
+	    "modules. I'll do my best to install them, but note that some " .
+	    ", especially DBD::mysql, can be finky and require installation by " .
+	    "hand given system-specific settings. If this fails, see this link:\n" .
+	    "http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod\n\n\n" 
+	 );
+     my @db_mods = (
+	 "DBIx::Class",
+	 "DBIx::BulkLoader::Mysql",
+	 "DBI",
+	 "DBD::mysql", #if mysql server is on foreign machine, install by hand
+	 #see http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod 
+	 );
+     foreach my $db_mod( @db_mods ){
+	 push( @mods, $db_mod );
+     }    
+ }
+ 
  foreach my $mod( @mods ){
      my $cmd = "perl ${bin}/cpanm -L ${ext} ${mod}";
      system( $cmd );
