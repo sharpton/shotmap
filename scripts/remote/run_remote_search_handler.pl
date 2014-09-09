@@ -12,7 +12,7 @@ warn "This command was run:\n perl run_remote_search_handler.pl @ARGV";
 my($result_dir, $db_dir, $query_seq_dir, $db_name, $scriptpath, $nsplits );
 my $waitTimeInSeconds = 5; # default value is 5 seconds between job checks
 
-my $loop_number  = 10; #how many times should we check that the data was run to completion? we restart failed jobs here
+my $loop_number  = 1; #how many times should we check that the data was run to completion? we restart failed jobs here
 my $force_search = 0;
 my $compress     = 0; #compress output? Not for general use!
 my $bigsim       = 0; #Bigsim analysis. Not for general use!

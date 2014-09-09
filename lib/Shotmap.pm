@@ -196,7 +196,6 @@ sub set_samples{
     return $self->{"samples"};
 }
 
-
 =head2 get_sample_hashref
 
  Title   : get_sample_hashref
@@ -738,10 +737,9 @@ sub read_split_size{
 }
 
 sub remote_script_path{
-    my( $self, $type, $value ) = @_;
-    if( defined( $value ) ){
-	$self->{"rscriptpath"}->{$type} = $value;
-    }
+    my( $self, $type ) = @_;
+    my $value = $self->remote_scripts_dir . "/run_" . $type . ".sh";
+    $self->{"rscriptpath"}->{$type} = $value;
     return $self->{"rscriptpath"}->{$type};
 }
 
@@ -776,7 +774,6 @@ sub remote_search_db{
     }
 
 }
-
 
 sub verbose{
     my( $self, $value ) = @_; #value is binary 1/0
@@ -948,6 +945,42 @@ sub perl{
     $self->set_value( $key, $value );
     return $self->{ $key };
 }
+
+sub scratch_path{
+    my( $self, $value ) = @_;
+    my $key = "scratch_path";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub use_array{
+    my( $self, $value ) = @_;
+    my $key = "use_array";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub search_db_fmt_method{
+    my( $self, $value ) = @_;
+    my $key = "search_db_fmt_method";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub cluster_config_file{
+    my( $self, $value ) = @_;
+    my $key = "cluster_config_file";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub lightweight{
+    my( $self, $value ) = @_;
+    my $key = "lightweight";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
 
 sub set_value{
     my( $self, $key, $value ) = @_;

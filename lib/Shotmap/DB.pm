@@ -826,6 +826,7 @@ sub build_sample_ffdb{
     my $ffdb    = $self->ffdb();
     my $pid     = $self->project_id();
     my $projDir = $self->project_dir;
+    my $scripts = "$projDir/scripts";
     my $outDir  = "$projDir/output";
     my $logDir  = "$projDir/logs";
     my $searchlogs = "$logDir/" . $self->search_method;    
@@ -839,9 +840,9 @@ sub build_sample_ffdb{
     if( $self->search_method eq "last" ){
 	$formatdblogs = "$logDir/lastdb";
     }   
-    my $transeqlogs      = "$logDir/transeq";
+    my $orfslogs      = "$logDir/" . $self->trans_method;
     my $parselogs        = "$logDir/parse_results";
-    my @paths = ( $outDir, $logDir, $searchlogs, $transeqlogs, $parselogs );
+    my @paths = ( $outDir, $logDir, $searchlogs, $orfslogs, $parselogs, $scripts );
     if( defined( $formatdblogs ) ){
 	push( @paths, $formatdblogs );
     }

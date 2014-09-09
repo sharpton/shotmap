@@ -57,29 +57,33 @@ sub load_project{
 	} else { #prepare cluster submission scripts
 	    $self->Shotmap::Notify::dryNotify("Skipping the REMOTE loading of the project.");
 	}
-	#hmmscan
-	if( $self->search_method eq "hmmscan" ){
-	    $self->remote_script_path( "hmmscan",      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
+	#obsolete as we simply updated remote_script_path to auto generate these paths
+	if( 0 ){
+	    #hmmscan
+	    if( $self->search_method eq "hmmscan" ){
+		$self->remote_script_path( "hmmscan",      File::Spec->catfile($self->remote_project_path(), "run_hmmscan.sh"));
+	    }
+	    #hmmsearch
+	    if( $self->search_method eq "hmmsearch" ){
+		$self->remote_script_path( "hmmsearch",    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
+	    }
+	    #blast
+	    if( $self->search_method eq "blast" ){
+		$self->remote_script_path( "blast",        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
+		$self->remote_script_path( "formatdb",     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
+	    }
+	    #last
+	    if( $self->search_method eq "last" ){
+		$self->remote_script_path( "last",         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
+		$self->remote_script_path( "lastdb",       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
+	    }
+	    #rapsearch
+	    if( $self->search_method eq "rapsearch" ){
+		$self->remote_script_path( "rapsearch",    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
+		$self->remote_script_path( "prerapsearch", File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
+	    }      
 	}
-	#hmmsearch
-	if( $self->search_method eq "hmmsearch" ){
-	    $self->remote_script_path( "hmmsearch",    File::Spec->catfile($self->remote_project_path(), "run_hmmsearch.sh"));
-	}
-	#blast
-	if( $self->search_method eq "blast" ){
-	    $self->remote_script_path( "blast",        File::Spec->catfile($self->remote_project_path(), "run_blast.sh"));
-	    $self->remote_script_path( "formatdb",     File::Spec->catfile($self->remote_project_path(), "run_formatdb.sh"));
-	}
-	#last
-	if( $self->search_method eq "last" ){
-	    $self->remote_script_path( "last",         File::Spec->catfile($self->remote_project_path(), "run_last.sh"));
-	    $self->remote_script_path( "lastdb",       File::Spec->catfile($self->remote_project_path(), "run_lastdb.sh"));
-	}
-	#rapsearch
-	if( $self->search_method eq "rapsearch" ){
-	    $self->remote_script_path( "rapsearch",    File::Spec->catfile($self->remote_project_path(), "run_rapsearch.sh"));
-	    $self->remote_script_path( "prerapsearch", File::Spec->catfile($self->remote_project_path(), "run_prerapsearch.sh"));
-	}      
+	$self->remote_scripts_dir( $self->remote_project_path . "/scripts" ); 
 	$self->remote_project_log_dir( File::Spec->catdir( $self->remote_project_path(), "logs") );
     }
 }

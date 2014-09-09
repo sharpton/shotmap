@@ -68,6 +68,7 @@ sub build_search_db{
     return $self;
 }
 
+#obsolete. we now embed the function Shotmap::Run::build_remote_script into Shotmap::Search::run_search
 sub build_search_script{
     my( $self ) = @_;
 
@@ -136,8 +137,11 @@ sub run_search{
     if ($is_remote){
 	$self->Shotmap::Notify::printBanner("RUNNING REMOTE SEARCH");
 	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
+	#build the search submission script
+	my $script = $self->Shotmap::Run::build_remote_script( "search" );	
+	$self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path($search_method) );
 	foreach my $sample_id(@{ $self->get_sample_ids() }) {
-	    $self->Shotmap::Run::run_search_remote($sample_id, $search_method,   $db_splits,   $waittime, $verbose, $force_search);
+	    $self->Shotmap::Run::run_search_remote($sample_id, $search_method, $db_splits, $waittime, $verbose, $force_search);
 	    $self->Shotmap::Notify::print( "Progress report: $search_method for sample ${sample_id} completed on " . `date` );
 	}  
     } else {
@@ -163,7 +167,8 @@ sub stage_search_db{
 
     if ($self->remote && $self->stage){
 	$self->Shotmap::Notify::printBanner("STAGING REMOTE SEARCH DATABASE");
-	if (defined($self->search_db_name("hmm")) && ( $search_method eq "hmmsearch" || $search_method eq "hmmscan" )){
+	if (defined($self->search_db_name("hmm")) && 
+	    ( $search_method eq "hmmsearch" || $search_method eq "hmmscan" )){
 	    $self->Shotmap::Run::remote_transfer_search_db( $self->search_db_name("hmm"), "hmm");
 	    if (!$self->scratch){
 		print "Not using remote scratch space, apparently...\n";
@@ -171,9 +176,11 @@ sub stage_search_db{
 	    } else {
 		print "Using remote scratch space, apparently...\n";
 	    }
-	    $self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("hmm"), "hmm");
+	    #do we still want to do this?
+	    #$self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("hmm"), "hmm");
 	}	
-	if (defined($self->search_db_name("blast")) && ( $search_method eq "blast" || $search_method eq "last" || $search_method eq "rapsearch" )){
+	if (defined($self->search_db_name("blast")) && 
+	    ( $search_method eq "blast" || $search_method eq "last" || $search_method eq "rapsearch" )){
 	    my $blastdb_name = $self->search_db_name( "blast" );
 	    my $use_scratch  = $self->scratch;
 	    $self->Shotmap::Run::remote_transfer_search_db($self->search_db_name("blast"), "blast");
@@ -183,34 +190,14 @@ sub stage_search_db{
 	    } else {
 		$self->Shotmap::Notify::print_verbose( "Using remote scratch space, apparently...\n" );
 	    }
-	    $self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("blast"), "blast");
+	    #do we still want to do this?
+	    #$self->Shotmap::Run::gunzip_remote_dbs($self->search_db_name("blast"), "blast");
 	    my $project_path = $self->remote_project_path();
 	    my $nsplits      = $self->Shotmap::DB::get_number_db_splits("blast");
-	    if ($search_method eq "blast" ){
-		print "Building remote formatdb script...\n";
-		my $formatdb_script_path = "$local_ffdb/projects/$dbname/$projID/run_formatdb.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_formatdb_script.pl -o $formatdb_script_path " .
-							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
-		$self->Shotmap::Run::transfer_file($formatdb_script_path, ($self->remote_connection() . ":" . $self->remote_script_path("formatdb") ));
-		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("formatdb") );
-	    }
-	    if ($search_method eq "last" ){
-		print "Building remote lastdb script...\n";
-		my $lastdb_script = "$local_ffdb/projects/$dbname/$projID/run_lastdb.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_lastdb_script.pl -o $lastdb_script " . 
-							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch");
-		$self->Shotmap::Run::transfer_file($lastdb_script, ($self->remote_connection() . ":" . $self->remote_script_path("lastdb") ));
-		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("lastdb") ); #this will work for last
-	    }
-	    if ($search_method eq "rapsearch" ){
-		print "Building remote prerapsearch script...\n";
-		my $db_suffix = $self->search_db_name_suffix();
-		my $prerapsearch_script = "$local_ffdb/projects/$dbname/$projID/run_prerapsearch.sh";
-		Shotmap::Notify::exec_and_die_on_nonzero("perl $localScriptDir/building_scripts/build_remote_prerapsearch_script.pl -o $prerapsearch_script " . 
-							 "-n $nsplits --name $blastdb_name -p $project_path -s $use_scratch --suf $db_suffix");
-		$self->Shotmap::Run::transfer_file($prerapsearch_script, ($self->remote_connection() . ":" . $self->remote_script_path("prerapsearch") ));
-		$self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path("prerapsearch") ); #this will work for rapsearch
-	    }
+
+	    my $script = $self->Shotmap::Run::build_remote_script( "dbformat" );
+	    $self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path($self->search_db_fmt_method) );
+	    $self->Shotmap::Run::format_remote_blast_dbs( $self->remote_script_path($self->search_db_fmt_method) );
 	}
     }        
     return $self;

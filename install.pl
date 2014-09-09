@@ -7,7 +7,7 @@ use File::Basename;
 my $testing = 1;
 
 my $perlmods  = 0; #should we install perl modules
-my $rpackages = 0; #should we install R modules
+my $rpackages = 1; #should we install R modules
 my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
 my $clean     = 0; #wipe old installations of algs?
 my $get       = 0; #download alg source code?

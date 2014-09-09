@@ -17,9 +17,10 @@ my( $scriptpath, $query_seq_dir,     $result_dir,
 
 my $waitTimeInSeconds = 5; # default value is 5 seconds between job checks
 
-my $loop_number       = 10; #how many times should we check that the data was run to completion? we restart failed jobs here
+my $loop_number       = 1; #how many times should we check that the data was run to completion? we restart failed jobs here
 my $force_parse       = 0;
 my $delete_raw_switch = 0; #should we delete the raw search results? Decreases file transfer time. Most relevant data stored in .msyqld files
+my $compress          = 1;
 
 GetOptions("resultdir|i=s"  => \$result_dir,
 	   "querydir|q=s"   => \$query_seq_dir,	  
@@ -74,6 +75,9 @@ if( $force_parse ){
 	#need to set naming conventions for qsub script. These are same conventions used in run_remote_search_handler.pl
 	my $result_file_prefix = get_prefix( $query_seq_file, $db_name );
 	my $result_file_suffix = get_suffix( $algo );
+	if( $compress ){
+	    $result_file_suffix .= ".gz";
+	}
 	
 	#modify result_dir here such that the output is placed into each split's subdir w/in $result_dir
 	my $split_sub_result_dir = File::Spec->catdir($result_dir, $query_seq_file);
@@ -107,7 +111,7 @@ if( $force_parse ){
 	print "-"x60 . "\n";
 	my $results = run_remote_parse($scriptpath, $query_seq_dir, $query_seq_file, 
 				       $split_sub_result_dir, $result_file_prefix, $result_file_suffix,
-				       $sample_id, $algo, $trans_method,
+				       $sample_id, $algo, 
 				       $t_evalue,  $t_coverage, $t_score, $proj_dir, $scripts_dir, $delete_raw_switch,
 				       $array_string);
 	if ($results =~ m/^Your job-array (\d+)\./) { #an array job
@@ -148,7 +152,9 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
         #need to set naming conventions for qsub script. These are same conventions used in run_remote_search_handler.pl
 	my $result_file_prefix = get_prefix( $query_seq_file, $db_name );
 	my $result_file_suffix = get_suffix( $algo );
-
+	if( $compress ){
+	    $result_file_suffix .= ".gz";
+	}
 	my $split_sub_result_dir = File::Spec->catdir($result_dir, $query_seq_file);
 	print "$split_sub_result_dir\n";
 	if( ! -d $split_sub_result_dir ){
@@ -208,7 +214,7 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 	print "-"x60 . "\n";
 	my $results = run_remote_parse( $scriptpath,            $query_seq_dir,       $query_seq_file, 
 					$split_sub_result_dir,  $result_file_prefix,  $result_file_suffix,
-					$sample_id,             $algo,                $trans_method,
+					$sample_id,             $algo,                
 					$t_evalue, $t_coverage, $t_score, $proj_dir,  $scripts_dir,  $delete_raw_switch,
 					$sub_array_string,      $split_array);
 	
@@ -244,7 +250,7 @@ while( $count <= $loop_number + 1 ){ #the last loop will just report any sets th
 sub run_remote_parse {
     my ($scriptpath,  $query_seq_dir,      $query_seq_file, 
 	$result_dir,  $result_file_prefix, $result_file_suffix,
-	$sample_id,   $algo,               $trans_method,
+	$sample_id,   $algo,               
 	$t_evalue,    $t_coverage,         $t_score, $proj_dir, 
 	$scripts_dir, $delete_raw_switch,  $array_string,       $split_array)            = @_;
 
@@ -259,7 +265,6 @@ sub run_remote_parse {
     check_var( $result_file_suffix, "Result file suffix" );
     check_var( $sample_id, "Sample id" );
     check_var( $algo, "Algo" );
-    check_var( $trans_method, "Trans method");
     check_var( $proj_dir, "Project directory" );
     check_var( $scripts_dir, "Scripts directory" );
     check_var( $t_evalue, "Evalue" );
@@ -274,14 +279,17 @@ sub run_remote_parse {
 	$split_array = '';
     }
 
-    # Arg names as seen in "run_last.sh", below in all-caps:
-    #                          INPATH         INPUT           DBPATH     OUTPATH     OUTSTEM
     my $array_opt = "-t ${array_string}";
-    my @args = ( $array_opt, $scriptpath,  $query_seq_dir, $query_seq_file, 
-		 $result_dir,  $result_file_prefix,        $result_file_suffix,
-		 $sample_id,   $algo,         $trans_method,
-		 $t_evalue,    $t_coverage,    $t_score,    $proj_dir, 
-		 $scripts_dir, $delete_raw_switch, $split_array);     
+#    my @args = ( $array_opt, $scriptpath,  $query_seq_dir, $query_seq_file, 
+#		 $result_dir,  $result_file_prefix,        $result_file_suffix,
+#		 $sample_id,   $algo,         
+#		 $t_evalue,    $t_coverage,    $t_score,    $proj_dir, 
+#		 $scripts_dir, $delete_raw_switch, $split_array);     
+
+    print "Suffix is $result_file_suffix\n";
+
+    my @args  = ( $array_opt, $scriptpath, $query_seq_dir, $query_seq_file, $result_dir, 
+		  $result_file_prefix, $result_file_suffix, $sample_id );
 
     warn("We will attempt to execute the following job:\n qsub @args");
 

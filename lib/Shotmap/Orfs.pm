@@ -71,12 +71,18 @@ sub translate_reads{
     my $waittime          = $self->wait();
     my $should_split_orfs = $self->split_orfs();
     my $filter_length     = $self->orf_filter_length();
+    my $proj_dir          = $self->project_dir();
+    my $trans_method      = $self->trans_method();
+
     $self->Shotmap::Notify::printBanner( "TRANSLATING READS" );
     if (!$dryRun) {
 	if ($is_remote) {
 	    # run transeq remotely, check on SGE job status, pull results back locally once job complete.
-	    my $remoteLogDir = File::Spec->catdir($self->remote_project_path(), "logs");
-	    $self->Shotmap::Run::translate_reads_remote($waittime, $remoteLogDir, $should_split_orfs, $filter_length);
+	    my $remoteLogDir  = File::Spec->catdir($self->remote_project_path(), "logs");
+	    #build the script that we'll use on the remote server
+	    my $script = $self->Shotmap::Run::build_remote_script( "orfs" );
+	    $self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path($trans_method) );
+	    $self->Shotmap::Run::translate_reads_remote($waittime, $remoteLogDir, $filter_length, $script );
 	} else {
 	    foreach my $sampleID (@{$self->get_sample_ids()}){
 		my $raw_reads_dir   = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "raw");

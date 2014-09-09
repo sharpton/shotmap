@@ -39,6 +39,12 @@ sub check_vars{
 		 "Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). " . 
 		 "COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.\n"
 	     );
+	 if( !defined($self->opts->{"cluster-config"}) || ! -e $self->opts->{"cluster-config"} ){
+	     $self->Shotmap::Notify::dieWithUsageError(
+		 "You must specify an SGE cluster configuration header file, or I won't be able to properly submit jobs to the remote cluster. You gave me: " .
+		 $self->opts->{"cluster-config"} . "\n"
+		 );
+	 }
     } else {
 	$self->Shotmap::Notify::warn( "You did not invoke --remote, so shotmap will run locally\n" );
 	(defined($self->opts->{"nprocs"})) 
@@ -117,7 +123,8 @@ sub check_vars{
 	     "You must specify a database name suffix for indexing when running rapsearch!" 
 	     ); 
      }
-     
+    
+
      #($coverage >= 0.0 && $coverage <= 1.0) or $self->Shotmap::Notify::dieWithUsageError("Coverage must be between 0.0 and 1.0 (inclusive). You specified: $coverage.");
      
      if ((defined($self->opts->{"goto"}) && 
@@ -314,10 +321,11 @@ sub get_options{
 	$rarefaction_type,     $class_level,
 	#the following options are now obsolete
 	$hmmdb_build,          $blastdb_build,         	
-	$build_search_db,      $force_db_build,       $force_search,        $small_transfer,
+	$build_search_db,      $force_db_build,       $force_search,        $small_transfer, 
 	$normalization_type,   $abundance_type,
 	#vars being tested
-	$nprocs, $auto, $python, $perl,
+	$nprocs, $auto, $python, $perl, $cluster_config_file, $use_array, $scratch_path, 
+	$lightweight, 
 	#non conf-file vars	
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
@@ -353,6 +361,9 @@ sub get_options{
 	, "rpath"      => \$remoteExePath
 	, "scratch"    => \$use_scratch
 	, "wait"       => \$waittime        #   <-- in seconds
+	, "cluster-config" => \$cluster_config_file
+	, "use-array"      => \$use_array,
+	, "scratch-path"   => \$scratch_path,
 	# Local compute related variables
 	, "nprocs"     => \$nprocs #overrides hmmsplit, blastsplit (both =1) and seq-split-size (total seqs/nprocs)
 	#db communication method (NOTE: use EITHER multi OR bulk OR neither)
@@ -399,6 +410,7 @@ sub get_options{
 	, "auto"              => \$auto
 	, "python"            => \$python
 	, "perl"              => \$perl
+	, "lightweight"       => \$lightweight #tries to keep the ffdb as small as possible
 	#forcing statements
 	,    "stage"          => \$stage # should we "stage" the database onto the remote machine?
 	,    "build-searchdb" => \$build_search_db
@@ -438,6 +450,9 @@ sub get_options{
 			  , "rpath=s"
 			  , "scratch!"
 			  , "wait|w=i"    
+			  , "cluster-config=s"
+			  , "use-array!"
+			  , "scratch-path:s"
 			  # Local compute related vars
 			  , "nprocs=i" #this overrides read_split_size!
 			  #db communication method (NOTE: use EITHER multi OR bulk OR neither)
@@ -481,9 +496,10 @@ sub get_options{
 			  , "conf-file|c=s" 
 			  , "pid=i"
 			  , "goto|g=s"			  
-			  , "auto"
+			  , "auto!"
 			  , "python=s"
 			  , "perl=s"
+			  , "lightweight!"
 			  #forcing statements
 			  , "stage!"
 			  , "build-searchdb!"
@@ -541,6 +557,7 @@ sub set_params{
     $self->raw_data( $self->opts->{"rawdata"} );
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
+    $self->lightweight( $self->opts->{"lightweight"} );
 
     # Set remote - do here because it f/x many downstream vars
     # more on remote variables below.
@@ -551,12 +568,7 @@ sub set_params{
     $self->nprocs( $self->opts->{"nprocs"} ); #this overrides read_split_size
 
     # Set orf calling parameters
-    my $trans_method = $self->opts->{"trans-method"};
-    if( $self->opts->{"split-orfs"} ){
-	$trans_method = $trans_method . "_split";
-	$self->split_orfs( $self->opts->{"split-orfs"} );
-    }
-    $self->trans_method( $trans_method );
+    $self->trans_method(      $self->opts->{"trans-method"}   );
     $self->orf_filter_length( $self->opts->{"orf-filter-len"} );
 
     # Set information about the algorithms being used
@@ -576,6 +588,14 @@ sub set_params{
     $self->search_method( $search_method );
     if( defined( $blast_methods->{$search_method} ) ){
 	$self->search_type( "blast" );
+	my $meth = $self->search_method;
+	if( $meth eq "rapsearch" ){
+	    $self->search_db_fmt_method( "prerapsearch" );	    
+	} elsif( $meth eq "last" ){
+	    $self->search_db_fmt_method( "lastdb" );	    	    
+	} elsif( $meth eq "blast" ){
+	    $self->search_db_fmt_method( "makeblastdb" );	    	    
+	}
     } elsif( defined( $hmm_methods->{$search_method} ) ){
 	$self->search_type("hmm");
     } else {
@@ -666,8 +686,10 @@ sub set_params{
 	print( $self->remote_host . "\n" );
 	$self->remote_exe_path( $self->opts->{"rpath"} );
 	$self->remote_master_dir( $self->opts->{"rdir"} );
-	$self->remote_scripts_dir( $self->remote_master_dir . "/scripts" ); 
 	$self->remote_ffdb(    $self->remote_master_dir . "/shotmap_ffdb" ); 
+	$self->scratch_path( $self->opts->{"scratch-path"} );
+	$self->use_array( $self->opts->{"use-array"} );
+	$self->cluster_config_file( $self->opts->{"cluster-config"} );
 	$self->Shotmap::Notify::warn_ssh_keys();	
 	#if we aren't staging, does the database exist on the remote server?
 	#skip for now if goto is invoked.
@@ -713,8 +735,11 @@ sub set_params{
     $self->parse_evalue( $self->opts->{"parse-evalue"} ); 
     $self->parse_coverage( $self->opts->{"parse-coverage"} ); 
     $self->parse_score( $self->opts->{"parse-score"} );
-    $self->small_transfer( $self->opts->{"small-transfer"} );
-    
+    if( $self->lightweight ){
+	$self->small_transfer( 1 );
+    } else {
+	$self->small_transfer( $self->opts->{"small-transfer"} );
+    }
     # Set classification values
     $self->clustering_strictness( $self->opts->{"is-strict"}); 
     $self->class_evalue( $self->opts->{"class-evalue"} ); 
@@ -770,7 +795,9 @@ sub load_defaults{
 	    # Remote computational cluster server related variables
 	    ,        "ruser"        => $ENV{"LOGNAME"}
 	    ,        "scratch"      => 1
-	    ,        "wait"         => 30
+	    ,        "wait"         => 5
+	    ,        "use-array"    => 1
+	    ,       "scratch-path"  => "/scratch/"
 	    #db communication method (NOTE: use EITHER multi OR bulk OR neither)
 	    ,        "dbuser"       => $ENV{"LOGNAME"}
 	    ,        "dbschema"     => "Shotmap::Schema"
@@ -782,6 +809,7 @@ sub load_defaults{
 	    ,      "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
 	    ,    "auto"             => 1
+	    ,    "lightweight"      => 1
 	    # translation options
 	    ,      "trans-method"   => 'prodigal'
 	    ,      "orf-len-filter" => 14

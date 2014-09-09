@@ -231,8 +231,10 @@ sub parse_results{
     if( $self->remote ){
 	$self->Shotmap::Notify::printBanner("PARSING REMOTE SEARCH RESULTS");
 	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
+	my $script = $self->Shotmap::Run::build_remote_script( "parse" );	
+	$self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path( "parse_results" ) );
 	foreach my $sample_id(@{ $self->get_sample_ids() }) {
-	    $self->Shotmap::Run::parse_results_remote($sample_id, $search_method,   $db_splits,   $waittime, $verbose, $force_search);
+	    $self->Shotmap::Run::parse_results_remote( $sample_id, $db_splits, $waittime, $verbose, $force_search);
 	    $self->Shotmap::Notify::print( "Progress report: finished ${sample_id} on " . `date` );
 	}  
     } else {

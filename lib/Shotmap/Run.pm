@@ -596,14 +596,16 @@ sub back_load_project(){
     $self->params_dir( $self->project_dir . "/parameters" );
     $self->params_file( $self->params_dir . "/parameters.xml" );
     if( $self->remote ){
-	$self->remote_script_path(      "hmmscan",      $self->remote_project_path() . "/run_hmmscan.sh" );
-	$self->remote_script_path(    "hmmsearch",    $self->remote_project_path() . "/run_hmmsearch.sh" );
-        $self->remote_script_path(        "blast",        $self->remote_project_path() . "/run_blast.sh" );
-        $self->remote_script_path(     "formatdb",     $self->remote_project_path() . "/run_formatdb.sh" );
-        $self->remote_script_path(       "lastdb",       $self->remote_project_path() . "/run_lastdb.sh" );
-        $self->remote_script_path(         "last",         $self->remote_project_path() . "/run_last.sh" );
-	$self->remote_script_path(    "rapsearch",    $self->remote_project_path() . "/run_rapsearch.sh");
-	$self->remote_script_path( "prerapsearch", $self->remote_project_path() . "/run_prerapsearch.sh");
+	$self->remote_scripts_dir( $self->remote_project_path . "/scripts" ); 
+#	$self->remote_script_path(      "hmmscan",      $self->remote_project_path() . "/run_hmmscan.sh" );
+#	$self->remote_script_path(    "hmmsearch",    $self->remote_project_path() . "/run_hmmsearch.sh" );
+#        $self->remote_script_path(        "blast",        $self->remote_project_path() . "/run_blast.sh" );
+#        $self->remote_script_path(     "formatdb",     $self->remote_project_path() . "/run_formatdb.sh" );
+#        $self->remote_script_path(       "lastdb",       $self->remote_project_path() . "/run_lastdb.sh" );
+#        $self->remote_script_path(         "last",         $self->remote_project_path() . "/run_last.sh" );
+#	$self->remote_script_path(    "rapsearch",    $self->remote_project_path() . "/run_rapsearch.sh");
+#	$self->remote_script_path( "prerapsearch", $self->remote_project_path() . "/run_prerapsearch.sh");
+	
 	$self->remote_project_log_dir(     $self->remote_project_path() . "/logs" );
     }
     #do some extra work for old types of jobs
@@ -683,7 +685,11 @@ sub back_load_samples{
     closedir PROJ;
     my %samples = ();
     foreach my $file( @files ){
-	next if ( $file =~ m/^\./ || $file =~ m/logs/ || $file =~ m/hmmscan/ || $file =~ m/output/ || $file =~ m/\.sh/  || $file =~ m/parameters/ );
+	next if ( $file =~ m/^\./     || $file =~ m/logs/       || 
+		  $file =~ m/hmmscan/ || $file =~ m/output/     || 
+		  $file =~ m/\.sh/    || $file =~ m/parameters/ || 
+		  $file =~ m/scripts/ 
+	    );
 	my $sample_id = $file;
 	my $sample_alt_id;
 	if( $self->use_db ){
@@ -2038,8 +2044,8 @@ sub compress_hmmdb{
 sub load_project_remote {
     my ($self) = @_;
     my $project_dir_local = File::Spec->catdir($self->ffdb(), "projects", $self->db_name(), $self->project_id());
-    my $remote_dir     = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name(),  $self->project_id());
-    my $ssh_remote_dir = $self->remote_connection() . ":" . $remote_dir;
+    my $remote_dir        = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name(),  $self->project_id());
+    my $ssh_remote_dir    = $self->remote_connection() . ":" . $remote_dir;
     warn("Pushing $project_dir_local to the remote (" . $self->remote_host() . ") server's ffdb location in <$remote_dir>\n");
     my $remote_cmd = "mkdir -p ${remote_dir}";
     $self->Shotmap::Run::execute_ssh_cmd( $self->remote_connection(), $remote_cmd );
@@ -2050,50 +2056,45 @@ sub load_project_remote {
 #the qsub -sync y option keeps the connection open. lower chance of a connection failure due to a ping flood, but if connection between
 #local and remote tends to drop, this may not be foolproof
 sub translate_reads_remote($$$$$) {
-    my ($self, $waitTimeInSeconds, $logsdir, $should_we_split_orfs, $filter_length) = @_;
-    ($should_we_split_orfs == 1 or $should_we_split_orfs == 0) or die "Split orf setting should either be 1 or 0! Other values NOT ALLOWED. Even 'undef' is not allowed. Fix this programming error. The value was: <$should_we_split_orfs>.";
+    my ($self, $waitTimeInSeconds, $logsdir, $filter_length, $local_copy_of_remote_script) = @_;
+    my $method = $self->trans_method;
+
     #push translation scripts to remote server
     my $connection = $self->remote_connection();
     my $remote_script_dir = $self->remote_scripts_dir();
 
-    my $local_copy_of_remote_handler  = File::Spec->catfile($self->local_scripts_dir(), "remote", "run_transeq_handler.pl");
-    my $local_copy_of_remote_script   = File::Spec->catfile($self->local_scripts_dir(), "remote", "run_transeq_array.sh"); 
-    my $transeqPerlRemote = File::Spec->catfile($remote_script_dir, "run_transeq_handler.pl");
+    my $local_copy_of_remote_handler  = File::Spec->catfile($self->local_scripts_dir(), "remote", "run_metatrans_handler.pl");
+    my $metatransPerlRemote = File::Spec->catfile($remote_script_dir, "run_metatrans_handler.pl");
     
     $self->Shotmap::Run::transfer_file_into_directory($local_copy_of_remote_handler, "$connection:$remote_script_dir/"); # transfer the script into the remote directory
     $self->Shotmap::Run::transfer_file_into_directory($local_copy_of_remote_script,  "$connection:$remote_script_dir/"); # transfer the script into the remote directory
 
     warn "About to translate reads...";
 
-    my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "split_orf_on_stops.pl"));
-    foreach my $transferMe (@scriptsToTransfer) {
-	$self->Shotmap::Run::transfer_file_into_directory($transferMe, $self->remote_connection() . ':' . $self->remote_scripts_dir() . '/'); # transfer the script into the remote directory
-    }
-
     my $numReadsTranslated = 0;
     foreach my $sample_id( @{$self->get_sample_ids()} ) {
 	my $remote_raw_dir    = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name, $self->project_id(), $sample_id, "raw");
 	my $remote_output_dir = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name, $self->project_id(), $sample_id, "orfs");
+
 	$self->Shotmap::Notify::notify("Translating reads on the REMOTE machine, from $remote_raw_dir to $remote_output_dir...");
-	if ($should_we_split_orfs) {
-	    # Split the ORFs!
-	    my $local_unsplit_dir  =        $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/$sample_id/unsplit_orfs"; # This is where the files will be tranferred BACK to. Should NOT end in a slash!
-	    my $remote_unsplit_dir = $self->remote_ffdb() . "/projects/" . $self->db_name . "/" .  $self->project_id() . "/$sample_id/unsplit_orfs"; # Should NOT end in a slash!
-	    my $remote_cmd = "\'" . "perl ${transeqPerlRemote} " . " -i $remote_raw_dir" . " -o $remote_output_dir" . " -w $waitTimeInSeconds" . " -l $logsdir" . " -s $remote_script_dir" . " -u $remote_unsplit_dir" . " -f $filter_length" . "\'";
-	    my $response = $self->Shotmap::Run::execute_ssh_cmd($connection, $remote_cmd);
-	    $self->Shotmap::Notify::notify("Translation result text, if any was: \"$response\"");
-	    $self->Shotmap::Notify::notify("Translation complete, Transferring split and raw translated orfs\n");
-	    $self->Shotmap::Run::transfer_directory("${connection}:$remote_unsplit_dir", $local_unsplit_dir); # REMOTE to LOCAL: the unsplit orfs
-	} else{
-	    my $remote_cmd_no_unsplit = "\'perl ${transeqPerlRemote} " . " -i $remote_raw_dir" . " -o $remote_output_dir" . " -w $waitTimeInSeconds" . " -l $logsdir" . " -s $remote_script_dir" . "\'";
-	    $self->Shotmap::Run::execute_ssh_cmd($connection, $remote_cmd_no_unsplit);
+	#execute the command...
+	my $remote_cmd = "\'perl ${metatransPerlRemote} " . " -i $remote_raw_dir" . " -o $remote_output_dir" . " -w $waitTimeInSeconds" . " -l $logsdir" . " -s $remote_script_dir" . " -f $filter_length -m $method\'";
+	if( $self->verbose ){
+	    $remote_cmd .= " -v ";
 	}
+	my $response   = $self->Shotmap::Run::execute_ssh_cmd( $connection, $remote_cmd );
+	$self->Shotmap::Notify::notify("Translation result text, if any was: \"$response\"");
 
 	$self->Shotmap::Notify::notify("Translation complete, Transferring ORFs\n");
 	
 	my $theOutput = $self->Shotmap::Run::execute_ssh_cmd($connection, "ls -l $remote_output_dir/");
-	$self->Shotmap::Notify::notify("Got the following files that were generated on the remote machine:\n$theOutput");
-	(not($theOutput =~ /total 0/i)) or die "Dang! Somehow nothing was translated on the remote machine. We expected the directory \"$remote_output_dir\" on the machine " . $self->remote_host() . " to have files in it, but it was totally empty! This means the translation of reads probably failed. You had better check the logs on the remote machine! There is probably something interesting in the \"" . File::Spec->catdir($logsdir, "transeq") . "\" directory (on the REMOTE machine!) that will tell you exactly why this command failed! Check that directory!";
+	$self->Shotmap::Notify::notify_verbose("Got the following files that were generated on the remote machine:\n$theOutput");
+	(not($theOutput =~ /total 0/i)) or die "Dang! Somehow nothing was translated on the remote machine. " . 
+	    "We expected the directory \"$remote_output_dir\" on the machine " . $self->remote_host() . 
+	    " to have files in it, but it was totally empty! This means the translation of reads probably failed. " . 
+	    "You had better check the logs on the remote machine! There is probably something interesting in the \"" . 
+	    File::Spec->catdir($logsdir, "transeq") . "\" directory (on the REMOTE machine!) that will tell you exactly " . 
+	    "why this command failed! Check that directory!";
 
 	my $localOrfDir  = File::Spec->catdir($self->get_sample_path($sample_id), "orfs");
 	$self->Shotmap::Run::transfer_directory("$connection:$remote_output_dir", $localOrfDir); # This happens in both cases, whether or not the orfs are split!
@@ -2186,8 +2187,10 @@ sub gunzip_remote_dbs{
 
 sub format_remote_blast_dbs{
     my($self, $remote_script_path) = @_;
+    my $search_type           = $self->search_type;
     my $remote_database_dir   = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $self->search_db_name("blast"));
-    my $results               = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), "qsub -sync y $remote_script_path $remote_database_dir");
+    my $n_splits              = $self->Shotmap::DB::get_number_db_splits( $search_type ); #do we still need this?
+    my $results               = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), "qsub -t 1-${n_splits} -sync y $remote_script_path $remote_database_dir");
 }
 
 sub run_search_remote {
@@ -2217,13 +2220,6 @@ sub run_search_remote {
 	. " --nsplits=$nsplits "
 	. " --scriptpath=${remote_script_path} "
 	. " -w $waitTimeInSeconds ";
-    if( $search_type =~ m/rapsearch/ ){
-	my $parse_score = $self->parse_score;
-	$remote_cmd .= "--parse-score=${parse_score}";
-    }
-    if( $search_type eq "rapsearch_accelerated" ){
-	$remote_cmd .= "--accelerate=T";
-    }
     if( $forcesearch ){
 	$remote_cmd .= " --forcesearch ";
     }
@@ -2490,33 +2486,32 @@ sub parse_results_hack {
 
 
 sub parse_results_remote {
-    my ($self, $sample_id, $type, $nsplits, $waitTimeInSeconds, $verbose, $forceparse) = @_;
-    ($type eq "blast" or $type eq "last" or $type eq "rapsearch" or $type eq "hmmsearch" or $type eq "hmmscan") or
-	die "Invalid type passed in! The invalid type was: \"$type\".";
+    my ($self, $sample_id, $nsplits, $waitTimeInSeconds, $verbose, $forceparse) = @_;
     ( $nsplits > 0 ) || die "Didn't get a properly formatted count for the number of search DB splits! I got $nsplits.";
-    my $trans_method = $self->trans_method;
-    my $proj_dir     = $self->remote_project_path;
-    my $scripts_dir  = $self->remote_scripts_dir;
-    my $t_score      = $self->parse_score;
-    my $t_coverage   = $self->parse_coverage;
-    my $t_evalue     = $self->parse_evalue;
+    my $search_method = $self->search_method;
+    my $search_type   = $self->search_type;
+    my $trans_method  = $self->trans_method;
+    my $proj_dir      = $self->remote_project_path;
+    my $scripts_dir   = $self->remote_scripts_dir;
+    my $t_score       = $self->parse_score;
+    my $t_coverage    = $self->parse_coverage;
+    my $t_evalue      = $self->parse_evalue;
     my $remote_orf_dir             = File::Spec->catdir($self->remote_sample_path($sample_id), "orfs");
     my $log_file_prefix            = File::Spec->catfile($self->remote_project_log_dir(), "run_remote_parse_results_handler");
-    my $remote_results_output_dir  = File::Spec->catdir($self->remote_sample_path($sample_id), "search_results", ${type});
+    my $remote_results_output_dir  = File::Spec->catdir($self->remote_sample_path($sample_id), "search_results", ${search_method});
     my ($remote_script_path, $db_name, $remote_db_dir);
-    $remote_script_path        = $self->remote_scripts_dir() . "/run_parse_results.sh";
-    if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
-	$db_name               = $self->search_db_name("blast");
+    $remote_script_path        = $self->remote_script_path( "parse_results" );
+    if ( $search_type eq "blast" ){
+	$db_name               = $self->search_db_name( $search_type );
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $BLASTDB_DIR, $db_name);
     }
-    if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
-	$db_name               = $self->search_db_name("hmm");
+    if ( $search_type eq "hmm" ){
+	$db_name               = $self->search_db_name( $search_type );
 	$remote_db_dir         = File::Spec->catdir($self->remote_ffdb(), $HMMDB_DIR, $db_name);
     }
 
     # Transfer the required scripts, such as "run_remote_search_handler.pl", to the remote server. For some reason, these don't get sent over otherwise!
     my @scriptsToTransfer = (File::Spec->catfile($self->local_scripts_dir(), "remote", "run_remote_parse_results_handler.pl"),
-			     File::Spec->catfile($self->local_scripts_dir(), "remote", "run_parse_results.sh"),
 			     File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
 	); 
     foreach my $transferMe (@scriptsToTransfer) {
@@ -2533,10 +2528,10 @@ sub parse_results_remote {
 	. " -w $waitTimeInSeconds "
 	. " --sample-id=$sample_id "
 #	. " --class-id=$classification_id "
-	. " --algo=$type "
+	. " --algo=$search_method "
 	. " --transmeth=$trans_method "
 	. " --proj-dir=$proj_dir "
-	. " --script-dir=$scripts_dir";
+	. " --script-dir=$scripts_dir";        
     if( defined( $t_score ) ){
 	$remote_cmd .= " --score=$t_score ";
     }
@@ -3035,23 +3030,33 @@ sub count_objects_in_files{
 	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
 	    closedir( DIR );
 	    foreach my $file( @files ){
-		next unless( $file =~ m/\.fa$/ );
-		open( FILE, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
-		while(<FILE>){
+		next unless( $file =~ m/\.fa/ );
+		my $fh;
+		if( $file =~ m/\.gz$/ ){
+		    open( $fh, "zmore ${input}/${file} |" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
+		} else {
+		    open( $fh, "${input}/${file}" ) || die "Can't open ${input}/${file} for read in count_objects_in_file: $!\n";
+		}
+		while(<$fh>){
 		    if( $_ =~ m/^>/ ){
 			$count++;
 		    }
 		}
-		close( FILE );
+		close( $fh );
 	    }
 	} else {
 	    die "In count_objects_in_file: $input doesn't exist!\n";
 	}
     } elsif( $type eq "class_read" || $type eq "class_orf" ){
 	if( -e $input ){
-	    open( FILE, $input ) || die "Can't open $input for read: $!\n";
+	    my $fh;
+	    if( $input =~ m/\.gz$/ ){
+		open( $fh, "zmore $input|" ) || die "Can't open $input for read: $!\n";
+	    } else {
+		open( $fh, $input ) || die "Can't open $input for read: $!\n";
+	    }
 	    my $ids = (); #hashref
-	    while( <FILE> ){
+	    while( <$fh> ){
 		chomp $_;
 		my( $orf_alt_id, $read_alt_id, @row ) = split( "\,", $_ );
 		if( $type eq "class_read" ){
@@ -3060,7 +3065,7 @@ sub count_objects_in_files{
 		    $ids->{$orf_alt_id}++;
 		}		
 	    }
-	    close FILE;
+	    close $fh;
 	    $count = scalar( keys( %$ids ) );
 	    $ids = (); #cleanup
 	} else {
@@ -3231,6 +3236,7 @@ sub build_intersample_abundance_map_flatfile{
     my $fams = (); #hashref
     foreach my $file( @files ){
 	next unless( $file =~ m/$param_str/ );
+	next if( $file =~ m/\.map$/ ); #in case of a re-run, skip R ouput files
 	open( FILE, "${outdir}/${file}" ) || die "Can't open ${outdir}/${file} for read: $!\n";
 	while( <FILE> ){
 	    next if(  $_ =~ m/^SAMPLE\.ID/ );
@@ -3348,7 +3354,8 @@ sub check_sample_rarefaction_depth{
 
 sub calculate_diversity{
     my( $self, $class_id, $abund_param_id ) = @_; #abundance type is "abundance" or "relative_abundance"
-    my $r_lib = $ENV{"SHOTMAP_LOCAL"} . "/ext/R/";
+    my $r_lib   = $ENV{"SHOTMAP_LOCAL"} . "/ext/R/";
+    my $verbose = $self->verbose;
     #set output directory
     my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output/", "cid_${class_id}_aid_${abund_param_id}" );
     File::Path::make_path($outdir);
@@ -3375,11 +3382,9 @@ sub calculate_diversity{
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} 0 $r_lib < ${script}";
+    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
-
-    die;
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
 
@@ -3391,8 +3396,9 @@ sub calculate_diversity{
     #my $intrafamily_prefix      = $outdir . "/${family_path_stem}/Family_Comparisons_cid_${class_id}_aid_${abund_param_id}";
     #run an R script that groups samples by metadata parameters and calculates family-level variance w/in and between groups
     #produce plots and output tables for this analysis
+    my $test_type      = "wilcoxon.test";
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} < ${script}";
+    $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} $test_type $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
@@ -3404,8 +3410,8 @@ sub calculate_diversity{
     my $center           = 1;
     my $scale            = 1;
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
-    $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );
-    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} ${center} ${scale} < ${script}";
+    $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );    
+    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} ${center} ${scale} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }
@@ -3463,9 +3469,9 @@ sub split_sequence_file{
 	$compressed = 1;
     }
     if( $compressed ){
-	open( SEQS, "zcat $full_seq_file|" ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";
+	open( SEQS, "zcat $full_seq_file|" ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file\n";
     } else {
-	open( SEQS, $full_seq_file ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file_no_bp\n";
+	open( SEQS, $full_seq_file ) || die "Can't open $full_seq_file for read in Shotmap::DB::split_sequence_file\n";
     }
     my $counter  = 1;
     my $outname  = $basename . $counter . ".fa";
@@ -3496,13 +3502,13 @@ sub split_sequence_file{
 	    $sequence = $sequence . $_;
 	}
 	if( eof ) {
-	    print OUT "$header\n$sequence\n";	    
+	    print OUT "$header\n$sequence\n";
+	    close OUT;
 	    #unless( $self->remote ){
 	    Shotmap::Run::gzip_file( $splitout );
 	    unlink( $splitout );
 	    #}
-	}
-	if( $seq_ct == $nseqs_per_split - 1 ){	
+	} elsif( $seq_ct == $nseqs_per_split  ){	
 	    close OUT;
 	    #unless( $self->remote ){
 		Shotmap::Run::gzip_file( $splitout );
@@ -3520,8 +3526,100 @@ sub split_sequence_file{
 	}
     }    
     close SEQS;
-    close OUT;
     return \@output_names;
+}
+
+sub build_remote_script{
+    my( $self, $type ) = @_;
+    my $localScriptDir = $self->local_scripts_dir();
+    my $project_dir    = $self->project_dir();
+
+    my $method;
+    if( $type eq "orfs" ){
+	$method = $self->trans_method;
+    } elsif( $type eq "search" || $type eq "parse" ){
+	$method = $self->search_method;
+    } elsif( $type eq "dbformat" ){
+	$method = $self->search_db_fmt_method;
+    }
+    
+    #get options/defaults
+    my $cluster_config_file   = $self->cluster_config_file;
+    my $remote_project_dir    = $self->remote_project_path;
+    my $db_name               = $self->search_db_name($self->search_type);
+    my $use_array             = $self->use_array;
+    my $use_scratch           = $self->scratch;
+    my $db_suffix             = $self->search_db_name_suffix; #only for rapsearch
+    my $rapsearch_n_hits      = 1;
+    my $hmmer_maxacc          = 0;
+    my $cpus                  = 1;
+    my $score_threshold       = $self->parse_score;
+    my $last_max_multiplicity = 10; #increase to improve sensitivity
+    my $metatrans_len_cutoff  = $self->orf_filter_length;
+    my $compress              = 1;
+    my $scratch_path          = $self->scratch_path;
+    my $lightweight           = $self->lightweight;
+
+    my $db_size = 0; #only relevant to type = search
+    if( $type eq "search" ){
+	if( $self->search_type( "blast" ) ){
+	    $db_size = $self->Shotmap::DB::get_blast_db_length($db_name);
+	} elsif ( $self->search_type( "hmm" ) ){
+	    $db_size = $self->Shotmap::DB::get_number_hmmdb_scans( $self->search_db_split_size($self->search_type) );
+	}
+    }
+
+    my( $compress_str, $hmmeracc_str, $array_str, $scratch_str,
+	$light_str,
+	);
+    if( $compress )    { $compress_str = "--compress";       }
+    else               { $compress_str = "--nocompress";     }
+    if( $hmmer_maxacc ){ $hmmeracc_str = "--hmmer_maxacc";   }
+    else               { $hmmeracc_str = "--nohmmer_maxacc"; }
+    if( $use_array )   { $array_str    = "--array";          }
+    else               { $array_str    = "--noarray";        }
+    if( $use_scratch ) { $scratch_str  = "--scratch";        }
+    else               { $scratch_str  = "--noscratch";      }    
+    if( $lightweight ) { $light_str    = "--delete-raw";     }
+    else               { $light_str    = "--nodelete-raw";   }
+    
+    my $script       = "$localScriptDir/building_scripts/build_remote_script.pl";
+    my $out_script   = "${project_dir}/scripts/";
+    if( $type eq "parse" ){
+	$out_script .= "run_parse_results.sh";
+    } else {
+	$out_script .= "run_${method}.sh";
+    }
+    my $cmd     = "perl $script "  .
+	"-t=$type "      .  #search, orfs, dbformat
+	"-o=$out_script "          . 
+	"-c=$cluster_config_file " . 
+	"-m=$method "              .
+	"-p=$remote_project_dir "  .
+	"--name=$db_name "      .
+	"$scratch_str "         .
+	"$array_str "           .
+	"--suffix=$db_suffix "  .
+	"--db-size=$db_size "           .
+	"--rapsearch-n-hits=$rapsearch_n_hits "         .
+	"$hmmeracc_str "  .
+	"--metatrans_len_cutoff=$metatrans_len_cutoff " .
+	"$compress_str "    . 
+	"--nprocs=${cpus} " . 
+	"--scratch-path=${scratch_path} " . 
+	"$light_str ";
+    if( defined( $self->parse_coverage ) ){
+	$cmd .= " --coverage=" . $self->parse_coverage . " ";
+    }
+    if( defined( $self->parse_evalue ) ){
+	$cmd .= " --evalue="   . $self->parse_evalue   . " ";
+    }
+    if( defined( $self->parse_score ) ){
+	$cmd .= " --score="    . $self->parse_score    . " ";
+    }
+    my $results = Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
+
+    return $out_script;
 }
 
 1;

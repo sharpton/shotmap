@@ -70,6 +70,14 @@ sub notify {
     print STDERR ($self->Shotmap::Notify::safeColor("[NOTE]: $msg\n", "cyan on_black"));
 }
 
+sub notify_verbose {
+    my ($self, $msg) = @_;
+    if( $self->verbose ){
+	chomp($msg);
+	print STDERR ($self->Shotmap::Notify::safeColor("[NOTE]: $msg\n", "cyan on_black"));
+    }
+}
+
 sub dieWithUsageError {
     my ($self, $msg) = @_;
     chomp($msg);

@@ -2,13 +2,13 @@
 
 use strict;
 use Getopt::Long;
+use File::Basename;
+use Data::Dumper;
 
 #parse_results.pl - Parses sequence search result files and produces mysql data tables for bulk loading. Is run on remote server and called by run_parse_results.sh 
 
-print "parse_results.pl @ARGV";
-
 my ( $results_tab, $query_orfs_file,
-     $sample_id,   $algo,            $trans_method,
+     $sample_id,   $algo,            
      $t_evalue,    $t_coverage,      $t_score, 
      $no_coverage, $target_skip_string
     );
@@ -21,7 +21,6 @@ GetOptions(
     "sample-id=i"    => \$sample_id,
 #    "class-id=i"     => \$classification_id,
     "algo=s"         => \$algo,
-    "trans-method=s" => \$trans_method,
     "evalue=s"       => \$t_evalue,     #thresholds might be float, might be "NULL" via bash. if float, perl will coerse from string
     "coverage=s"     => \$t_coverage,
     "score=s"        => \$t_score,
@@ -57,20 +56,21 @@ unless( $no_coverage ){
 my $hitmap = {};
 
 my $res_fh;
-my $compressed = "${results_tab}.gz";
-if( -e $results_tab && -e $compressed ){
-    die "It looks like the compression of $results_tab is incomplete...";
-} elsif( -e $results_tab ){
-    open( $res_fh, "$results_tab" ) || die "can't open $results_tab for read: $!\n";    
-} elsif( -e $compressed ){
-    open( $res_fh, "zmore $compressed|" ) || die "can't open $compressed for read: $!\n";    
+my $output_basename = $results_tab;
+if( $results_tab =~ m/\.gz$/ ){
+    open( $res_fh, "zmore $results_tab|" ) || die "can't open $results_tab for read: $!\n";    
+    $output_basename =~ s/\.gz$//;
+} else {
+   open( $res_fh, "$results_tab" ) || die "can't open $results_tab for read: $!\n";    
 }
 
-my $output = $results_tab . ".mysqld";
+my $output = $output_basename . ".mysqld";
+print "Will write results to $output\n";
 open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
 while(<$res_fh>){
-    chomp $_;
-    if( $_ =~ m/^\#/ || $_ =~ m/^$/ || $_ =~ m/$compressed/ ) {
+    chomp $_;    
+    if( $_ =~ m/^\#/ || $_ =~ m/^$/ 
+	|| $_ =~ m/\-\-\-\-\-\-\>.*\.gz/ ) { #gz compression header
 	next; # skip comments (lines starting with a '#') and completely-blank lines
     }
     my($qid, $qlen, $tid, $tlen, $evalue, $score, $start, $stop);
@@ -177,7 +177,7 @@ while(<$res_fh>){
     if( defined( $t_coverage ) ){
 	next unless $coverage >= $t_coverage;
     }
-    my $read_alt_id = parse_orf_id( $qid, $trans_method );
+    my $read_alt_id = parse_orf_id( $qid );
 #print mysql data row to file
     my @fields = ( $qid, $read_alt_id, $sample_id, $tid, $famid, $score, $evalue, $coverage, $aln_len );
     my $row    = join( ",", @fields, "\n" );
@@ -234,16 +234,21 @@ sub parse_orf_id{
 sub get_sequence_lengths_from_file{
     my( $file ) = shift;    
     my %seqlens = ();
-    open( FILE, "$file" ) || die "Can't open $file for read: $!\n";
+    my $fh;
+    if( $file =~ m/\.gz$/ ){
+	open( $fh, "zmore $file|" ) || die "Can't open $file for read: $!\n";
+    } else {
+	open( $fh, "$file" ) || die "Can't open $file for read: $!\n";
+    }
     my($header, $sequence);
-    while(<FILE>){
+    while(<$fh>){
 	chomp $_;
 	if (eof) { # this is the last line I guess
 	    $sequence .= $_; # append to the sequence
 	    $seqlens{$header} = length($sequence);
 	}
 
-	if( $_ =~ m/\>(.*)/ ){
+	if( $_ =~ m/\>(.*?)\s/ ){ #only want the id, not the rest of the header
 	    # Starts with a '>' so this is a header line!
 	    if (defined($header)) { # <-- process the PREVIOUSLY READ sequence, which we have now completed
 		$seqlens{$header} = length($sequence);
@@ -254,6 +259,7 @@ sub get_sequence_lengths_from_file{
 	    $sequence .= $_;
 	}
     }
+    close $fh;
     return \%seqlens;
 }
 

@@ -39,6 +39,8 @@ $pipe->Shotmap::Notify::pipeline_params();
 
 my $path_to_family_annotations;
 
+goto_step( $pipe );
+
 # Load the project
 $pipe->Shotmap::Reads::load_project();
 # Find orfs
@@ -54,7 +56,7 @@ if( $pipe->remote ){
  LOCALSTAGE: $pipe->Shotmap::Search::format_search_db();
 }
 # Build search script
- BUILDSEARCHSCRIPT: $pipe->Shotmap::Search::build_search_script();
+ #BUILDSEARCHSCRIPT: $pipe->Shotmap::Search::build_search_script();
 # Execute search
  EXECUTESEARCH: $pipe->Shotmap::Search::run_search();
 # Parse search results
@@ -74,6 +76,7 @@ if( $pipe->remote ){
 $pipe->Shotmap::Notify::printBanner("ANALYSIS COMPLETED!");
 
 sub goto_step{
+    my $pipe = shift;
  # What step of the pipeline are we running?
  ## If the user has specified something in the --goto option, then we skip some parts of the analysis and go directly
  ## to the "skip to this part" part.
@@ -111,25 +114,25 @@ sub goto_step{
 	    goto REMOTESTAGE; 
 	}
 	if ($goto eq "S" or $goto eq "SCRIPT")  {     
-	    warn "Skipping to building hmmscan script step!\n"; 
+	    warn "Skipping to building search script step!\n"; 
 	    $pipe->Shotmap::Load::stage_check; 
 	    goto BUILDSEARCHSCRIPT; 
 	}
 	if ($goto eq "X" or $goto eq "SEARCH")  {     
-	    warn "Skipping to hmmscan step!\n"; 
+	    warn "Skipping to remote search step!\n"; 
 	    $pipe->Shotmap::Load::stage_check; 
 	    goto EXECUTESEARCH; 
 	}
 	if ($goto eq "P" or $goto eq "PARSE")   {     
-	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    warn "Skipping to get parse results step!\n"; 
 	    goto PARSERESULTS; 
 	}
 	if ($goto eq "G" or $goto eq "GET")     {     
-	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    warn "Skipping to get remote search results step!\n"; 
 	    goto GETRESULTS; 
 	}
 	if ($goto eq "L" or $goto eq "LOADRESULTS"){  
-	    warn "Skipping to get remote hmmscan results step!\n"; 
+	    warn "Skipping to load search results step!\n"; 
 	    goto LOADRESULTS; 
 	}
 	if ($goto eq "C" or $goto eq "CLASSIFY"){     
