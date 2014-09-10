@@ -23,16 +23,77 @@ Once you have a configuration file built (see below), all you need to do to anno
      
      perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configutation_file>
 
+Installation
+------------
+
+1. Set your SHOTMAP_LOCAL environment variable.
+
+    export SHOTMAP_LOCAL=/my/home/directory/shotmap       
+
+Where this is your github-checked-out copy of shotmap. Ideally, you place the above command in your ~/.bash_profile (or ~/.profile) so that you don't have to execute the same command everytime you run shotmap. You might try the following:
+
+      echo "export SHOTMAP_LOCAL=/m/home/directory/shotmap" >> ~/.bash_profile
+
+2. Run the installer script, located in the top level of the shotmap repository (install.pl). This script attempts to auto install all of the requirements and dependencies used by shotmap. It does so by downloading source files via the internet (so you must have an internet connection for this to work!) and building binaries on your server. Note that this is challenging to automate, and you may still have to install some software by hand. Run the script with the following command:
+
+   perl install.pl > install.log 2> install.err
+
+This will take some time to run and will generate a lot of output. I recommend storing the output in a file like install.log so that you can review the results of the installation process.
+
+3. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The following script builds a configuration file for you:
+
+   perl scripts/build_conf_file.pl  --conf-file=<path_of_output_conf_file> [options]
+
+Note that this script can receive via the command line any of shotmap's options. The simplest configuration file (running the analysis on a local machine without using a mysql database and using as many defaults as possible) would look like the following:
+
+     perl scripts/build_conf_file.pl --conf-file=<path_of_output_conf_file> --nprocs=<number_of_processors> --rawdata=<directory_containing_metagenome> --refdb=<directory_containing_protein_families>
+
+Note: if you elect to use a mysql database, this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
+
+4. For analyses using an SGE-configured cloud (i.e., --remote), you have to set up passphrase-less SSH to your computational cluster. In this example, the cluster should have a name like "compute.cluster.university.edu".
+Follow the links at "https://www.google.com/search?q=passphraseless+ssh" in order to find some solutions for setting this up. It is quite easy!
+
+5. Test your configuration file and installation using the following script:
+
+   perl scripts/test_conf_file.pl --conf-file=<path_of_configuration_file>
+
+This will validate your shotmap settings and verify that your installation and infrastructure is properly configured. Note that there are many edge cases and this script may not yet adequately check them all. Please contact the author if you find that this script fails to detect problems with your configuration.
+
+6. Run shotmap:
+
+   perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> [options]
+
+Note that you can override configuration file settings by invoking command line options. The first time you run shotmap, you'll need to format your search database. This can be invoked as follows:
+
+     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb
+
+Once formatted, you do not need to reformat, unless you change search database related options (see below). Also, If you are using a cloud (i.e., --remote), you'll need to conduct a one-time transfer of your search database to the remote server using --stage:
+
+     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb --stage
+
+Example
+-------
+
+The following commands provide an example of how to run shotmap, using the test data found in shotmap/data. From the root level shotmap directory (i.e., shotmap/):
+
+    perl install.pl
+
+    perl scripts/build_conf_file.pl perl build_conf_file.pl --nprocs=1 --rawdata=data/testdata/ --refdb=data/test_family_database/ --conf-file=test.conf
+
+    perl scripts/test_conf_file.pl --conf-file=test.conf
+
+    perl shotmap.pl --conf-file=test.conf --build-searchdb
+
+This will create a flat file database of results in data/testdata/shotmap_ffdb/.
 
 Requirements & Dependencies
 ---------------------------
 
+Note that install.pl attempts to install *all* of the packages below, and their dependencies, automatically.
+
 ###Perl Modules
 
-####Non-standard Libraries (you probably have to install these)
-
-* DBIx::Class
-* DBIx::BulkLoader::Mysql
+####All users need these
 * IPC::System::Simple
 * IO::Uncompress::Gunzip
 * IO::Compress::Gzip
@@ -44,55 +105,51 @@ Requirements & Dependencies
 * XML::Tidy
 * Math::Random
 * Parallel::ForkManager
-
-####Standard Libraries (you probably don't have to install these)
-
-* DBI
-* DBD::mysql
 * File::Basename
 * File::Copy
 * File::Path
 * File::Spec
 * Getopt::Long
+* Capture::Tiny
 
-###MySQL
+#####Only needed if using a mysql database (advanced users)
+* DBIx::Class
+* DBIx::BulkLoader::Mysql 
+* DBI
+* DBD::mysql  
 
+Note: if mysql server is on foreign machine, DBD::mysql may need to be 
+      installed by hand. see 
+      http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod 
+
+###MySQL (Only if using a mysql database - advanced users)
+
+* mysql 5.5 or greater
 
 ###R Packages
 
 * vegan
 * ggplot2
-* multtest
-* reshape (still?)
+* reshape2
+* plyr
+* fpc 
+* grid
+* coin
+* qvalue (bioconductor)
+* multtest (bioconductor)
 
 ###Translation/Gene Annotation Tools
 
+* Metatrans
 * transeq
+* prodigal
 
 ###Homology Detection Tools
 
 * HMMER (v3)
-* BLAST
+* BLAST+
 * LAST
 * RAPsearch (v2)
-
-Installation
-------------
-
-You have to set your SHOTMAP_LOCAL environment variable.
-
-    export SHOTMAP_LOCAL=/my/home/directory/shotmap       
-
-Where this is your github-checked-out copy of shotmap
-
-Now you need build a configuration file using build_conf_file.pl as follows:
-   
-    perl $SHOTMAP_LOCAL/scripts/build_conf_file.pl --conf-file=<path_to_configuration_file> [options]
-
-NOTE: You may store your MySQL password in this file, which will be locked down with user-only read permissions.
-
-You have to set up passphrase-less SSH to your computational cluster. In this example, the cluster should have a name like "compute.cluster.university.edu".
-Follow the links at "https://www.google.com/search?q=passphraseless+ssh" in order to find some solutions for setting this up. It is quite easy!
 
 Running Shotmap
 ---------------
