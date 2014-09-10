@@ -50,16 +50,13 @@ Note that this script can receive via the command line any of shotmap's options.
 
 Note: if you elect to use a mysql database, this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
 
-4. For analyses using an SGE-configured cloud (i.e., --remote), you have to set up passphrase-less SSH to your computational cluster. In this example, the cluster should have a name like "compute.cluster.university.edu".
-Follow the links at "https://www.google.com/search?q=passphraseless+ssh" in order to find some solutions for setting this up. It is quite easy!
-
-5. Test your configuration file and installation using the following script:
+4. Test your configuration file and installation using the following script:
 
    perl scripts/test_conf_file.pl --conf-file=<path_of_configuration_file>
 
 This will validate your shotmap settings and verify that your installation and infrastructure is properly configured. Note that there are many edge cases and this script may not yet adequately check them all. Please contact the author if you find that this script fails to detect problems with your configuration.
 
-6. Run shotmap:
+5. Run shotmap:
 
    perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> [options]
 
@@ -85,6 +82,30 @@ The following commands provide an example of how to run shotmap, using the test 
     perl shotmap.pl --conf-file=test.conf --build-searchdb
 
 This will create a flat file database of results in data/testdata/shotmap_ffdb/.
+
+Cloud (remote) Users (Advanced)
+-------------------------------
+
+Some additional options must be set to run shotmap on a remote, SGE configured distributed computing cluster (invoked using --remote):
+
+1. You must set up passphrase-less SSH to your computational cluster. In this example, the cluster should have a name like "compute.cluster.university.edu". Follow the links at "https://www.google.com/search?q=passphraseless+ssh" in order to find some solutions for setting this up.
+
+2. Cluster configuration file: you will need point shotmap to a file that contains a SGE submission script configuration header (using --cluster-config=<path_to_cluster_configuration_file>). These configurations are often system specific; you may need to consult with the system administrator. See data/cluster_config.txt for an example.
+
+3. Ensure that gene prediction and search algorithms being invoked by shotmap are installed and accessible via the $PATH environmental variable on the remote machine.
+
+4. Remote options: Invoke and properly set the following remote options (see below for details): --remote, --rhost, --rdir
+
+MySQL (db) Users (Advanced)
+---------------------------
+
+Some additional configurations must be set up to interface shotmap with a MySQL database, which can be invoked using the --db option. Most users won't need to worry about this.
+
+1. MySQL is installed on the database server, which need not be the machine shotmap is being run on.
+
+2. The user has CREATE, INSERT, DROP, SELECT, and FILE privileges. Also, the user must be able to write to /tmp/ so that data can be loaded infile (this results in *massive* speed-ups).
+
+3. DB options: Invoke and properly set the following db opions (see below for details): --db, --dbuser, --dbhost, --dbpass, --dbname
 
 Requirements & Dependencies
 ---------------------------
