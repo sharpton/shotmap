@@ -11,10 +11,10 @@ Shotmap is a software workflow that functionally annotates and compares shotgun 
 1.  Compared unassembled or assembled metagenomic sequences to a protein family database
 2.  Calculate metagenome functional abundance and diversity
 3.  Compare metagenomes using a variety of statistical and ecological tools
-4.  Identify protein families that differentiate metagenomes
+4.  Identify protein families that differentiate metagenomes using robust statistical tests
 
-Shotmap manages the information and data associated with this workflow in a relational database and will 
-handle the communication with and transfer of data between a database server and a distributed computer cluster (SGE).
+Shotmap can be run on a multicore computer or can optionally interface with an SGE-configured computing cluste (i.e., a cloud). 
+Shotmap can also optionally manage the information and data associated with this workflow in a relational database.
 
 Quickstart
 ----------
