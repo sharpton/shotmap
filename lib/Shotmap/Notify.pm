@@ -150,7 +150,9 @@ sub warn{
     if( $string !~ m/\n$/ ){
 	$string = $string . "\n";
     }
-    print STDERR ($self->Shotmap::Notify::safeColor("[WARNING]: $string", "magenta on_black"));
+    unless( $self->is_test ){
+	print STDERR ($self->Shotmap::Notify::safeColor("[WARNING]: $string", "magenta on_black"));
+    }
     return $self;
 }
 

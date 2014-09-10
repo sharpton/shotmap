@@ -76,6 +76,8 @@ sub new{
     $self->{"opts"}               = undef; #hashref that stores runtime options
     $self->{"verbose"}            = 0;
     $self->{"database"}           = 0; #should a relational database be used to manage the data?
+    $self->{"is_test"}            = 0;
+    $self->{"is_conf_build"}      = 0;
     bless($self);
     return $self;
 }
@@ -981,6 +983,12 @@ sub lightweight{
     return $self->{ $key };    
 }
 
+sub is_conf_build{
+    my( $self, $value ) = @_;
+    my $key = "is_conf_build";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
 
 sub set_value{
     my( $self, $key, $value ) = @_;
@@ -992,8 +1000,6 @@ sub set_value{
     }
     return $value
 }
-
-
 
 1;
 

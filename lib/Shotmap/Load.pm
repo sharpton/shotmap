@@ -56,10 +56,12 @@ sub check_vars{
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies."
 	);
-    (defined($self->opts->{"ffdb"})) 
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo"
-	);
+    unless( $self->is_conf_build ){
+	(defined($self->opts->{"ffdb"})) 
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo"
+	    );
+    }
     if( ! -d $self->opts->{"ffdb"} ){
 	$self->Shotmap::Notify::warn(
 	    "I don't see a previously created ffdb at " . $self->opts->{"ffdb"} . " so I will try to create it." );
@@ -87,13 +89,15 @@ sub check_vars{
 	    "I do not know if you want to use a mysql database to store your data or not. Please specify with --db. Select from:\n" .
 	    "<none> <full> <slim>"
 	);
-    if( defined( $self->opts->{"conf-file"} ) ){
-	( -e $self->opts->{"conf-file"} ) or 
-	    $self->Shotmap::Notify::dieWithUsageError(
-		"You have specified a password file by using the --conf-file option, but I cannot find that file. You entered <" . 
-		$self->opts->{"conf-file"} . ">"
-	    );
-     }
+    unless( $self->is_conf_build ){
+	if( defined( $self->opts->{"conf-file"} ) ){
+	    ( -e $self->opts->{"conf-file"} ) or 
+		$self->Shotmap::Notify::dieWithUsageError(
+		    "You have specified a password file by using the --conf-file option, but I cannot find that file. You entered <" . 
+		    $self->opts->{"conf-file"} . ">"
+		);
+	}
+    }
     my $algo_list = "hmmsearch, hmmscan, blast, last, rapsearch";
      if ($self->opts->{"use_hmmsearch"} ||
 	 $self->opts->{"use_hmmscan"}   || 
@@ -220,10 +224,12 @@ sub check_vars{
 		);
 	}
     }
-    (defined($self->opts->{"searchdb-name"})) 
-	or $self->Shotmap::Notify::dieWithUsageError( 
-	    "Note: You must name your search database using the --searchdb-name option. Exiting\n" 
-	);
+    unless( $self->is_conf_build ){
+	(defined($self->opts->{"searchdb-name"})) 
+	    or $self->Shotmap::Notify::dieWithUsageError( 
+		"Note: You must name your search database using the --searchdb-name option. Exiting\n" 
+	    );
+    }
     (defined($self->opts->{"normalization-type"})) 
 	or  $self->Shotmap::Notify::dieWithUsageError( 
 	    "You must provide a proper abundance normalization type on the command line (--normalization-type)"
@@ -515,13 +521,14 @@ sub get_options{
     #grab command line options
 
     GetOptionsFromArray( \@args, \%options, @opt_type_array );
-    if( defined( $conf_file ) ){
-	if( ! -e $conf_file ){ 
-	    $self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); 
+    unless( $self->is_conf_build ){
+	if( defined( $conf_file ) ){	
+	    if( ! -e $conf_file ){ 
+		$self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); 
+	    }
 	}
 	my $opt_str = get_conf_file_options( $conf_file, \%options );
 	GetOptionsFromString( $opt_str, \%options, @opt_type_array );
-
     }
     #getopts keeps the values referenced, so we have to dereference them if we want to directly call. Note: if we ever add hash/array vals, we'll have to reconsider this function
     %options = %{ dereference_options( \%options ) };
@@ -793,6 +800,8 @@ sub load_defaults{
 	    ,    "nr"               => 1
 	    ,    "db-suffix"        => 'rsdb'
 	    ,    "verbose"          => 0
+	    # Search DB settings
+	    ,    "searchdb-name"    => basename( $options->{"refdb"} )
 	    # Remote computational cluster server related variables
 	    ,        "ruser"        => $ENV{"LOGNAME"}
 	    ,        "scratch"      => 1
@@ -831,7 +840,7 @@ sub load_defaults{
     #PLATFORMS
     #may move read length specific to autodetect, but this is here in case we 
     #ever need platform specific settings
-    my $config_count; 
+    my $config_count = 0;
 
     if( defined( $options->{"hiseq-101"} ) ){
 	$defaults->{"class-score"} = 31;

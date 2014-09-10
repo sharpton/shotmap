@@ -24,7 +24,6 @@ GetOptions(
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
     my $dir = getcwd;
-    system( "echo 'export SHOTMAP_LOCAL=${dir} >> ~/.bash_profile'" );
     #we still need to load into current shell
     $ENV{'SHOTMAP_LOCAL'} = $dir;
     my $shotmap = $ENV{'SHOTMAP_LOCAL'} . "/scripts/shotmap.pl";
@@ -37,6 +36,8 @@ if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
 	     "on what exists in your home directory) yourself. You should probably add " .
 	     "something like the following:\n\n" .
 	     "export SHOTMAP_LOCAL=<path_to_shotmap_repository>\n" );
+    } else{
+	system( "echo 'export SHOTMAP_LOCAL=${dir}' >> ~/.bash_profile" );
     }
 }
 

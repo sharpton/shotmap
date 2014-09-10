@@ -2323,7 +2323,6 @@ sub run_search{
 sub parse_results {
     my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
     my $nprocs       = $self->nprocs();
-    my $trans_method = $self->trans_method;
     my $proj_dir     = $self->project_dir;
     my $scripts_dir  = $self->local_scripts_dir;
     my $t_score      = $self->parse_score;
@@ -2332,8 +2331,7 @@ sub parse_results {
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
     my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
     my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
-
-    
+   
     my $pm = Parallel::ForkManager->new($nprocs);
 
     for( my $i=1; $i<=$nprocs; $i++ ){
@@ -2346,13 +2344,13 @@ sub parse_results {
 	if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
 	    $infile = $infile . ".m8";
 	}
+	my $incompressed = $infile . ".gz";
 	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
 	my $cmd  = "perl $script_file "
-	    . "--results-tab=$infile "
+	    . "--results-tab=$incompressed "
 	    . "--orfs-file=$query_orfs_file "
 	    . "--sample-id=$sample_id "
 	    . "--algo=$type "
-	    . "--trans-method=$trans_method "
 	    . "--parse-type=best_hit "
 	    ;	
 	if( defined( $t_score ) ){
