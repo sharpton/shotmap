@@ -239,7 +239,7 @@ if( $algs ){
 	}
     }
     link_src( $algs->{$alg} . "/ReleaseMT/bin/blastp;" . 
-	      $algs->{$alg} . "/ReleaseMT/bin/makeblasatdb", 
+	      $algs->{$alg} . "/ReleaseMT/bin/makeblastdb", 
 	      $bin );
     print "\t...done with ${alg}\n";
     
