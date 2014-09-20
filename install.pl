@@ -8,18 +8,36 @@ use Getopt::Long;
 
 my $testing = 0;
 
-my $perlmods  = 1; #should we install perl modules
-my $rpackages = 1; #should we install R modules
-my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 1; #wipe old installations of algs?
-my $get       = 1; #download alg source code?
-my $build     = 1; #build alg source code?
-my $test      = 1; #should we run make checks during build?
+my $perlmods  = 0; #should we install perl modules
+my $rpackages = 0; #should we install R modules
+my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
+my $clean     = 0; #wipe old installations of algs?
+my $get       = 0; #download alg source code?
+my $build     = 0; #build alg source code?
+my $test      = 0; #should we run make checks during build?
 my $db        = 0;
+my $all       = 1;
 
+my ($r_only);
 GetOptions(
     "use-db!" => \$db, #try to build the libraries needed for mysql communication
+    "r-only!" => \$r_only, #only build the R packages
     );
+
+if( defined( $r_only ) ){
+    $all       = 0;
+    $rpackages = 1;
+}
+
+if( $all ){
+    $perlmods  = 1;
+    $rpackages = 1;
+    $algs      = 1;
+    $clean     = 1;
+    $get       = 1;
+    $build     = 1;
+    $test      = 1;
+}
 
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){

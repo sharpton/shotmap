@@ -156,6 +156,7 @@ Note: if mysql server is on foreign machine, DBD::mysql may need to be
 * fpc 
 * grid
 * coin
+* MASS
 * qvalue (bioconductor)
 * multtest (bioconductor)
 
@@ -217,7 +218,7 @@ OPTIONS
 
 ###METAGENOME DATA ARGUMENTS:
 
-* **--rawdir=/PATH/TO/PROJECT/DIR** (REQUIRED argument) NO DEFAULT VALUE
+* **--rawdata=/PATH/TO/PROJECT/DIR** (REQUIRED argument) NO DEFAULT VALUE
 
   Location of the metagenomic sequences to be processed. Each metagenomic sample should be in a single
   and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa, .fna, or .fa.gz or .fna.gz (if a gzipped compressed file) as the file suffix.

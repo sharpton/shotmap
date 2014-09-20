@@ -28,12 +28,14 @@ if( verbose ) {
     require(reshape2)
     require(fpc)
     require(grid) #needed for PCbiplot's call to arrow()
+    require(MASS)
 } else {
     msg.trap <- capture.output( suppressMessages( library( vegan ) ) )
     msg.trap <- capture.output( suppressMessages( library( ggplot2 ) ) )
     msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
     msg.trap <- capture.output( suppressMessages( library( fpc ) ) )
     msg.trap <- capture.output( suppressMessages( library( grid ) ) )
+    msg.trap <- capture.output( suppressMessages( library( MASS ) ) )
 }
 
 
