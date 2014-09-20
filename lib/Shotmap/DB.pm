@@ -48,6 +48,7 @@ sub load_db_libs{
 				    "so I'm going to attempt to load the relevant " .
 				    "modules...\n"
 	);
+    require Shotmap::Schema;
     require DBI; #used only for DBIx::BulkLoader::Mysql
     require DBD::mysql;
     require DBIx::BulkLoader::Mysql; #Used only for multi-row inserts

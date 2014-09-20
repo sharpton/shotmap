@@ -17,7 +17,6 @@ use Shotmap::Load;
 use Shotmap::Notify;
 use Shotmap::DB;
 use Shotmap::Run;
-use Shotmap::Schema;
 use Data::Dumper;
 use File::Basename;
 use File::Path;
