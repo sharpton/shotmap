@@ -652,11 +652,13 @@ sub set_params{
 		    );
 		$self->build_search_db( $self->search_type, 1 );
 	    } else {
-		$self->Shotmap::Notify::dieWithUsageError(
-		    "You are apparently trying to conduct a pairwise sequence search, " .
-		    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
-		    "<${db_name}>. As a result, you must use the --build-searchdb option to build a new blast database"
-		    );	    
+		unless( $self->is_test ){
+		    $self->Shotmap::Notify::dieWithUsageError(
+			"You are apparently trying to conduct a pairwise sequence search, " .
+			"but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
+			"<${db_name}>. As a result, you must use the --build-searchdb option to build a new blast database"
+			);	    
+		}
 	    }
 	}
     }

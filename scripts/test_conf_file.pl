@@ -18,6 +18,8 @@ $pipe->Shotmap::Load::get_options( @ARGV );
 $pipe->Shotmap::Load::check_vars();
 $pipe->Shotmap::Load::set_params();
 
+my $has_fails = 0;
+
 # is SHOTMAP_LOCAL defined in environment?
 my $shotmap_local = $ENV{ 'SHOTMAP_LOCAL' };
 if ( !defined( $shotmap_local ) || $shotmap_local eq "" ) {
@@ -79,7 +81,7 @@ if( $pipe->use_db ){
 
 
 foreach my $mod( @mods ){
-    _chk_mod( "$mod" );
+    $has_fails = _chk_mod( "$mod", $has_fails );
 }
 
 # test 3rd party algorithms
@@ -109,7 +111,8 @@ foreach my $alg( sort( keys( %$algs ) ) ){
     };
     if( $exit_val == -1 ){
 	_pr( "testing $alg installation", "FAIL" );
-    } else {
+	$has_fails = 1;
+   } else {
 	_pr( "testing $alg installation", "PASS" );
     }
 }
@@ -172,6 +175,7 @@ if( $pipe->use_db ){
     };
     unless( $@ ){
 	print( "Can connect to " . $pipe->db_name . " on mysql server " . $pipe->db_host . ".");
+	$has_fails = 1;
     }
 }
 
@@ -193,13 +197,20 @@ if( $pipe->remote ){
     }    
 }
 
+if( $has_fails ){
+    die "Found errors when testing the configuration file. Please see the above output for more\n";
+}
+
 sub _chk_mod{
-    my $mod_str = shift;
+    my $mod_str   = shift;
+    my $has_fails = shift;
     if( eval( "use ${mod_str}; 1" )){
 	_pr( "testing $mod_str installation", "PASS" );
     } else {
 	_pr( "testing $mod_str installation", "FAIL" );
+	$has_fails = 1;
     }    
+    return $has_fails;
 }
 
 sub _pr{

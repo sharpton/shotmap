@@ -44,8 +44,9 @@ foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
     if( defined( $value ) ){
 	if( defined( $switches{$key} ) ){
 	    print OUT "--no${key}\n";
+	} else {
+	    print OUT "--${key}=${value}\n";
 	}
-	print OUT "--${key}=${value}\n";
     }
 }    
 close OUT;
