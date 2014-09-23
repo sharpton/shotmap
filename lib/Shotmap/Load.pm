@@ -636,11 +636,14 @@ sub set_params{
     my $db_name;
     if( $self->search_type eq "blast" ){
 	if( $self->remote ){
-	    $db_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
-		($self->nr()?'nr_':'') . $self->search_db_split_size( $self->search_type );
+	    $db_name = $db_prefix_basename . 
+		($self->reps()?'_reps':'') . 
+		($self->nr()?'_nr':'')     . 
+		(defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
 	} else { #local job, so no search db splits
-	    $db_name = $db_prefix_basename . '_' . ($self->reps()?'reps_':'') . 
-		($self->nr()?'nr':'');
+	    $db_name = $db_prefix_basename . 
+		($self->reps()?'_reps':'') . 
+		($self->nr()?'_nr':'');
 	}
 	$self->search_db_name( $self->search_type, $db_name );
 	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
@@ -664,7 +667,8 @@ sub set_params{
     }
     if( $self->search_type eq "hmm" ){
 	if( $self->remote ){
-	    $db_name = "${db_prefix_basename}_" . $self->search_db_split_size( $self->search_type );
+	    $db_name = "${db_prefix_basename}" . 
+		(defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
 	} else { #local job, so no search db splits
 	    $db_name = $db_prefix_basename;
 	    $self->search_db_name( $self->search_type, $db_name );

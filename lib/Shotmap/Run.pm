@@ -772,7 +772,9 @@ sub translate_reads {
     }
     $self->Shotmap::Notify::print( "\tWaiting for all local jobs to finish...\n" );
     $pm->wait_all_children;
-    print "errors: $errors\n";
+    if( defined( $errors ) ){
+	print "errors: $errors\n";
+    }
     if( $errors ne "" ){
 	die( "Obtained errors: $errors\n" );
     }
@@ -1681,56 +1683,48 @@ sub _get_family_path_from_dir{
     my $recurse_lim  = shift; #how many total recursions do we allow?
     my $family_paths = shift; #hashref
     opendir( DIR, $dir ) || die "Can't opendir on $dir\n";
-#    my @paths = glob( "${path}/*" );
-    my @paths = readdir( DIR );
+    my @files = readdir( DIR );
     closedir DIR;
-    foreach my $p( @paths ){ #top level must be dirs. will skip any files here
-	next if ( $p =~ m/^\./ );
-	my $path = $dir . "/" . $p;
-	#are the top level dirs what we're looking for?
-	#print "Looking in $path\n";
-	if( $type eq "hmm" ){ #find hmms and build the db		
-	    print( "Grabbing family paths from $path\n" );
-	    opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
-	    my @files = readdir( SUBDIR );
-	    closedir SUBDIR;
-	    foreach my $file( @files ){
-		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		next unless( !-d $file );
-		my $family = $file; #we'll try to parse, but default to file name
-		if( $file =~ m/(.*)\.hmm/ ){
-		    $family = $1;
-		}
-		my $hmm_path = "${path}/$file";
-		$family_paths->{$type}->{$family} = $hmm_path;
-	    }
-	}
-	if( $type eq "blast" ){ #find the seqs and build the db
-	    print( "Grabbing family paths from $path\n" );
-	    opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
-	    my @files = readdir( SUBDIR );
-	    closedir SUBDIR;
-	    foreach my $file( @files ){
-		next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		next unless( !-d $file );
-		my $family = $file; #we'll try to parse, but default to file name
-		if( $file =~ m/(.*)\.fa/  || 
-		    $file =~ m/(.*)\.faa/ || 
-		    $file =~ m/(.*)\.pep/ ||
-		    $file =~ m/(.*)\.aa/ ){
-		    $family = $1;
-		}
-		my $seq_path = "${path}/${file}";
-		$family_paths->{$type}->{$family} = $seq_path;	    
-	    }  
-	}
-	else{ #don't have what we're looking for in the top level dirs, so let's recurse a level
+    print( "Grabbing family paths from $dir\n" );
+    foreach my $file( @files ){ 
+	next if ( $file =~ m/^\./ );
+	#if directories, recurse:
+	my $path = $dir . "/" . $file;
+	if( -d $path ){
+	    print "entering $path\n";
 	    my $sub_recurse_lvl = $recurse_lvl + 1; #do this so that each of the sister subdirs get processed fairly
 	    if( $sub_recurse_lvl >= $recurse_lim ){
-		#print "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n";
+		print "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n";
 		next;
 	    }
-	    $family_paths = _get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
+	    else{
+		$family_paths = _get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
+	    }
+	    next;
+	}
+        #are the top level dirs what we're looking for?
+	if( $type eq "hmm" ){ #find hmms and build the db		
+	    next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
+	    next unless( !-d $file );
+	    my $family = $file; #we'll try to parse, but default to file name
+	    if( $file =~ m/(.*)\.hmm/ ){
+		$family = $1;
+	    }
+	    my $hmm_path = "${dir}/$file";
+	    $family_paths->{$type}->{$family} = $hmm_path;
+	}
+	if( $type eq "blast" ){ #find the seqs and build the db
+	    next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
+	    next unless( !-d $file );
+	    my $family = $file; #we'll try to parse, but default to file name
+	    if( $file =~ m/(.*)\.fa/  || 
+		$file =~ m/(.*)\.faa/ || 
+		$file =~ m/(.*)\.pep/ ||
+		$file =~ m/(.*)\.aa/ ){
+		$family = $1;
+	    }
+	    my $seq_path = "${dir}/${file}";
+	    $family_paths->{$type}->{$family} = $seq_path;	    
 	}
     }
     return $family_paths;
