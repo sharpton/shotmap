@@ -35,12 +35,16 @@ if( $pipe->use_db ){
 	or die "Connection Error: $DBI::errstr\n";
     print "Looks like we can connect with these database settings.\n";
 }
+my %switches = %{ get_switch_array() };
 print "Building conf-file...\n";
 my $conf_file = $pipe->{"opts"}->{"conf-file"};
 open( OUT, ">$conf_file" ) || die "Can't open $conf_file for write: $!\n";
 foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
     my $value = $pipe->{"opts"}->{$key};
     if( defined( $value ) ){
+	if( defined( $switches{$key} ) ){
+	    print OUT "--no${key}\n";
+	}
 	print OUT "--${key}=${value}\n";
     }
 }    
@@ -48,3 +52,31 @@ close OUT;
 
 `chmod 0600 $conf_file`;
 print "Confile created here with permissions 0600: $conf_file\n";
+
+sub get_switch_array{
+    my %switches = (
+	"verbose"        => 1,
+	"nr"             => 1,
+	"remote"         => 1,
+	"scratch"        => 1,
+	"use-array"      => 1,
+	"multi"          => 1,
+	"bulk"           => 1,
+	"slim"           => 1,
+	"split-orfs"     => 1,
+	"small-transfer" => 1,
+	"top-hit"        => 1,
+	"auto"           => 1,
+	"lightweight"    => 1,
+	"stage"          => 1,
+	"build-searchdb" => 1,
+	"force-searchdb" => 1,
+	"forcesearch"    => 1,
+	"verbose"        => 1,
+	"clobber"        => 1,
+	"dryrun"         => 1,
+	"reload"         => 1,
+    );
+    
+    return \%switches;
+}
