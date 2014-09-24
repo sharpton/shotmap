@@ -16,7 +16,7 @@ r.lib             <- Args[10]
 
 col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
 
-if( is.na( verbose ) ){
+if( is.na( verbose ) | verbose == 0){
     verbose = 0
 } else {
     verbose = 1

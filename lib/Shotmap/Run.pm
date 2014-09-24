@@ -732,6 +732,13 @@ sub translate_reads {
     my @children = ();
     my $errors   = "";
     my $pm = Parallel::ForkManager->new($nprocs);
+    $pm->run_on_finish(
+	sub{ my ( $parent_id, $exit_code ) = @_;
+	     if( $exit_code != 0 ){
+		 die "child (parent $parent_id) returned a non-zero exit code! Got $exit_code\n";
+	     }
+	}
+	);
     for( my $i=1; $i<=$nprocs; $i++ ){
 	my $pid = $pm->start and next;
 	#do some work here
@@ -751,6 +758,7 @@ sub translate_reads {
 	if( -e "${infile}.gz" ){
 	    $infile = "${infile}.gz";
 	}
+	print $infile . "\n";
 	#ADD ADDITIONAL METHODS
         if( $method eq '6FT' ){	   
 	    $cmd    = $self->python . " ${bin}/metatrans.py -m 6FT $infile $outfile";
@@ -767,17 +775,12 @@ sub translate_reads {
 	if( $@ ){
 	    print( "$!\n" );
 	    $errors .= "Error running $cmd: $!\n";
+	    die;
 	}
 	$pm->finish; # Terminates the child process
     }
     $self->Shotmap::Notify::print( "\tWaiting for all local jobs to finish...\n" );
     $pm->wait_all_children;
-    if( defined( $errors ) ){
-	print "errors: $errors\n";
-    }
-    if( $errors ne "" ){
-	die( "Obtained errors: $errors\n" );
-    }
     #old code, no longer using, replaced with Parallel::Fork
     if( 0 ){
       TRANSLATEFORK: for( my $i=1; $i<=$nprocs; $i++ ){
@@ -816,6 +819,13 @@ sub split_orfs_local{
 	die( "Couldn't obtain a raw file output basename to input into ${splitscript}!");
     }
     my $pm = Parallel::ForkManager->new($nprocs);
+    $pm->run_on_finish(
+	sub{ my ( $parent_id, $exit_code ) = @_;
+	     if( $exit_code != 0 ){
+		 die "child (parent $parent_id) returned a non-zero exit code! Got $exit_code\n";
+	     }
+	}
+	);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
 	#do some work here
@@ -823,7 +833,9 @@ sub split_orfs_local{
 	my $infile   = "${input}/${inbasename}${i}.fa";
 	my $outfile  = "${output}/${outbasename}${i}.fa";
 	$cmd      = "perl $splitscript -l $length_cutoff -i $infile -o $outfile > /dev/null 2>&1";	
-        system( $cmd );
+	my $results = IPC::System::Simple::capture("$cmd");
+        (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
+        #system( $cmd );
         $pm->finish; # Terminates the child process                                                                                                                                                                                          
     }
     $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish...\n" );
@@ -2252,6 +2264,13 @@ sub run_search{
     }
     #RUN THE SEARCH
     my $pm = Parallel::ForkManager->new($nprocs);
+    $pm->run_on_finish(
+	sub{ my ( $parent_id, $exit_code ) = @_;
+	     if( $exit_code != 0 ){
+		 die "child (parent $parent_id) returned a non-zero exit code! Got $exit_code\n";
+	     }
+	}
+	);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
         #do some work here                                                                                 
@@ -2294,6 +2313,8 @@ sub run_search{
         
 	#execute
 	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
+#	my $results = IPC::System::Simple::capture("$cmd");
+#        (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
 	system( $cmd );
 	#compress results
 	if( $type eq "rapsearch" ){
@@ -2327,7 +2348,13 @@ sub parse_results {
     my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
    
     my $pm = Parallel::ForkManager->new($nprocs);
-
+    $pm->run_on_finish(
+	sub{ my ( $parent_id, $exit_code ) = @_;
+	     if( $exit_code != 0 ){
+		 die "child (parent $parent_id) returned a non-zero exit code! Got $exit_code\n";
+	     }
+	}
+	);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
         #do some work here                                                                                 

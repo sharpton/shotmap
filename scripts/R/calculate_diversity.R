@@ -13,7 +13,7 @@ r.lib             <- Args[9]
 
 .libPaths( r.lib )
 
-if( is.na( verbose ) ){
+if( is.na( verbose ) | verbose == 0){
     verbose = 0
 } else {
     verbose = 1
