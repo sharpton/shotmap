@@ -3578,6 +3578,7 @@ sub build_remote_script{
     my $compress              = 1;
     my $scratch_path          = $self->scratch_path;
     my $lightweight           = $self->lightweight;
+    my $rpath                 = $self->remote_exe_path;
 
     my $db_size = 0; #only relevant to type = search
     if( $type eq "search" ){
@@ -3635,6 +3636,9 @@ sub build_remote_script{
     }
     if( defined( $self->parse_score ) ){
 	$cmd .= " --score="    . $self->parse_score    . " ";
+    }
+    if( defined( $rpath ) ){
+	$cmd .= " --rpath="    . $rpath                . " ";
     }
     my $results = Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 

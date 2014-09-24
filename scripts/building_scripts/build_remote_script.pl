@@ -11,6 +11,7 @@ my (
     $method,
     $db_name_stem,
     $db_size,
+    $rpath,
     );
 
 my $use_array             = 1;
@@ -50,6 +51,7 @@ GetOptions(
     "score:f"                => \$score_threshold, 
     "coverage:f"             => \$coverage_threshold,
     "delete-raw!"            => \$delete_raw,
+    "rpath:s"                => \$rpath,
     );
 
 my $remote_scripts_dir = $projectdir . "/scripts/";
@@ -60,6 +62,10 @@ open( my $out, ">$outfile" ) || die "Can't open $outfile for write: $!\n";
 #import cluster configuration data
 my $cluster_config = import_cluster_configs( $cluster_configuration_file );
 print $out $cluster_config;
+
+if( defined( $rpath ) ){
+    print $out echo_path( $rpath );
+}
 
 print $out get_header_strings( type               => $type, 
 			       method             => $method, 
@@ -527,3 +533,9 @@ sub get_run_strings{
     return $string;
 }
 
+sub echo_path{
+    my $rpath  = shift;
+    my $string = "";
+    $string   .= "export PATH=${rpath}:\${PATH}\n";
+    return $string;
+}

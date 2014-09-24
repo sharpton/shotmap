@@ -33,7 +33,7 @@ sub check_vars{
 	     or $self->Shotmap::Notify::dieWithUsageError(
 		 "--rdir (remote computational server scratch/flatfile location. Example: --rdir=/cluster/share/yourname/shotmap). This is mandatory!"
 	     );
-	 (defined($self->opts->{"remoteExePath"})) 
+	 (defined($self->opts->{"rpath"})) 
 	     or $self->Shotmap::Notify::warn(
 		 "Note that --rpath was not defined. This is the remote computational server's \$PATH, where we find various executables like 'lastal'). " .
 		 "Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). " . 
