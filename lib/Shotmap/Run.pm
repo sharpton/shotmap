@@ -175,6 +175,10 @@ sub exec_remote_cmd($$) {
 sub get_partitioned_samples{
     my ($self, $path) = @_;
     my %samples = ();        
+    if( ! defined( $path ) || ! -d $path ){
+	die "You either have not specified or I cannot file the raw data location. Please double check " .
+	    "how the option --rawdata is set and that this directory exists\n";
+    }
     opendir( PROJ, $path ) || die "Can't open the directory $path for read: $!\n";     #open the directory and get the sample names and paths, 
     my @files = readdir(PROJ);
     closedir(PROJ);
@@ -1738,6 +1742,12 @@ sub _get_family_path_from_dir{
 	    my $seq_path = "${dir}/${file}";
 	    $family_paths->{$type}->{$family} = $seq_path;	    
 	}
+    }
+    my $count = scalar( keys ( %{ $family_paths->{$type} } ) );   
+    if( $count == 0 ){
+	die( "I couldn't identify any properly formatted reference family data files in $dir!" );
+    } else {
+	print( "Identified $count reference family data files\n" );
     }
     return $family_paths;
 }

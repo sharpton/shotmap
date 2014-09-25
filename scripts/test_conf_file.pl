@@ -183,7 +183,7 @@ if( $pipe->use_db ){
 if( $pipe->remote ){
     #can we write to the remote server?
     my $rdir       = $pipe->remote_ffdb();
-    my $remote_cmd = "mkdir $rdir";
+    my $remote_cmd = "mkdir -p $rdir";
     eval{ 
 	$pipe->Shotmap::Run::execute_ssh_cmd( $pipe->remote_connection(), $remote_cmd );
     };

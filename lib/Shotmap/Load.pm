@@ -45,6 +45,13 @@ sub check_vars{
 		 "--cluster-config=data/cluster_config.txt\n"
 		 );
 	 }
+	 if( !defined( $self->opts->{"searchdb-split-size"} ) ){
+	     $self->Shotmap::Notify::dieWithUsageError(
+		 "Since you are running a remote job (--remote), you must set --searchdb-split-size, " .
+		 "as this is how shotmap determines the number of tasks to run. Future versions "      .
+		 "will enable searching against a single database file\n"		 
+		 );
+	 }
     } else {
 	$self->Shotmap::Notify::warn( "You did not invoke --remote, so shotmap will run locally\n" );
 	(defined($self->opts->{"nprocs"})) 
@@ -56,12 +63,21 @@ sub check_vars{
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies."
 	);
-    unless( $self->is_conf_build ){
-	(defined($self->opts->{"ffdb"})) 
+    #right now, we only require --rawdata  to be set at time of test or run, allows run-time looping over projects
+    unless( defined( $self->opts->{"pid"} ) || $self->is_conf_build ){ 
+	(-d $self->opts->{"rawdata"}) 
 	    or $self->Shotmap::Notify::dieWithUsageError(
-		"--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo"
+		"You must provide a properly structured raw data (--rawdata) directory! Sadly, the specified directory <" . 
+		$self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n"
 	    );
-    }
+    }    
+    (defined($self->opts->{"ffdb"})) 
+	or $self->Shotmap::Notify::dieWithUsageError(
+	    "--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo " .
+	    "Note that if you set --rawdata and don't specify --ffdb, shotmap will automatically create a ffdb path within the " .
+	    "directory specific in --rawdata"
+	);
+    
     if( ! -d $self->opts->{"ffdb"} ){
 	$self->Shotmap::Notify::warn(
 	    "I don't see a previously created ffdb at " . $self->opts->{"ffdb"} . " so I will try to create it." );
@@ -73,7 +89,6 @@ sub check_vars{
 	    "', but I can't find that directory, even after trying to create it. Please check that you have " . 
 	    "permission to write this directory."
 	);
-    
     (defined($self->opts->{"refdb"})) 
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "--refdb (local REFERENCE flat-file database directory path) must be specified! Example: --refdb=/some/local/path/protein_family_database"
@@ -178,13 +193,6 @@ sub check_vars{
 	    $self->opts->{"rhost"} . ">. Disambiguate by using --stage"
 	    );
      }    
-    unless( defined( $self->opts->{"pid"} ) ){ 
-	(-d $self->opts->{"rawdata"}) 
-	    or $self->Shotmap::Notify::dieWithUsageError(
-		"You must provide a properly structured raw data (--rawdata) directory! Sadly, the specified directory <" . 
-		$self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n"
-	    );
-    }    
     my $dbtype = $self->opts->{"db"};
     if( $dbtype ne "none" &&
 	$dbtype ne "full" &&
@@ -352,7 +360,7 @@ sub get_options{
 	, "dbschema"   => \$schema_name
 	# FFDB Search database related options
 	, "searchdb-name"       => \$db_prefix_basename
-	, "serachdb-split-size" => \$search_db_split_size
+	, "searchdb-split-size" => \$search_db_split_size
 	, "hmmsplit"         => \$hmm_db_split_size # now obsolete
 	, "blastsplit"       => \$blast_db_split_size #now obsolete
 	, "family-subset"    => \$family_subset_list	  ####RECENTLY CHANGED THIS KEY CHECK ELSEWHERE
@@ -826,7 +834,7 @@ sub load_defaults{
 	    ,    "lightweight"      => 1
 	    # translation options
 	    ,      "trans-method"   => 'prodigal'
-	    ,      "orf-len-filter" => 14
+	    ,      "orf-filter-len" => 14
 	    # search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 	    ,      "parse-score"    => 29
 	    # family classification thresholds (more stringent)
@@ -883,9 +891,8 @@ sub load_defaults{
 	$defaults->{"search-method"} = "blast"; #note, should have switch to hmm on sequence length
 	$defaults->{"trans-method"}  = "6FT_split";
     }
-
     #Overwrite defaults with user-defined variables
-    foreach my $opt( keys( %$options ) ){
+    foreach my $opt( keys( %$defaults ) ){
 	next if defined $options->{$opt}; #user provided a variable, which we want
 	$options->{$opt} = $defaults->{$opt};
     }
