@@ -43,7 +43,14 @@ foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
     my $value = $pipe->{"opts"}->{$key};
     if( defined( $value ) ){
 	if( defined( $switches{$key} ) ){
-	    print OUT "--no${key}\n";
+	    if( $value == 0 ){
+		print OUT "--no${key}\n";
+	    } elsif( $value == 1 ){
+		print OUT "--${key}\n";
+	    } else {
+		die "I can't figure out how to parse $key: $value\n";
+	    }
+	    next;
 	} else {
 	    print OUT "--${key}=${value}\n";
 	}
@@ -52,7 +59,7 @@ foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
 close OUT;
 
 `chmod 0600 $conf_file`;
-print "Confile created here with permissions 0600: $conf_file\n";
+print "Configuration file created here with permissions 0600: $conf_file\n";
 
 sub get_switch_array{
     my %switches = (

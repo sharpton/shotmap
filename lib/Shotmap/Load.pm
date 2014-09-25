@@ -41,8 +41,8 @@ sub check_vars{
 	     );
 	 if( !defined($self->opts->{"cluster-config"}) || ! -e $self->opts->{"cluster-config"} ){
 	     $self->Shotmap::Notify::dieWithUsageError(
-		 "You must specify an SGE cluster configuration header file, or I won't be able to properly submit jobs to the remote cluster. You gave me: " .
-		 $self->opts->{"cluster-config"} . "\n"
+		 "You must specify an SGE cluster configuration header file, or I won't be able to properly submit jobs to the remote cluster. Example: " .
+		 "--cluster-config=data/cluster_config.txt\n"
 		 );
 	 }
     } else {
@@ -706,8 +706,10 @@ sub set_params{
 	$self->Shotmap::Notify::warn_ssh_keys();	
 	#if we aren't staging, does the database exist on the remote server?
 	#skip for now if goto is invoked.
-	if( !$self->stage && !(defined( $self->{"opts"}->{"goto"} ) ) ){
-	    $self->Shotmap::Load::stage_check();
+	unless( $self->is_conf_build ){
+	    if( !$self->stage && !(defined( $self->{"opts"}->{"goto"} ) ) ){
+		$self->Shotmap::Load::stage_check();
+	    }
 	}
     }
     
@@ -801,13 +803,9 @@ sub load_defaults{
     my $defaults = {
 	    # db settings
   	    "db" => "none"
-	    # FFDB Search database related options
-	    ,    "ffdb"             => $options->{"rawdata"} . "/shotmap_ffdb/"
 	    ,    "nr"               => 1
 	    ,    "db-suffix"        => 'rsdb'
 	    ,    "verbose"          => 0
-	    # Search DB settings
-	    ,    "searchdb-name"    => basename( $options->{"refdb"} )
 	    # Remote computational cluster server related variables
 	    ,        "ruser"        => $ENV{"LOGNAME"}
 	    ,        "scratch"      => 1
@@ -839,7 +837,12 @@ sub load_defaults{
 	    ,      "abundance-type"     => 'coverage'
 	    ,      "normalization-type" => 'target_length'
     };
-    
+    if( defined( $options->{"rawdata"} ) ){
+	$defaults->{"ffdb"} = $options->{"rawdata"} . "/shotmap_ffdb/";
+    }
+    if( defined( $options->{"refdb"} ) ){
+	$defaults->{"searchdb-name"} = basename( $options->{"refdb"} );
+    }
     #############
     # Set configuration-specific defaults here
 
