@@ -10,19 +10,24 @@ my $testing = 0;
 
 my $perlmods  = 0; #should we install perl modules
 my $rpackages = 0; #should we install R modules
-my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 0; #wipe old installations of algs?
-my $get       = 0; #download alg source code?
-my $build     = 0; #build alg source code?
-my $test      = 0; #should we run make checks during build?
+my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
+my $clean     = 1; #wipe old installations of algs?
+my $get       = 1; #download alg source code?
+my $build     = 1; #build alg source code?
+my $test      = 1; #should we run make checks during build?
 my $db        = 0;
-my $all       = 1;
+my $all       = 0;
+my $source    = 0;
 
 my ($r_only);
 GetOptions(
     "use-db!" => \$db, #try to build the libraries needed for mysql communication
     "r-only!" => \$r_only, #only build the R packages
+    "source!" => \$source,
     );
+
+print "Note that this installer attempts to install precompiled x86 binaries when possible. If ".
+    "this doesn't work for your architecture, please rerun the installer and invoke --source\n";
 
 if( defined( $r_only ) ){
     $all       = 0;
@@ -137,15 +142,18 @@ if( $rpackages ){
 if( $algs ){
 
     my $rapsearch_src  = "https://github.com/zhaoyanswill/RAPSearch2";
-    #my $hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1-linux-intel-x86_64.tar.gz";
-    my $hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1.tar.gz";
-    #my $blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-x64-linux.tar.gz";
-    my $blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-src.tar.gz";
+    my $hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1-linux-intel-x86_64.tar.gz";
+    my $blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-x64-linux.tar.gz";
     my $last_src       = "http://last.cbrc.jp/last-475.zip";
     my $transeq_src    = "ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz";
     my $prodigal_src   = "https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz";
     my $mbcensus_src   = "https://github.com/snayfach/MicrobeCensus.git";
     my $metatrans_src  = "https://github.com/snayfach/metatrans.git";
+
+    if( $source ){
+	$hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1.tar.gz";
+	$blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-src.tar.gz";
+    }
 
     my $rapsearch_stem = "RAPSearch2";
     #my $hmmer_stem     = "hmmer-3.1b1-linux-intel-x86_64";
@@ -223,7 +231,7 @@ if( $algs ){
 	get_src( $srcs->{$alg}, $pkg, "wget" );
 	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
-    if( $build ){
+    if( $source && $build ){
 	if( $test ){
 	    build_src( $algs->{$alg}, "./configure;make; make check" );	    
 	} else{ 
@@ -233,6 +241,7 @@ if( $algs ){
     link_src( $algs->{$alg} . "/src/hmmsearch;" . 
 	      $algs->{$alg} . "/src/hmmscan"    , 
 	      $bin );
+
     print "\t...done with ${alg}\n";
     
     ######################
@@ -250,16 +259,22 @@ if( $algs ){
 	get_src( $srcs->{$alg}, $pkg, "wget" );
 	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
-    if( $build ){
+    if( $source && $build ){
 	if( $test ){
 	    build_src( $algs->{$alg}, "./configure;make check; make" );	    
 	} else{ 
 	    build_src( $algs->{$alg}, "./configure;make" );	    
 	}
     }
-    link_src( $algs->{$alg} . "/ReleaseMT/bin/blastp;" . 
-	      $algs->{$alg} . "/ReleaseMT/bin/makeblastdb", 
-	      $bin );
+    if( $source ) {
+	link_src( $algs->{$alg} . "/ReleaseMT/bin/blastp;" . 
+		  $algs->{$alg} . "/ReleaseMT/bin/makeblastdb", 
+		  $bin );
+    } else {
+	link_src( $algs->{$alg} . "/bin/blastp;" . 
+		  $algs->{$alg} . "/bin/makeblastdb", 
+		  $bin );
+    }
     print "\t...done with ${alg}\n";
     
     ######################
@@ -286,7 +301,7 @@ if( $algs ){
     
     ######################
     # TRANSEQ
-    
+    if( 0 ){
     $alg = "transeq";
     print "Installing ${alg}...\n";
     if( $clean ){
@@ -307,7 +322,8 @@ if( $algs ){
     }
     link_src( $algs->{$alg}. "/emboss/transeq;", $bin );
     print "\t...done with ${alg}\n";
-    
+    }
+
     ######################
     # PRODIGAL
     
@@ -335,7 +351,7 @@ if( $algs ){
     $alg = "microbecensus";
     print "Installing ${alg}...\n";
     if( $clean ){
-	clean_src( "bin/microbe_census.py;" .
+	clean_src( "bin/microbe_census;" .
 		   "bin/ags_functions.py"   ,
 		   $algs->{$alg}, 
 		   "${pkg}" . basename( $srcs->{$alg} )  );
@@ -348,7 +364,7 @@ if( $algs ){
 	#do nothing
     }
     link_src( $algs->{$alg} . "/src/ags_functions.py;" . 
-	      $algs->{$alg} . "/src/microbe_census.py"  , 
+	      $algs->{$alg} . "/src/microbe_census"    , 
 	      $bin );
     print "\t...done with ${alg}\n";
     
@@ -450,6 +466,7 @@ sub clean_src{
 
     print "\tcleaning old install...\n";
     foreach my $link( split( "\;", $link_names ) ){
+	print( "removing $link\n" );
 	unlink( $link );
     }
     if( -d "${src_dir}" ){
@@ -460,6 +477,7 @@ sub clean_src{
 	    unlink( "${dl_stem}" );
 	}
     }
+
     chdir( $ROOT );
     return;
 }
