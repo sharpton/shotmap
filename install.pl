@@ -156,10 +156,14 @@ if( $algs ){
     }
 
     my $rapsearch_stem = "RAPSearch2";
-    #my $hmmer_stem     = "hmmer-3.1b1-linux-intel-x86_64";
-    my $hmmer_stem     = "hmmer-3.1b1";
-    #my $blast_stem     = "ncbi-blast-2.2.29+";
-    my $blast_stem     = "ncbi-blast-2.2.29+-src";
+    my $hmmer_stem     = "hmmer-3.1b1-linux-intel-x86_64";
+    if( $source ){
+	$hmmer_stem     = "hmmer-3.1b1";
+    }
+    my $blast_stem     = "ncbi-blast-2.2.29+";
+    if( $source ){
+	$blast_stem     = "ncbi-blast-2.2.29+-src";
+    }
     my $last_stem      = "last-475";
     my $transeq_stem   = "EMBOSS-6.6.0";
     my $prodigal_stem  = "Prodigal-2.6.1";
@@ -168,7 +172,10 @@ if( $algs ){
 
     my $rapsearch = "${pkg}/${rapsearch_stem}/";
     my $hmmer     = "${pkg}/${hmmer_stem}/";
-    my $blast     = "${pkg}/${blast_stem}/c++/";
+    my $blast     = "${pkg}/${blast_stem}/";
+    if( $source ){
+	$blast    = "${pkg}/${blast_stem}/c++/";
+    }
     my $last      = "${pkg}/${last_stem}/";
     my $transeq   = "${pkg}/${transeq_stem}/";
     my $prodigal  = "${pkg}/${prodigal_stem}/";
@@ -238,9 +245,15 @@ if( $algs ){
 	    build_src( $algs->{$alg}, "./configure;make" );	    
 	}
     }
-    link_src( $algs->{$alg} . "/src/hmmsearch;" . 
-	      $algs->{$alg} . "/src/hmmscan"    , 
-	      $bin );
+    if( $source ){
+	link_src( $algs->{$alg} . "/src/hmmsearch;" . 
+		  $algs->{$alg} . "/src/hmmscan"    , 
+		  $bin );
+    } else {
+	link_src( $algs->{$alg} . "/binaries/hmmsearch;" . 
+		  $algs->{$alg} . "/binaries/hmmscan"    , 
+		  $bin );
+    }
 
     print "\t...done with ${alg}\n";
     

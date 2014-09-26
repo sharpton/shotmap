@@ -325,6 +325,7 @@ sub get_options{
 	$reps_only,            $nr_db,                 $db_suffix,            $is_remote,           $remote_hostname,
 	$remote_user,          $remoteDir,             $remoteExePath,        $use_scratch,         $waittime,
 	$multi,                $mult_row_insert_count, $bulk,                 $bulk_insert_count,   $slim,
+	$remote_bash_source,
 	#the use_* methods are now obsolete
 	$use_hmmscan,          $use_hmmsearch,         $use_blast,            $use_last,            $use_rapsearch,
 	#use this in its place
@@ -378,6 +379,7 @@ sub get_options{
 	, "cluster-config" => \$cluster_config_file
 	, "use-array"      => \$use_array,
 	, "scratch-path"   => \$scratch_path,
+	, "remote-bash-source" => \$remote_bash_source,
 	# Local compute related variables
 	, "nprocs"     => \$nprocs #overrides hmmsplit, blastsplit (both =1) and seq-split-size (total seqs/nprocs)
 	#db communication method (NOTE: use EITHER multi OR bulk OR neither)
@@ -456,6 +458,7 @@ sub get_options{
 			  , "reps-only!"
 			  , "nr!"
 			  , "db-suffix:s"  
+			  , "remote-bash-source:s"
 			  # Remote computational cluster server related variables
 			  , "remote!"
 			  , "rhost=s"
@@ -712,6 +715,9 @@ sub set_params{
 	$self->use_array( $self->opts->{"use-array"} );
 	$self->cluster_config_file( $self->opts->{"cluster-config"} );
 	$self->Shotmap::Notify::warn_ssh_keys();	
+	if( defined( $self->opts->{"remote-bash-source"} ) ){
+	    $self->bash_source( $self->opts->{"remote-bash-source"} );
+	}
 	#if we aren't staging, does the database exist on the remote server?
 	#skip for now if goto is invoked.
 	unless( $self->is_conf_build ){

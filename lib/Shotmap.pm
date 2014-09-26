@@ -33,7 +33,7 @@ sub new{
     $self->{"user"}        = undef; #username to interact with DB
     $self->{"pass"}        = undef; #password to interact with DB
     $self->{"dbname"}      = undef; #name of the mysql database to talk to
-    $self->{"rawdata"} = undef; #path to the raw data
+    $self->{"rawdata"}     = undef; #path to the raw data
     $self->{"projectname"} = undef;
     $self->{"project_id"}  = undef;
     $self->{"proj_desc"}   = undef;
@@ -989,13 +989,23 @@ sub is_conf_build{
     return $self->{ $key };    
 }
 
+sub bash_source{
+    my( $self, $value ) = @_;
+    my $key = "remote_bash_source";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
 sub set_value{
     my( $self, $key, $value ) = @_;
     if( defined( $value ) ){
 	$self->{$key} = $value;
     }
     if( !defined( $self->{$key} ) ){
-	die( "You are calling for a Shotmap.pm value that hasn't been defined (<$key>)!\n" );
+	#some keys are OK to be undef
+	unless( $key eq "remote_bash_source" ){
+	    die( "You are calling for a Shotmap.pm value that hasn't been defined (<$key>)!\n" );
+	}
     }
     return $value
 }

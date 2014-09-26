@@ -123,6 +123,11 @@ sub execute_ssh_cmd{
     my $verboseFlag = (defined($verbose) && $verbose) ? '-v' : '';
     my $sshOptions = "ssh $GLOBAL_SSH_TIMEOUT_OPTIONS_STRING $verboseFlag $connection";
     $self->Shotmap::Notify::notifyAboutRemoteCmd($sshOptions);
+    if( defined( $self->bash_source() ) ){
+	$remote_cmd = "source " . $self->bash_source . "; ${remote_cmd}";
+    }
+    #add single ticks around the command
+    $remote_cmd = "\'${remote_cmd}\'";
     $self->Shotmap::Notify::notifyAboutRemoteCmd($remote_cmd);
     my $results = IPC::System::Simple::capture("$sshOptions $remote_cmd");
     (0 == $EXITVAL) or die( "Error running this ssh command: $sshOptions $remote_cmd: $results" );
@@ -2094,7 +2099,7 @@ sub translate_reads_remote($$$$$) {
 
 	$self->Shotmap::Notify::notify("Translating reads on the REMOTE machine, from $remote_raw_dir to $remote_output_dir...");
 	#execute the command...
-	my $remote_cmd = "\'perl ${metatransPerlRemote} " . " -i $remote_raw_dir" . " -o $remote_output_dir" . " -w $waitTimeInSeconds" . " -l $logsdir" . " -s $remote_script_dir" . " -f $filter_length -m $method\'";
+	my $remote_cmd = "perl ${metatransPerlRemote} " . " -i $remote_raw_dir" . " -o $remote_output_dir" . " -w $waitTimeInSeconds" . " -l $logsdir" . " -s $remote_script_dir" . " -f $filter_length -m $method";
 	if( $self->verbose ){
 	    $remote_cmd .= " -v ";
 	}
@@ -2228,7 +2233,7 @@ sub run_search_remote {
     }
     
     # See "run_remote_search" in run_remote_search_handler.pl
-    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_search_handler.pl")
+    my $remote_cmd  = "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_search_handler.pl")
 	. " --resultdir=$remote_results_output_dir "
 	. " --dbdir=$remote_db_dir "
 	. " --querydir=$remote_orf_dir "
@@ -2239,8 +2244,7 @@ sub run_search_remote {
     if( $forcesearch ){
 	$remote_cmd .= " --forcesearch ";
     }
-    $remote_cmd .=    "> ${log_file_prefix}.out 2> ${log_file_prefix}.err "
-	. "\'"; # single quotes bracket this command for whatever reason
+    $remote_cmd .=    "> ${log_file_prefix}.out 2> ${log_file_prefix}.err ";
 
     my $results     = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), $remote_cmd, $verbose);
     (0 == $EXITVAL) or $self->Shotmap::Notify::warn("Execution of command <$remote_cmd> returned non-zero exit code $EXITVAL. The remote reponse was: $results.");
@@ -2548,7 +2552,7 @@ sub parse_results_remote {
     }
     
     # See "run_remote_search" in run_remote_search_handler.pl
-    my $remote_cmd  = "\'" . "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_parse_results_handler.pl")
+    my $remote_cmd  = "perl " . File::Spec->catfile($self->remote_scripts_dir(), "run_remote_parse_results_handler.pl")
 	. " --resultdir=$remote_results_output_dir "
 	. " --querydir=$remote_orf_dir "
 	. " --dbname=$db_name "
@@ -2573,8 +2577,7 @@ sub parse_results_remote {
     if( $forceparse ){
 	$remote_cmd .= " --forceparse ";
     }
-    $remote_cmd .=    "> ${log_file_prefix}.out 2> ${log_file_prefix}.err "
-	. "\'"; # single quotes bracket this command for whatever reason
+    $remote_cmd .=    "> ${log_file_prefix}.out 2> ${log_file_prefix}.err ";
 
     my $results     = $self->Shotmap::Run::execute_ssh_cmd($self->remote_connection(), $remote_cmd, $verbose);
     (0 == $EXITVAL) or warn("Execution of command <$remote_cmd> returned non-zero exit code $EXITVAL. The remote reponse was: $results.");
