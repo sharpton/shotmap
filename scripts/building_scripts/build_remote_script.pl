@@ -12,6 +12,7 @@ my (
     $db_name_stem,
     $db_size,
     $rpath,
+    $extra_method,
     );
 
 my $use_array             = 1;
@@ -52,6 +53,7 @@ GetOptions(
     "coverage:f"             => \$coverage_threshold,
     "delete-raw!"            => \$delete_raw,
     "rpath:s"                => \$rpath,
+    "extra-method:s"         => \$extra_method, #needed by parse, is trans method
     );
 
 my $remote_scripts_dir = $projectdir . "/scripts/";
@@ -77,6 +79,7 @@ print $out get_header_strings( type               => $type,
 			       evalue_threshold   => $evalue_threshold,
 			       coverage_threshold => $coverage_threshold,
 			       remote_scripts_dir => $remote_scripts_dir,			       
+			       extra_method       => $extra_method,
     );
 print $out get_metadata_strings( $type, $method );
 print $out get_scratch_prefix( $type ) if $use_scratch;
@@ -113,7 +116,8 @@ sub get_header_strings{
     my $evalue_threshold   = $vals{evalue_threshold};
     my $coverage_threshold = $vals{coverage_threshold};
     my $remote_scripts_dir = $vals{remote_scripts_dir};
-			       
+    my $extra_method       = $vals{extra_method};
+
     my $string = "";
     if( $type eq "search" ){
 	$string   .= join( "\n", "INPATH=\$1", "INPUT_GZ=\$2", "DBPATH=\$3", "OUTPATH=\$4", "OUTSTEM=\$5", "\n" );
@@ -184,6 +188,7 @@ sub get_header_strings{
 			 "EVALUE="        . $evalue_threshold,
 			 "COVERAGE="      . $coverage_threshold,
 			 "SCORE="         . $score_threshold,
+			 "TRANS_METHOD="  . $extra_method,
 			 "\n" );
          #we want old jobs to be wiped in the case that we've run force_parse in the control script
 	$string .= join( "\n",
@@ -422,8 +427,9 @@ sub get_run_strings{
     #####
     if( $type eq "parse" ){
 	$cmd = "perl \${PARSE_RESULTS} --results-tab=" . $out . " --orfs-file=" . 
-	    $query . " --sample-id=\${SAMPLE_ID} --algo=\${SEARCH_METHOD} " .
-	    "--evalue=\${EVALUE} --coverage=\${COVERAGE} --score=\${SCORE}";
+	    $query . " --sample-id=\${SAMPLE_ID} --algo=\${SEARCH_METHOD} "  .
+	    "--evalue=\${EVALUE} --coverage=\${COVERAGE} --score=\${SCORE} " .
+	    "--trans-method=\${TRANS_METHOD}" ;
     } else {
 	#####
 	# HOMOLOGY SEARCH

@@ -10,7 +10,8 @@ use Data::Dumper;
 my ( $results_tab, $query_orfs_file,
      $sample_id,   $algo,            
      $t_evalue,    $t_coverage,      $t_score, 
-     $no_coverage, $target_skip_string
+     $no_coverage, $target_skip_string,
+     $trans_method,
     );
 
 my $parse_type = "best_hit"; #use this to save space. Will still have to look across searchdb splits for top hit.
@@ -27,6 +28,7 @@ GetOptions(
     "parse-type=s"   => \$parse_type, #what results should we store? 'best_hit' (per read), 'best_per_fam' (per read), 'all' (above thresholds)
     "no_coverage"    => \$no_coverage,
     "target-skip-string" => \$target_skip_string,
+    "trans-method=s"     => \$trans_method,
     );
 
 if( $t_evalue eq "NULL" && $t_coverage eq "NULL" && $t_score eq "NULL" ){
@@ -177,7 +179,7 @@ while(<$res_fh>){
     if( defined( $t_coverage ) ){
 	next unless $coverage >= $t_coverage;
     }
-    my $read_alt_id = parse_orf_id( $qid );
+    my $read_alt_id = parse_orf_id( $qid, $trans_method );
 #print mysql data row to file
     my @fields = ( $qid, $read_alt_id, $sample_id, $tid, $famid, $score, $evalue, $coverage, $aln_len );
     my $row    = join( ",", @fields, "\n" );
@@ -218,11 +220,17 @@ close OUT;
     
 sub parse_orf_id{
     my $orfid  = shift;
-    my $method = shift; #we used to use this to customize how to parse id; metatrans standardizes
+    my $method = shift; 
     my $read_id = ();
     #assumes that orfs will all have this format.
-    if( $orfid =~ m/^(.*?)\_\d_\d+$/ ){
-	$read_id = $1;
+    if( $method eq "6FT_split" ){
+	if( $orfid =~ m/^(.*?)\_\d_\d+$/ ){
+	    $read_id = $1;
+	}
+    } elsif( $method eq "6FT" || $method eq "prodigal" ){
+	if( $orfid =~ m/^(.*?)\_\d+$/ ){
+	    $read_id = $1;
+	}
     }
     else{
 	die "Can't parse read_id from $orfid\n";
@@ -247,8 +255,7 @@ sub get_sequence_lengths_from_file{
 	    $sequence .= $_; # append to the sequence
 	    $seqlens{$header} = length($sequence);
 	}
-
-	if( $_ =~ m/\>(.*?)\s/ ){ #only want the id, not the rest of the header
+	if( $_ =~ m/\>(.*?)(\s|$)/ ){ #only want the id, not the rest of the header
 	    # Starts with a '>' so this is a header line!
 	    if (defined($header)) { # <-- process the PREVIOUSLY READ sequence, which we have now completed
 		$seqlens{$header} = length($sequence);

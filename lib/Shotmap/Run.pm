@@ -2357,6 +2357,7 @@ sub parse_results {
     my $t_score      = $self->parse_score;
     my $t_coverage   = $self->parse_coverage;
     my $t_evalue     = $self->parse_evalue;
+    my $trans_meth   = $self->trans_method;
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
     my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
     my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
@@ -2387,6 +2388,7 @@ sub parse_results {
 	    . "--sample-id=$sample_id "
 	    . "--algo=$type "
 	    . "--parse-type=best_hit "
+	    . "--trans-method=$trans_meth "
 	    ;	
 	if( defined( $t_score ) ){
 	    $cmd .= " --score=$t_score ";
@@ -3592,6 +3594,7 @@ sub build_remote_script{
     my $scratch_path          = $self->scratch_path;
     my $lightweight           = $self->lightweight;
     my $rpath                 = $self->remote_exe_path;
+    my $extra_method          = $self->trans_method; #might need control over var in future
 
     my $db_size = 0; #only relevant to type = search
     if( $type eq "search" ){
@@ -3640,7 +3643,8 @@ sub build_remote_script{
 	"$compress_str "    . 
 	"--nprocs=${cpus} " . 
 	"--scratch-path=${scratch_path} " . 
-	"$light_str ";
+	"$light_str " .
+	"--extra-method=${extra_method}";	
     if( defined( $self->parse_coverage ) ){
 	$cmd .= " --coverage=" . $self->parse_coverage . " ";
     }
