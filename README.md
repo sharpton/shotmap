@@ -417,6 +417,39 @@ OPTIONS
     Forces slave nodes to use local scratch space (i.e., /scratch) when running processes on the compute cluster. When disabled, all distributed shotmap tasks
     will read/write using --rdir, which may create I/O bottlenecks on the cluster. Talk to your system administrator before disabling!
     
+* **--scratch-path** (Optional) DEFAULT: /scratch
+
+  --scratch-path=/data/
+
+  Not all remote clusters use the same path structure to indicate the location of the machine's scratch space. Use this variable
+  to specify the location of the scratch space on your remote machine.
+
+* **--use-array** (Optional) DEFAULT: ENABLED
+
+  Should shotmap use array jobs when invoking SGE? The answer is probably yes, but you might check with your system admin.
+
+  Disable by invoking --nouse-array.
+
+* **--cluster-config=/PATH/TO/LOCAL/CLUSTER/HEADER/FILE** (Optional argument) NO DEFAULT
+
+  Example: --cluster-config=data/cluster_config.txt 
+
+  Your SGE distributed compute cluster may require that specific job-level variables be properly set for successful execution. 
+  These variables can be made available through the header section of the queue submission script (denoted by #$ -option value).
+  You can point to a file that includes such a header, which shotmap will prepend to the submission scripts that it creates.
+
+  Note that this may be unnecessary for your cluster. Also, options that you normally invoke at the commandline when executing
+  qsub can be included here using the aforementioned format)
+
+* **--remote-bash-source=/PATH/TO/REMOTE/SOURCE/FILE** (Optional argument) NO DEFAULT
+
+  Example: --remote-bash-source=/remote/home/user/.bashrc
+  
+  The location of a file on the remote machine that includes the bash settings needed to operate the remote environment.
+  During our troubleshooting, we noticed that while some remote machines will load the bash variables when commands are called
+  via ssh, others will not. So, when shotmap executes a command on the remote machine via ssh, it first sources the file
+  that this option points to so that the bash environmental variables are properly configured for successful execution.
+
 ###TRANSLATION/GENE CALLING METHODS:
 
 * **--trans-method=STRING** (REQUIRED) DEFAULT: --trans-method=prodigal
@@ -568,7 +601,7 @@ OPTIONS
   * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families
   * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
 
-* **--reload** (Optional) DEFAULT: DISABLED)
+* **--reload** (Optional) DEFAULT: DISABLED
 
   Normally, shotmap emits a warning when you attempt to analyze data that you have already processed at some level with shotmap. 
   It prefers that you use the --goto option and amend your settings, but you can completely start over using the --reload option.
@@ -579,6 +612,29 @@ OPTIONS
 * **--verbose** (Optional) DEFAULT: DISABLED
 
   Verbose output is produced. Helpful for troubleshooting.
+
+* **--python=/PATH/TO/PYTHON/EXE** (Optional) NO DEFAULT
+
+  If you want to specify a specific version of python, you can point shotmap to the binary using this variable
+
+* **--perl=/PATH/TO/PERL/EXE** (Optional) NO DEFAULT
+
+  If you want to specify a specific version of perl, you can point shotmap to the binary using this variable
+
+* **--auto** (Optional) DEFAULT: ENABLED
+
+  Setting this variable tells shotmap to make intellegent guesses about which runtime options should be set. 
+  For example, if you tell shotmap to build a search database and invoke --remote, it will automatically
+  invoke --stage.
+
+  Disable with --noauto
+
+* **--lightweight** (Optional) DEFAULT: ENABLED
+
+  Setting this tells shotmap to keep the disc footprint as small as possible throughout the run. This means that it
+  cleans up some data in the ffdb throughout the run and compresses data where possible.
+
+  Disable with --nolightweight	
 
 
 Details
