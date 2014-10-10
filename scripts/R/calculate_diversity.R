@@ -94,13 +94,19 @@ abund.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="ABUNDANCE", fill=0
 count.map  <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="COUNTS", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 ra.map     <- acast(abund.df, SAMPLE.ID~FAMILY.ID, value.var="REL.ABUND", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 
-# write the sample-by-data matrices
-samp.abund.file = paste( samp.abund.map, ".abund.map", sep="" )
-write.table( abund.map, file = samp.abund.file )
-samp.count.file = paste( samp.abund.map, ".counts.map", sep="" )
-write.table( count.map, file = samp.count.file )
-samp.ra.file    = paste( samp.abund.map, ".ra.map", sep="" )
-write.table( ra.map, file = samp.ra.file )
+### write the sample-by-data matrices
+#abundance table
+samp.abund.file = paste( samp.abund.map, ".abund.tab", sep="" )
+print( paste( "Producing samples-by-abundance table here: ", samp.abund.file, sep="") )
+write.table( abund.map, file = samp.abund.file, quote=FALSE )
+#counts table
+samp.count.file = paste( samp.abund.map, ".counts.tab", sep="" )
+print( paste( "Producing samples-by-counts table here: ", samp.count.file, sep="") )
+write.table( count.map, file = samp.count.file, quote=FALSE )
+#relative abundance table
+samp.ra.file    = paste( samp.abund.map, ".ra.tab", sep="" )
+print( paste( "Producing samples-by-relative abundance table here: ", samp.ra.file, sep="") )
+write.table( ra.map, file = samp.ra.file, quote=FALSE )
 
 class.df   <- as.data.frame( unique(cbind(abund.df$SAMPLE.ID, abund.df$CLASS.SEQS) ) )
 class.df   <- class.df[ order( class.df[,1] ), ]

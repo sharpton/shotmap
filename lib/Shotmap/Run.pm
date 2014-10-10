@@ -3258,6 +3258,7 @@ sub build_intersample_abundance_map_flatfile{
 	die( "I couldn't locate sample flatfile abundance tables in ${outdir}. Are you sure they were built?" );
     }
     my $sample_abund_out  = $outdir . "/Abundance_Map_InterSample_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
     print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "COUNTS", 
 		            "ABUNDANCE", "REL.ABUND", "TOT.ABUND", 
@@ -3422,8 +3423,13 @@ sub calculate_diversity{
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
 
+    my $n_samples = scalar( @{ $self->get_sample_ids } );
+    if( $n_samples < 2 ){
+	print "You are processing a single sample, so I will not run the intersample comparative analyses\n";
+	return;
+    }
     #INTERFAMILY ANALYSIS
-    #open directory that contains sample-famid abundance maps for all samples for given class/abundparam id
+    #open directory that contains sample-famid abundance maps for all samples for given class/abundparam id   
     my $family_path_stem = "Inter_Family_Results";
     File::Path::make_path( $outdir . "/${family_path_stem}/" );
     my $family_abundance_prefix = $outdir . "/${family_path_stem}/Family_Tests_cid_${class_id}_aid_${abund_param_id}";
