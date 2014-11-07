@@ -21,7 +21,7 @@ Quickstart
 
 Once you have a configuration file built (see below), all you need to do to annotate your metagenome is:
      
-     perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configutation_file>
+     perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file>
 
 Detailed Workflow Synopsis (section under development)
 ______________________________________________________
