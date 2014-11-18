@@ -231,9 +231,18 @@ sub get_partitioned_samples{
 	}
 	else { #is a sample sequence file
 	    #is it properly formatted?
-	    $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt" );
+	    my $is_compressed = 0;
+	    if( $file =~ m/\.gz$/ ){
+		$is_compressed = 1;
+	    }
+	    $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt", $is_compressed );
 	    #get sample name here, simple parse on the period in file name
-    	    my $thisSample = basename($file, (".fa", ".fna"));
+	    my $thisSample;
+	    if( $is_compressed ){
+		$thisSample = basename($file, (".fa.gz", ".fna.gz"));
+	    } else {
+		$thisSample = basename($file, (".fa", ".fna"));
+	    }
 	    $samples{$thisSample}->{"path"} = "$path/$file";
 	}	
     }
@@ -251,12 +260,17 @@ sub get_partitioned_samples{
 }
 
 sub check_fasta_file{
-    my( $self, $file, $type ) = @_;
-    open( FILE, $file ) || die "Can't open $file for read: $!\n";
+    my( $self, $file, $type, $is_compressed ) = @_;
+    my $fh;
+    if( $is_compressed ){
+	open( $fh, "zcat $file|" ) || die "Can't open $file for read: $!\n";
+    } else {
+	open( $fh, $file ) || die "Can't open $file for read: $!\n";
+    }
     my $is_fasta = 1;
     my $line_ct  = 0;
     my $line_lim = 100; #look at the first 100 lines to make a guess
-    while(<FILE>){
+    while(<$fh>){
 	chomp $_;
 	my $line = $_;
 	$line_ct++;
@@ -276,7 +290,7 @@ sub check_fasta_file{
 	    die "I received a value for type that I don't understand (<$type>)\n";
 	}
     }
-    close FILE;
+    close $fh;
     if( !$is_fasta ){
 	die( "$file doesn't look like a properly formatted fasta file\n" );
     }    
