@@ -235,7 +235,10 @@ sub get_partitioned_samples{
 	    if( $file =~ m/\.gz$/ ){
 		$is_compressed = 1;
 	    }
-	    $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt", $is_compressed );
+	    my $is_fasta = $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt", $is_compressed );
+	    if( !$is_fasta ){
+		next;
+	    }
 	    #get sample name here, simple parse on the period in file name
 	    my $thisSample;
 	    if( $is_compressed ){
@@ -292,8 +295,9 @@ sub check_fasta_file{
     }
     close $fh;
     if( !$is_fasta ){
-	die( "$file doesn't look like a properly formatted fasta file\n" );
+	warn( "$file doesn't look like a properly formatted fasta file\n" );
     }    
+    return $is_fasta;
 }
 
 
