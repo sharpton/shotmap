@@ -1528,6 +1528,8 @@ sub build_search_db{
 		$suffix = ".faa";
 	    } elsif( $family_db_file =~ m/\.fa$/ || $family_db_file =~ /\.fa\.gz$/ ){
 		$suffix = ".fa";
+	    } elsif( $family_db_file =~ m/\.fasta$/ || $family_db_file =~ /\.fasta\.gz$/ ){
+		$suffix = ".fasta";
 	    } else {
 		die ("I could not determine the suffix associated with $family_db_file\n" );
 	    }	   

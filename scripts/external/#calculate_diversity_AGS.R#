@@ -100,7 +100,7 @@ autodetect <- function( val.list, force = NULL  ) {
 
 ####get the metadata
 print( "Grabbing metadata..." )
-meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
+vmeta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
 meta.names <- colnames( meta )
 
 ###get family abundances by samples
