@@ -1958,6 +1958,9 @@ sub _build_nr_seq_db{
     while( <$fh> ){
 	chomp $_;	
 	if( eof ){
+	    if( !defined( $sequence ) ){
+		die( "Error parsing sequence from $family before this line: $_\n" );
+	    }
 	    my ( $id, $desc ) = _parse_seq_id( $header );
 	    my $new_id        = ">${id}_${famid}";
 	    my $new_header    = ">${id}_${famid} $desc";	    
