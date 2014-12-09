@@ -1957,23 +1957,6 @@ sub _build_nr_seq_db{
     my $header;
     while( <$fh> ){
 	chomp $_;	
-	if( eof ){
-	    if( !defined( $sequence ) ){
-		die( "Error parsing sequence from $family before this line: $_\n" );
-	    }
-	    my ( $id, $desc ) = _parse_seq_id( $header );
-	    my $new_id        = ">${id}_${famid}";
-	    my $new_header    = ">${id}_${famid} $desc";	    
-	    if( !defined( $dict->{$sequence} ) ){
-		print OUT "${new_header}\n${sequence}\n";	    
-		$dict->{$sequence} = $id;
-	    } else { #print out the duplicate sequence pairings
-		if( defined( $dups_list_file ) ){
-		    my $retained_id = $dict->{$sequence};
-		    print $dups_list_file join( "\t", $family, $retained_id, $id, "\n" );
-		}
-	    }
-	}
 	if( $_ =~ m/^>/ ){
 	    if( defined( $header ) ){
 		my ( $id, $desc ) = _parse_seq_id( $header );
@@ -1994,6 +1977,22 @@ sub _build_nr_seq_db{
 	} else {
 	    $sequence .= $_;
 	}		
+    }
+    #deal with the last line
+    if( !defined( $sequence ) ){
+	die( "Error parsing sequence from $family before this line: $_\n" );
+    }
+    my ( $id, $desc ) = _parse_seq_id( $header );
+    my $new_id        = ">${id}_${famid}";
+    my $new_header    = ">${id}_${famid} $desc";	    
+    if( !defined( $dict->{$sequence} ) ){
+	print OUT "${new_header}\n${sequence}\n";	    
+	$dict->{$sequence} = $id;
+    } else { #print out the duplicate sequence pairings
+	if( defined( $dups_list_file ) ){
+	    my $retained_id = $dict->{$sequence};
+	    print $dups_list_file join( "\t", $family, $retained_id, $id, "\n" );
+	}
     }
     close $fh;
     close OUT;
