@@ -49,6 +49,8 @@ if( verbose ) {
     msg.trap <- capture.output( suppressMessages( library( qvalue ) ) )
 }
 
+print( "Libraries loaded" )
+
 ###Set autodetection thresholds
 cont.thresh    = 0.2 #if there are fewer than this fraction of uniq vars in list, force discrete
 n.type.plot.lim = 10  #if there are more than this number of uniq vars in list, don't plot results, only produce table files
@@ -190,7 +192,7 @@ for( a in 1:length( meta.names ) ){
     ##t.test
     if( test.type == "t.test" ){
       rawp0 <- apply(test.data, 1, function(x) t.test(x~classes)$p.value)
-    } else if( test.type == "wilcoxon.test" ){   
+    } else if( test.type == "wilcoxon.test" ){        
       ##fastest procedure seems to be applying wilcox.test to df rows
       #rawp0 <- apply(test.data, 1, function(x) wilcox.test(x~classes)$p.value)
       #update to coin
@@ -221,11 +223,11 @@ for( a in 1:length( meta.names ) ){
   ##do a Kruskal-Wallis if the number of discrete classes > 2
   else if( length( types ) > 2 & autodetect( meta[,meta.field], cont.thresh ) == "discrete" ){
     print("...preparing kruskal-wallis tests...")
-    classes.unsort        <-meta[,meta.field]
+    classes.unsort        <-as.factor(meta[,meta.field])
     names(classes.unsort) <-meta$SAMPLE.ID
-    test.data <- t( ra.map )
-    classes   <- classes.unsort[ colnames( test.data ) ]
-    #rawp0     <- apply( test.data, 1, function(x) kruskal.test( x~classes)$p.value )
+    test.data       <- t( ra.map )
+    classes         <- classes.unsort[ colnames( test.data ) ]
+    #rawp0          <- apply( test.data, 1, function(x) kruskal.test( x~classes)$p.value )
     #update to coin	   
     rawp0           <- apply( test.data, 1, function(x) pvalue( kruskal_test( x~classes, data = list(abundance = x, feature = classes ), distribution = approximate(B=5000) ) ) )    
     res             <- mt.rawp2adjp(rawp0, procs, na.rm=TRUE)
