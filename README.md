@@ -674,3 +674,4 @@ OPTIONS
 
 Details
 -------
+shotmap is current in beta testing.
