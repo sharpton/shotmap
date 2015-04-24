@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #Copyright (C) 2011  Thomas J. Sharpton 
-#author contact: thomas.sharpton@gladstone.ucsf.edu
+#author contact: thomas.sharpton@gmail.com
 #This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 #This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #You should have received a copy of the GNU General Public License along with this program (see LICENSE.txt).  If not, see <http://www.gnu.org/licenses/>.
@@ -39,10 +39,17 @@ sub check_vars{
 		 "Example: --rpath=/cluster/home/yourname/bin:/somewhere/else/bin:/another/place/bin). " . 
 		 "COLONS delimit separate path locations, just like in the normal UNIX path variable. This is not mandatory, but is a good idea to include.\n"
 	     );
-	 if( !defined($self->opts->{"cluster-config"}) || ! -e $self->opts->{"cluster-config"} ){
+	 if( !defined($self->opts->{"cluster-config"}) ){ 
 	     $self->Shotmap::Notify::dieWithUsageError(
 		 "You must specify an SGE cluster configuration header file, or I won't be able to properly submit jobs to the remote cluster. Example: " .
-		 "--cluster-config=data/cluster_config.txt\n"
+		 "--cluster-config=" . $ENV{'SHOTMAP_LOCAL'} . "data/config/cluster_config.txt\n"
+		 );
+	 }
+	 if( ! -e $self->opts->{"cluster-config"} ){
+	     $self->Shotmap::Notify::dieWithUsageError(
+		 "I can't seem to access your cluster-config file. You specified --cluster-config=" .
+		 $self->opts->{"cluster-config"} . 
+		 ". Please double check this filepath and permissions."
 		 );
 	 }
 	 if( !defined( $self->opts->{"searchdb-split-size"} ) ){
@@ -53,7 +60,7 @@ sub check_vars{
 		 );
 	 }
     } else {
-	$self->Shotmap::Notify::warn( "You did not invoke --remote, so shotmap will run locally\n" );
+	$self->Shotmap::Notify::notify_verbose( "You did not invoke --remote, so shotmap will run locally\n" );
 	(defined($self->opts->{"nprocs"})) 
 	    or $self->Shotmap::Notify::dieWithUsageError( 
 		"You did not specify the number of processors that shotmap should use on your local compute server. Rerun by specifying --nprocs or run a remote job" 
@@ -64,41 +71,72 @@ sub check_vars{
 	    "Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies."
 	);
     #right now, we only require --rawdata  to be set at time of test or run, allows run-time looping over projects
-    unless( defined( $self->opts->{"pid"} ) || $self->is_conf_build ){ 
+    unless( defined( $self->opts->{"pid"} ) || !$self->full_pipe ){ 
 	(-d $self->opts->{"rawdata"}) 
 	    or $self->Shotmap::Notify::dieWithUsageError(
 		"You must provide a properly structured raw data (--rawdata) directory! Sadly, the specified directory <" . 
 		$self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n"
 	    );
     }    
-    (defined($self->opts->{"ffdb"})) 
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--ffdb (local flat-file database directory path) must be specified! Example: --ffdb=/some/local/path/shotmap_repo " .
-	    "Note that if you set --rawdata and don't specify --ffdb, shotmap will automatically create a ffdb path within the " .
-	    "directory specific in --rawdata"
-	);
-    
-    if( ! -d $self->opts->{"ffdb"} ){
+    #but, if no ffdb or searchdb-dir is defined, then we need the rawdata to know where to place the searchdb
+    if( !defined( $self->opts->{"rawdata"}      ) &&
+	!defined( $self->opts->{"ffdb"}         ) &&
+	!defined( $self->opts->{"searchdb-dir"} ) ){
+	$self->Shotmap::Notify::dieWithUsageError(
+	    "You must specify the location of the directory containing your input sequence data using --rawdata"
+	    );
+    }
+		  
+    if( $self->full_pipe ){
+	if( !defined( $self->opts->{"ffdb"}         ) &&
+	    !defined( $self->opts->{"searchdb-dir"} ) ){
+		$self->Shotmap::Notify::notify_verbose(
+		    "I see you did not specify either --ffdb or --searchdb-dir. This is fine, " .
+		    "as I will create a ffdb within the directory specified by --rawdata. " .
+		    "But, it might be faster to use build_shotmap_searchdb.pl to build a search " .
+		    "database and specify its location with --searchdb-dir"
+		    );
+	}
+    }
+    if( defined( $self->opts->{"ffdb"} ) &&
+	! -d $self->opts->{"ffdb"} ){
 	$self->Shotmap::Notify::warn(
 	    "I don't see a previously created ffdb at " . $self->opts->{"ffdb"} . " so I will try to create it." );
 	mkdir( $self->opts->{"ffdb"} );
+	
+	(-d $self->opts->{"ffdb"} ) 
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--ffdb (local flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . 
+		"', but I can't find that directory, even after trying to create it. Please check that you have " . 
+		"permission to write this directory."
+	    );
     }
-    (-d $self->opts->{"ffdb"} ) 
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--ffdb (local flat-file database directory path) was specified as --ffdb='" . $self->opts->{"ffdb"} . 
-	    "', but I can't find that directory, even after trying to create it. Please check that you have " . 
-	    "permission to write this directory."
-	);
-    (defined($self->opts->{"refdb"})) 
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--refdb (local REFERENCE flat-file database directory path) must be specified! Example: --refdb=/some/local/path/protein_family_database"
-	);
-    (-d $self->opts->{"refdb"})
-	or $self->Shotmap::Notify::dieWithUsageError(
-	    "--refdb (local REFERENCE flat-file database directory path) was specified as --refdb='" . $self->opts->{"refdb"} . 
-	    "', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, ".
-	    "so please specify the full path in that case. Specify a directory that exists."
-	);
+    if( defined( $self->opts->{"searchdb-dir"} ) ){
+	if( $self->full_pipe ){
+	    (-d $self->opts->{"searchdb-dir"} )
+		or $self->Shotmap::Notify::dieWithUsageError(
+		    "--searchdb-dir (shotmap formatted search database) was specified as --searchdb-dir='" .
+		    $self->opts->{"searchdb-dir"} .
+		    "', but that directory does not appear to exist!"
+		);
+	} else {
+	    #do nothing (for now)
+	}
+    }
+    unless( defined $self->opts->{"searchdb-dir"} ){
+	(defined($self->opts->{"refdb"})) 
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--refdb (local REFERENCE flat-file database directory path) or " .
+		"--searchdb-dir (location ot pre-build SEARCH database) " .
+		"must be specified!"
+	    );
+	(-d $self->opts->{"refdb"})
+	    or $self->Shotmap::Notify::dieWithUsageError(
+		"--refdb (local REFERENCE flat-file database directory path) was specified as --refdb='" . $self->opts->{"refdb"} . 
+		"', but that directory appeared not to exist! Note that Perl does NOT UNDERSTAND the tilde (~) expansion for home directories, ".
+		"so please specify the full path in that case. Specify a directory that exists."
+	    );
+    }
     (defined( $self->opts->{"db"} ) ) 
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "I do not know if you want to use a mysql database to store your data or not. Please specify with --db. Select from:\n" .
@@ -108,50 +146,64 @@ sub check_vars{
 	if( defined( $self->opts->{"conf-file"} ) ){
 	    ( -e $self->opts->{"conf-file"} ) or 
 		$self->Shotmap::Notify::dieWithUsageError(
-		    "You have specified a password file by using the --conf-file option, but I cannot find that file. You entered <" . 
+		    "You have specified a configuration file by using the --conf-file option, but I cannot find that file. You entered <" . 
 		    $self->opts->{"conf-file"} . ">"
 		);
 	}
     }
-    my $algo_list = "hmmsearch, hmmscan, blast, last, rapsearch";
-     if ($self->opts->{"use_hmmsearch"} ||
-	 $self->opts->{"use_hmmscan"}   || 
-	 $self->opts->{"use_blast"}     || 
-	 $self->opts->{"use_last"}      || 
-	 $self->opts->{"use_rapsearch"} ){
-	 $self->Shotmap::Notify::dieWithUsageError( 
-	     "The --use_<algorithm> is now obsolete. Please specify a search algorithm with --search-method=<algorithm>. Pick from " . $algo_list 
-	     );
-     }
-    ( defined( $self->opts->{"search-method"} ) ) ||
+    my %trans_list = ( "6FT"       => 1, 
+		       "6FT_split" => 1, 
+		       "prodigal"  => 1 
+    );
+    my $trans      = $self->opts->{"trans-method"};
+    ( defined( $trans ) && exists( $trans_list{ $trans } ) ) ||
+	$self->Shotmap::Notify::dieWithUsageError(
+	    "You must specify a translation method with --trans-method. Select from " . 
+	    join( " ", keys( %trans_list ) )
+	);
+
+    my %algo_list = ( "hmmsearch" => 1, 
+		      "hmmscan"   => 1,
+		      "blast"     => 1,
+		      "last"      => 1, 
+		      "rapsearch" => 1
+	);
+    my $algo = $self->opts->{"search-method"};
+    ( defined( $algo ) && exists( $algo_list{$algo} ) ) ||
       $self->Shotmap::Notify::dieWithUsageError( 
-	  "You must specify a search algorithm with --search-method. Select from " . $algo_list 
+	  "You must specify a search algorithm with --search-method. Select from " . 
+	  join( " ", keys( %algo_list ) )
       );
-      my $algo = $self->opts->{"search-method"};
-      ( $algo eq "hmmsearch" || 
-	$algo eq "hmmscan"   || 
-	$algo eq "blast"     || 
-	$algo eq "last"      || 
-	$algo eq "rapsearch" ) ||
-	  $self->Shotmap::notify::dieWithUsageError( 
-	      "You did not select a --search-method that I know how to use. You gave " .
-	      $self->opts->{"search-method"} . ". Please select from " . $algo_list 
-	  );
-     if( $self->opts->{"use_rapsearch"} && !defined( $self->opts->{"db-suffix"} ) ){  
+    if( $self->opts->{"search-method"} eq "rapsearch" && 
+	!defined( $self->opts->{"db-suffix"} ) ){  
 	 $self->Shotmap::Notify::dieWithUsageError( 
 	     "You must specify a database name suffix for indexing when running rapsearch!" 
 	     ); 
      }
     
-
-     #($coverage >= 0.0 && $coverage <= 1.0) or $self->Shotmap::Notify::dieWithUsageError("Coverage must be between 0.0 and 1.0 (inclusive). You specified: $coverage.");
-     
-     if ((defined($self->opts->{"goto"}) && 
-	  $self->opts->{"goto"}) && 
-	 !defined($self->opts->{"pid"})) { 
-	 $self->Shotmap::Notify::dieWithUsageError(
-	     "If you specify --goto=SOMETHING, you must ALSO specify the --pid to goto!"
-	     ); 
+    
+    #($coverage >= 0.0 && $coverage <= 1.0) or 
+    #$self->Shotmap::Notify::dieWithUsageError(
+    #"Coverage must be between 0.0 and 1.0 (inclusive). You specified: $coverage.");
+    
+    if( defined( $self->opts->{"goto"} ) ){
+	if( !defined( $self->opts->{"pid"} ) ) { 
+	    #try to auto set the pid. Note that for mysql db usage, must still be defined.
+	    if( !$self->use_db ){
+		if( defined( $self->opts->{"rawdata"} ) ){
+		    my $path = $self->opts->{"rawdata"};
+		    my ($name, $dir, $suffix) = fileparse( $path );     #get project name and load
+		    $self->opts->{"pid"} = $name;
+		}
+	    }
+	    if( $self->iterate_output ){
+		if( !defined($self->opts->{"pid"} ) ) { 
+		    $self->Shotmap::Notify::dieWithUsageError(
+			"If you specify --goto=SOMETHING, you must ALSO specify the --pid to goto!"
+			); 
+		}
+	    }
+	}
      }     
      if( $self->opts->{"bulk"} && $self->opts->{"multi"} ){
 	 $self->Shotmap::Notify::dieWithUsageError( 
@@ -233,10 +285,24 @@ sub check_vars{
 	}
     }
     unless( $self->is_conf_build ){
-	(defined($self->opts->{"searchdb-name"})) 
-	    or $self->Shotmap::Notify::dieWithUsageError( 
-		"Note: You must name your search database using the --searchdb-name option. Exiting\n" 
-	    );
+	if( defined(  $self->opts->{"searchdb-dir"} ) &&
+	    !defined( $self->opts->{"searchdb-name"}) ){
+	    #searchdb-dir was checked to be -d above
+	    #use the first database split to get the basename
+	    my @files = glob( $self->opts->{"searchdb-dir"} . "/*_1.fa" ); 
+	    if( $self->full_pipe && !( @files ) ){
+		die( "There does not appear to be a properly formatted search database in the directory " .
+		     "specified by --searchdb-dir" );
+	    }
+	    my $name  = basename( $files[0] );
+	    $name =~ s/\_1\.fa$//;
+	    $self->opts->{"searchdb-name"} = $name;
+	} else {
+	    (defined($self->opts->{"searchdb-name"})) 
+		or $self->Shotmap::Notify::dieWithUsageError( 
+		    "Note: You must name your search database using the --searchdb-name option. Exiting\n" 
+		);
+	}       
     }
     (defined($self->opts->{"normalization-type"})) 
 	or  $self->Shotmap::Notify::dieWithUsageError( 
@@ -318,9 +384,10 @@ sub get_options{
 
     my( $conf_file,            $local_ffdb,            $local_reference_ffdb, $raw_data,         $input_pid,
 	$goto,                 $db_username,           $db_pass,              $db_hostname,         $dbname,
-	$schema_name,          $db_prefix_basename,    $search_db_split_size, $db_type,
+	$schema_name,          $db_prefix_basename,    $search_db_split_size, $db_type,          $search_db_dir,
 	#the following options are now obsolete
 	$hmm_db_split_size,    $blast_db_split_size, 
+
 	$family_subset_list,  
 	$reps_only,            $nr_db,                 $db_suffix,            $is_remote,           $remote_hostname,
 	$remote_user,          $remoteDir,             $remoteExePath,        $use_scratch,         $waittime,
@@ -331,16 +398,17 @@ sub get_options{
 	#use this in its place
 	$search_method,
 	$nseqs_per_samp_split, $prerare_count,         $postrare_count,       $trans_method,        $should_split_orfs,
-	$filter_length,        $p_evalue,              $p_coverage,           $p_score,             $evalue,
+	$orf_filter_length,    $p_evalue,              $p_coverage,           $p_score,             $evalue,
 	$coverage,             $score,                 $top_hit,              $top_hit_type,        $stage,	
 	$rarefaction_type,     $class_level,
 	#the following options are now obsolete
-	$hmmdb_build,          $blastdb_build,         	
+	$hmmdb_build,          $blastdb_build,    
+     	
 	$build_search_db,      $force_db_build,       $force_search,        $small_transfer, 
-	$normalization_type,   $abundance_type,
+	$normalization_type,   $abundance_type,       $ags_method,
 	#vars being tested
 	$nprocs, $auto, $python, $perl, $cluster_config_file, $use_array, $scratch_path, 
-	$lightweight, 
+	$lightweight, $iterate_output,  $read_filter_length, $adapt,
 	#non conf-file vars	
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
@@ -360,6 +428,7 @@ sub get_options{
 	, "dbname"     => \$dbname
 	, "dbschema"   => \$schema_name
 	# FFDB Search database related options
+	, "searchdb-dir"        => \$search_db_dir
 	, "searchdb-name"       => \$db_prefix_basename
 	, "searchdb-split-size" => \$search_db_split_size
 	, "hmmsplit"         => \$hmm_db_split_size # now obsolete
@@ -401,9 +470,10 @@ sub get_options{
 	,    "postrare-samps"   => \$postrare_count
 	,    "rarefaction-type" => \$rarefaction_type #could be orf, class_orf, or class_read in theory, only read and orf currently implemented
 	#translation options
-	,    "trans-method"   => \$trans_method
-	,    "split-orfs"     => \$should_split_orfs
-	,    "min-filter-len" => \$filter_length
+	,    "trans-method"    => \$trans_method
+	,    "split-orfs"      => \$should_split_orfs
+	,    "orf-filter-len"  => \$orf_filter_length
+	,    "read-filter-len" => \$read_filter_length
 	#search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 	,    "parse-evalue"   => \$p_evalue
 	,    "parse-coverage" => \$p_coverage
@@ -419,14 +489,17 @@ sub get_options{
 	#abundance claculation parameters
 	,    "abundance-type"     => \$abundance_type
 	,    "normalization-type" => \$normalization_type
+	,    "ags-method"         => \$ags_method
 	#usually set at run time
 	, "conf-file"         => \$conf_file
 	, "pid"               => \$input_pid          
 	, "goto"              => \$goto     
-	, "auto"              => \$auto
+	, "auto"              => \$auto  #use non-adaptive defaults
+	, "adapt"             => \$adapt #use adaptive classification
 	, "python"            => \$python
 	, "perl"              => \$perl
 	, "lightweight"       => \$lightweight #tries to keep the ffdb as small as possible
+	, "iterate-output"    => \$iterate_output #saves all old output generated using different classification/abundance thresholds
 	#forcing statements
 	,    "stage"          => \$stage # should we "stage" the database onto the remote machine?
 	,    "build-searchdb" => \$build_search_db
@@ -439,10 +512,12 @@ sub get_options{
 	,    "dryrun"      => \$dryRun
 	,    "reload"      => \$reload
 	);
-    my @opt_type_array = ("ffdb|d=s"
-			  , "refdb=s" 
-			  , "rawdata|i=s"      
-			      # Database-server related variables
+    my @opt_type_array = ( "rawdata|i=s"      
+			  # SearchDB/FFDB path variables
+			  , "searchdb-dir|d=s"
+			  , "ffdb=s"
+			  , "refdb|r=s" 			  
+			  # Database-server related variables
 			  , "db=s"
 			  , "dbuser|u=s"           
 			  , "dbpass|p=s"         
@@ -458,8 +533,8 @@ sub get_options{
 			  , "reps-only!"
 			  , "nr!"
 			  , "db-suffix:s"  
+			  # Remote computational cluster server related variable
 			  , "remote-bash-source:s"
-			  # Remote computational cluster server related variables
 			  , "remote!"
 			  , "rhost=s"
 			  , "ruser=s" 
@@ -493,7 +568,8 @@ sub get_options{
 			  #translation options
 			  , "trans-method:s" 
 			  , "split-orfs!"    
-			  , "orf-filter-len:i"    
+			  , "orf-filter-len:i"    #keep orfs greater than or equal to this length
+			  , "read-filter-len:i"   #keep reads greater than or equal to this length
 			  #search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
 			  , "parse-evalue:f" 
 			  , "parse-coverage:f"
@@ -508,15 +584,18 @@ sub get_options{
 			  ,    "hit-type:s"  
 			  #abundance calculation parameters
 			  , "abundance-type:s"
-			  , "normalization-type:s"			  
+			  , "normalization-type:s"			  			  
+			  , "ags-method:s"
 			  #general settings
 			  , "conf-file|c=s" 
 			  , "pid=i"
 			  , "goto|g=s"			  
 			  , "auto!"
+			  , "adapt!"
 			  , "python=s"
 			  , "perl=s"
 			  , "lightweight!"
+			  , "iterate-output!"
 			  #forcing statements
 			  , "stage!"
 			  , "build-searchdb!"
@@ -535,13 +614,25 @@ sub get_options{
     unless( $self->is_conf_build ){
 	if( defined( $conf_file ) ){	
 	    if( ! -e $conf_file ){ 
-		$self->Shotmap::Notify::dieWithUsageError( "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" ); 
-	    }
+		$self->Shotmap::Notify::dieWithUsageError( 
+		    "The path you supplied for --conf-file doesn't exist! You used <$conf_file>\n" 
+		    ); 
+	    }	    	 
+	    my $opt_str = get_conf_file_options( $conf_file, \%options );
+	    GetOptionsFromString( $opt_str, \%options, @opt_type_array );
+	} else {
+	    #$self->Shotmap::Notify::warn( "You did not supply a configuration file (i.e., --conf-file). " .
+	    #"It is recommend you do so, unless you want to pass all arguments " .
+	    #"via the command line\n" );
 	}
-	my $opt_str = get_conf_file_options( $conf_file, \%options );
-	GetOptionsFromString( $opt_str, \%options, @opt_type_array );
+    } else {
+	( defined( $conf_file ) )
+	    or $self->Shotmap::Notify::dieWithUsageError( 
+		"You must specify the location of your configuration file with --conf-file"
+	    );
     }
-    #getopts keeps the values referenced, so we have to dereference them if we want to directly call. Note: if we ever add hash/array vals, we'll have to reconsider this function
+    #getopts keeps the values referenced, so we have to dereference them if we want to directly call. 
+    #Note: if we ever add hash/array vals, we'll have to reconsider this function
     %options = %{ dereference_options( \%options ) };
     %options = %{ $self->Shotmap::Load::load_defaults( \%options ) };
     $self->opts( \%options );    
@@ -565,18 +656,40 @@ sub get_password_from_file{
 sub set_params{
     my ( $self ) = @_;
     
+    #This needs to be set before rest for proper printing
+    $self->verbose( $self->opts->{"verbose"} );
+
     #set automator
     $self->auto( $self->opts->{"auto"} );
+    if( $self->auto ){
+	$self->Shotmap::Notify::print_verbose( 
+	    "I see --auto is on, so I will automate as " .
+	    "much as possible. You can turn me off with --noauto" );
+    }
+    #set adaptor
+    $self->adapt( $self->opts->{"adapt"} );
+    if( $self->adapt ){
+	$self->Shotmap::Notify::print_verbose( 
+	    "I see --adapt is on, so I will adaptive classify reads. " .
+	    "Note this might override other options. " . 
+	    "You can turn me off with --noadapt" );
+	$self->adapt_class(1);
+	$self->parse_score( $self->readlen_map->{"thresholds"}->{'0'} ); #lowest accepted adapt-class threshold
+	$self->class_score("");
+    }
 
     # Some run time parameters
-    $self->verbose( $self->opts->{"verbose"} );
     $self->dryrun( $self->opts->{"dryrun"} );
     $self->project_id( $self->opts->{"pid"} );
     $self->raw_data( $self->opts->{"rawdata"} );
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
     $self->lightweight( $self->opts->{"lightweight"} );
-
+    if( defined( $self->opts->{"iterate-output"} ) ){
+	$self->iterate_output( $self->opts->{"iterate-output"} );
+    }
+    $self->clobber( $self->opts->{"clobber"} );
+    
     # Set remote - do here because it f/x many downstream vars
     # more on remote variables below.
     $self->remote( $self->opts->{"remote"} );
@@ -588,13 +701,9 @@ sub set_params{
     # Set orf calling parameters
     $self->trans_method(      $self->opts->{"trans-method"}   );
     $self->orf_filter_length( $self->opts->{"orf-filter-len"} );
+    $self->read_length_filter( $self->opts->{"read-filter-len"} );
 
     # Set information about the algorithms being used
-    #$self->use_search_alg( "blast",     $self->opts->{"use_blast"}     );
-    #$self->use_search_alg( "last",      $self->opts->{"use_last"}      );
-    #$self->use_search_alg( "rapsearch", $self->opts->{"use_rapsearch"} );
-    #$self->use_search_alg( "hmmsearch", $self->opts->{"use_hmmsearch"} );
-    #$self->use_search_alg( "hmmscan",   $self->opts->{"use_hmmscan"}   );
     my $search_method = $self->opts->{"search-method"};
     my $blast_methods = { "blast"     => 1,
 			  "rapsearch" => 1,
@@ -622,11 +731,20 @@ sub set_params{
 
     # Set local repository data
     $self->local_scripts_dir( $ENV{'SHOTMAP_LOCAL'} . "/scripts" ); #point to location of the shotmap scripts. Auto-detected from SHOTMAP_LOCAL variable.
+    if( defined( $self->opts->{"ffdb"} ) ){
+	$self->is_iso_db( 0 );
+    }
     $self->ffdb( $self->opts->{"ffdb"} ); 
     $self->ref_ffdb( $self->opts->{"refdb"} ); 
     $self->family_subset( $self->opts->{"family-subset"} ); #constrain analysis to a set of families of interest
 
     # Set the search database properties and names
+    if( defined( $self->opts->{"searchdb-dir"} ) ){
+	$self->iso_db_build(1);
+	$self->search_db_path_root( $self->opts->{"searchdb-dir"} );
+    } else {
+	$self->search_db_path_root( $self->ffdb);
+    }
     $self->force_build_search_db( $self->opts->{"force-searchdb"} );
     if( $self->force_build_search_db ){
 	$self->build_search_db( $self->search_type, 1 );
@@ -646,19 +764,24 @@ sub set_params{
     $self->search_db_name( "basename", $db_prefix_basename );
     my $db_name;
     if( $self->search_type eq "blast" ){
-	if( $self->remote ){
-	    $db_name = $db_prefix_basename . 
-		($self->reps()?'_reps':'') . 
-		($self->nr()?'_nr':'')     . 
-		(defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
-	} else { #local job, so no search db splits
-	    $db_name = $db_prefix_basename . 
-		($self->reps()?'_reps':'') . 
-		($self->nr()?'_nr':'');
+	unless( defined( $self->opts->{"searchdb-dir"} ) &&
+		$self->full_pipe ){ #only do this if we're building a searchdb on the fly
+	    if( $self->remote ){
+		$db_name = $db_prefix_basename . 
+		    ($self->reps()?'_reps':'') . 
+		    ($self->nr()?'_nr':'')     . 
+		    (defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
+	    } else { #local job, so no search db splits
+		$db_name = $db_prefix_basename . 
+		    ($self->reps()?'_reps':'') . 
+		    ($self->nr()?'_nr':'');
+	    }
+	} else {
+	    $db_name = $self->opts->{"searchdb-name"};
 	}
 	$self->search_db_name( $self->search_type, $db_name );
 	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
-	    if( $self->auto() ){
+	    if( $self->auto() && !$self->is_conf_build){ 
 		$self->Shotmap::Notify::warn(
 		    "You are apparently trying to conduct a pairwise sequence search, " .
 		    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
@@ -666,7 +789,7 @@ sub set_params{
 		    );
 		$self->build_search_db( $self->search_type, 1 );
 	    } else {
-		unless( $self->is_test ){
+		unless( $self->is_test || $self->is_conf_build ){
 		    $self->Shotmap::Notify::dieWithUsageError(
 			"You are apparently trying to conduct a pairwise sequence search, " .
 			"but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
@@ -758,13 +881,15 @@ sub set_params{
 	}
     } else {
 	$self->use_db( 0 );
-	$self->db_name( "nodb" );
+	$self->db_name( "" ); #if local, don't need the db name, but still need to set it so subsequent code works
     }
 
     # Set parsing values
-    $self->parse_evalue( $self->opts->{"parse-evalue"} ); 
-    $self->parse_coverage( $self->opts->{"parse-coverage"} ); 
-    $self->parse_score( $self->opts->{"parse-score"} );
+    unless( $self->adapt ){
+	$self->parse_evalue( $self->opts->{"parse-evalue"} ); 
+	$self->parse_coverage( $self->opts->{"parse-coverage"} ); 
+	$self->parse_score( $self->opts->{"parse-score"} );
+    }
     if( $self->lightweight ){
 	$self->small_transfer( 1 );
     } else {
@@ -772,15 +897,18 @@ sub set_params{
     }
     # Set classification values
     $self->clustering_strictness( $self->opts->{"is-strict"}); 
-    $self->class_evalue( $self->opts->{"class-evalue"} ); 
-    $self->class_coverage( $self->opts->{"class-coverage"} ); 
-    $self->class_score( $self->opts->{"class-score"} ); 
+    unless( $self->adapt ){
+	$self->class_evalue( $self->opts->{"class-evalue"} ); 
+	$self->class_coverage( $self->opts->{"class-coverage"} ); 
+	$self->class_score( $self->opts->{"class-score"} ); 
+    }
     $self->class_level( $self->opts->{"class-level"} );
     $self->top_hit_type( $self->opts->{"hit-type"} );
     
     # Set abundance calculation parameters
     $self->abundance_type(     $self->opts->{"abundance-type"}     );
     $self->normalization_type( $self->opts->{"normalization-type"} );
+    $self->ags_method(           $self->opts->{"ags-method"}           ); #currently "none" or "microbecensus"
 
     # Set rarefication parameters
     if( defined( $self->opts->{"prerare-samps"} ) ){ 
@@ -815,8 +943,9 @@ sub set_params{
 sub load_defaults{
     my ( $self, $options ) = @_; #options is a hashref    
     my $defaults = {
-	    # db settings
-  	    "db" => "none"
+	    # mysql db settings
+  	    "db"                    => "none"
+	    # search-db settings	
 	    ,    "nr"               => 1
 	    ,    "db-suffix"        => 'rsdb'
 	    ,    "verbose"          => 0
@@ -837,12 +966,16 @@ sub load_defaults{
 	    ,      "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
 	    ,    "auto"             => 1
+	    ,    "adapt"            => 1
 	    ,    "lightweight"      => 1
+	    ,    "iterate-output"   => 0
+	    ,    "nprocs"           => 1
 	    # translation options
-	    ,      "trans-method"   => 'prodigal'
-	    ,      "orf-filter-len" => 14
+	    ,      "trans-method"    => 'prodigal'
+	    ,      "orf-filter-len"  => 15
+	    ,      "read-filter-len" => 50
 	    # search result parsing thresholds (less stringent, optional, defaults to family classification thresholds)
-	    ,      "parse-score"    => 29
+	    ,      "parse-score"    => $self->readlen_map->{"thresholds"}->{'0'} #lowest accepted adapt-class threshold
 	    # family classification thresholds (more stringent)
 	    ,      "top-hit"        => 1
 	    ,      "hit-type"       => 'best_hit'
@@ -850,9 +983,11 @@ sub load_defaults{
 	    # abundance claculation parameters
 	    ,      "abundance-type"     => 'coverage'
 	    ,      "normalization-type" => 'target_length'
+	    ,      "ags-method"         => 'microbecensus'
     };
     if( defined( $options->{"rawdata"} ) ){
 	$defaults->{"ffdb"} = $options->{"rawdata"} . "/shotmap_ffdb/";
+	$self->is_iso_db(1); #on by default, turn off if ffdb specified by user
     }
     if( defined( $options->{"refdb"} ) ){
 	$defaults->{"searchdb-name"} = basename( $options->{"refdb"} );
@@ -862,7 +997,7 @@ sub load_defaults{
 
     #PLATFORMS
     #may move read length specific to autodetect, but this is here in case we 
-    #ever need platform specific settings
+    #ever need platform specific settings. Not currently implemented.
     my $config_count = 0;
 
     if( defined( $options->{"hiseq-101"} ) ){

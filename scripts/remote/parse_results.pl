@@ -17,16 +17,15 @@ my ( $results_tab, $query_orfs_file,
 my $parse_type = "best_hit"; #use this to save space. Will still have to look across searchdb splits for top hit.
 
 GetOptions(
-    "results-tab=s"  => \$results_tab,
-    "orfs-file:s"    => \$query_orfs_file,
-    "sample-id=i"    => \$sample_id,
-#    "class-id=i"     => \$classification_id,
-    "algo=s"         => \$algo,
-    "evalue=s"       => \$t_evalue,     #thresholds might be float, might be "NULL" via bash. if float, perl will coerse from string
-    "coverage=s"     => \$t_coverage,
-    "score=s"        => \$t_score,
-    "parse-type=s"   => \$parse_type, #what results should we store? 'best_hit' (per read), 'best_per_fam' (per read), 'all' (above thresholds)
-    "no_coverage"    => \$no_coverage,
+    "results-tab=s"      => \$results_tab,
+    "orfs-file:s"        => \$query_orfs_file,
+    "sample-alt-id=s"    => \$sample_id,
+    "algo=s"             => \$algo,
+    "evalue=s"           => \$t_evalue,     #thresholds might be float, might be "NULL" via bash. if float, perl will coerse from string
+    "coverage=s"         => \$t_coverage,
+    "score=s"            => \$t_score,
+    "parse-type=s"       => \$parse_type, #what results should we store? 'best_hit' (per read), 'best_per_fam' (per read), 'all' (above thresholds)
+    "no_coverage"        => \$no_coverage,
     "target-skip-string" => \$target_skip_string,
     "trans-method=s"     => \$trans_method,
     );

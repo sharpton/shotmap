@@ -680,10 +680,10 @@ sub delete_unsplit_orfs{
 #delete's a subdirectory within a sample's ffdb within a project
 sub delete_sample_subpath{ 
     my $self       = shift;
-    my $subpath    = shift; #e.g., "/unsplit_orfs/" or "/search_results/rapsearch/"
+    my $subpath    = shift; #e.g., "/unsplit_orfs/" or "/search_results/rapsearch/"    
     my $project_id = $self->project_id;
     my $ffdb       = $self->ffdb();
-    my $samples    = $self->get_sample_ids();
+    my $samples    = $self->get_sample_alt_ids();
     foreach my $sample( @$samples ){
 	my $path = $self->get_sample_path( $sample ) . $subpath;
 	if( -d $path ){
@@ -719,7 +719,7 @@ sub get_read_ids_from_ffdb{
 sub build_db_ffdb {    # This appears not to actually BUILD anything, it just makes a directory.
     my ($self, $path) = @_;
     if (-d $path){
-	$self->Shotmap::Notify::notify("For whatever reason, we are removing the entire directory in <$path>, in build_db_ffdb.");
+	$self->Shotmap::Notify::notify_verbose("For whatever reason, we are removing the entire directory in <$path>, in build_db_ffdb.");
 	File::Path::rmtree( $path );
     }
     File::Path::make_path( $path );
@@ -825,8 +825,23 @@ sub build_project_ffdb {
     my $ffdb    = $self->{"ffdb"};
     my $db_name = $self->{"dbname"};
     my $pid     = $self->{"project_id"};
-    my $proj_dir = "$ffdb/projects/$db_name/$pid";
+    my $use_db  = $self->{"use_db"};
+    my $proj_dir;
+    if( $self->is_iso_db ){
+	$proj_dir = "$ffdb/projects/$db_name/$pid";
+    } else {
+	$proj_dir = "$ffdb";
+    }
+    if( -d $proj_dir   &&
+	$self->clobber ){
+	$self->Shotmap::Notify::print_verbose(
+	    "Since --clobber is set, I'm removing the directory I found at " .
+	    $proj_dir
+	    );
+	rmtree( $proj_dir );
+    }
     $self->project_dir($proj_dir);
+
     File::Path::make_path($proj_dir); 
     my $params_dir    = "$proj_dir/parameters";
     File::Path::make_path($params_dir); 
@@ -866,8 +881,9 @@ sub build_sample_ffdb{
 	File::Path::make_path($path);
     }
     foreach my $sampleName (keys(%{$self->get_sample_hashref()})) {
-	my $thisSampleID = $self->get_sample_hashref()->{$sampleName}->{"id"};
-	my $sampDir      = "$projDir/${thisSampleID}";
+	#my $thisSampleID = $self->get_sample_hashref()->{$sampleName}->{"id"};
+	#my $sampDir         = "$projDir/${thisSampleID}";
+	my $sampDir         = "${projDir}/${sampleName}";
 	my $raw_sample_dir  = "$sampDir/raw";
 	my $orf_sample_dir  = "$sampDir/orfs";
 	my $search_res      = "$sampDir/search_results";
@@ -876,9 +892,12 @@ sub build_sample_ffdb{
 	my $results_dir     = $search_res . "/" . $self->search_method;
 
 	if (-d $raw_sample_dir) {
-	    warn("The directory \"$raw_sample_dir\" already existed!");
-	    if ($self->{"clobber"}) { warn("But you specified the CLOBBER option, so we will brutally overwrite it anyway!"); }
-	    else { die("Since the data already exists in $raw_sample_dir , we will not overwrite it! Unless you specify the flag --clobber to brutally clobber those directories anyway. NOT RECOMMENDED unless you know what you're doing."); }
+	    $self->Shotmap::Notify::warn("The directory \"$raw_sample_dir\" already exists!");
+	    if ($self->{"clobber"}) { $self->Shotmap::Notify::warn("But you specified the CLOBBER option, so we will brutally overwrite it anyway!"); }
+	    else { 
+		die("Since the data already exists in $raw_sample_dir , we will not overwrite it, " .
+		    "unless you specify the flag --clobber (WHICH WILL OVERWRITE YOUR CURRENT DATA. USE CAUTION). " ); 
+	    }
 	}
 
 	foreach my $dirToMake ($sampDir, $search_res, $results_dir, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
@@ -1216,13 +1235,24 @@ sub bulk_import{
 sub create_flat_file_project{
     my( $self, $name, $desc ) = @_;
     my $ffdb    = $self->{"ffdb"};
-    my $db_name = $self->{"dbname"};
+    my $db_name = $self->{"dbname"}; #is an empty string if nodb
     my $path    = "$ffdb/projects/$db_name/";
     my $pid     = $self->Shotmap::DB::create_flat_file_id( $path );
     return $pid;
 }
 
 sub create_flat_file_id{
+    my ( $self, $path ) = @_;
+    my $raw_data_path = $self->raw_data();
+    #can't have a trailing slash for the following code to work
+    $raw_data_path = $1 if ( $raw_data_path =~/(.*)\/$/ );
+    my @dirs = File::Spec->splitdir( $raw_data_path );
+    my $pid = $dirs[-1]; #the pid is the name of the dir containing the input data
+    return $pid;
+}
+
+#This is old and no longer used
+sub create_flat_file_numeric_id{
     my( $self, $path ) = @_;
     my $id;
     #open the ffdb path
@@ -1251,7 +1281,7 @@ sub create_flat_file_id{
 sub get_flatfile_sample_id{
     my ( $self, $samp ) = @_;
     my $path = $self->project_dir();
-    my $sid  = $self->Shotmap::DB::create_flat_file_id( $path );
+    my $sid  = $self->Shotmap::DB::create_flat_file_numeric_id( $path );
     return $sid;
 }
 
@@ -1260,10 +1290,19 @@ sub get_flatfile_sample_id{
 ####
 
 sub get_classification_id_flatfile{
-    my( $self, $evalue, $coverage, $score, $db_name, $search_method, $hit_type ) = @_;
-    $score     = _null_check( $score );
-    $coverage  = _null_check( $coverage );
-    $evalue    = _null_check( $evalue );
+    my( $self ) = @_; 
+    my $score         = _null_check( $self->class_score );
+    my $coverage      = _null_check( $self->class_coverage );
+    my $evalue        = _null_check( $self->class_evalue );
+    my $search_method = $self->search_method;
+    my $hit_type      = $self->top_hit_type;
+    my $db_name       = $self->search_db_name( $self->search_type );
+    my $adapt_class   = $self->adapt_class;
+    if( $adapt_class ){
+	$score    = "null";
+	$coverage = "null";
+	$evalue   = "null";
+    }
     my $method = $search_method . ";" . "best_${hit_type}";
     my $class_id;
     my $max_id = 0;
@@ -1361,13 +1400,13 @@ sub set_sample_parameters{
 }
 
 sub get_sample_by_id_flatfile{
-    my( $self, $sample_id ) = @_;
-    if( !defined( $sample_id ) ){
-	die "You did not provide a defined sample_id, so I cannot parse the parameters xml file!\n";
+    my( $self, $sample_alt_id ) = @_;
+    if( !defined( $sample_alt_id ) ){
+	die "You did not provide a defined sample_alt_id, so I cannot parse the parameters xml file!\n";
     }
-    my $sample_alt_id;
+    my $sample_id;
     my $sample = (); #hashref
-    $sample->{"id"} = $sample_id;
+    $sample->{"sample_alt_id"} = $sample_alt_id;
     my $parser = new XML::DOM::Parser;
     my $doc = $parser->parsefile( $self->params_file() );
     my $max_id = 0;
@@ -1379,9 +1418,9 @@ sub get_sample_by_id_flatfile{
 	    if( $id > $max_id ){
 		$max_id = $id;
 	    }
-	    if( $id == $sample_id ){
-		$sample_alt_id = $alt_id;
-		$sample->{"sample_alt_id"} = $alt_id;
+	    if( $alt_id eq $sample_alt_id ){
+		$sample_id      = $id;
+		$sample->{"id"} = $id;
 		last;		
 	    }
 	}

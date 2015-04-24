@@ -20,12 +20,13 @@ use File::Copy;
 
 sub build_search_db{
     my( $self ) = @_;
-    my $search_type = $self->search_type;
+    my $search_type   = $self->search_type;
     my $search_method = $self->search_method;
+    my $full_pipe     = $self->full_pipe; #is this a full pipeline run, or just a db build?
     #NOTE: These warning should NEVER be needed given the precautions we take in Load.pm (search method defines type of database to build!)
     #hmm
     if ($self->build_search_db("hmm")){
-	if ( $search_method ne "hmmsearch" && $search_method ne "hmmscan" ){
+	if ( $search_method ne "hmmsearch" && $search_method ne "hmmscan" && $full_pipe ){
 	    $self->Shotmap::Notify::warn("It seems that you want to build an hmm database, but you aren't invoking hmmscan or hmmsearch. " .
 					 "While I will continue, you should check your settings to make certain you aren't making a mistake."
 		);
@@ -35,7 +36,7 @@ sub build_search_db{
     }
     #blast-like
     if ($self->build_search_db("blast")) {
-	if ( $search_method ne "blast" && $search_method ne "last" && $search_method ne "rapsearch" ){
+	if ( $search_method ne "blast" && $search_method ne "last" && $search_method ne "rapsearch" && $full_pipe){
 	    $self->Shotmap::Notify::warn("It seems that you want to build a sequence database, but you aren't invoking pairwise sequence search algorithgm. " .
 					 "While I will continue, you should check your settings to make certain you aren't making a mistake. "
 		);
@@ -45,7 +46,7 @@ sub build_search_db{
     }
     
     #may not need to build the search database, but let's see if we need to load the database info into mysql....
-    if( $self->use_db ){
+    if( $self->use_db && $full_pipe ){
 	$self->Shotmap::Notify::printBanner("LOADING FAMILY DATA"); #could run a check to see if this is necessary, the loadings could be sped up as well....
 
 	if( ! $self->Shotmap::Run::check_family_loadings( $search_type, $self->db_name ) ){
@@ -63,8 +64,10 @@ sub build_search_db{
 	    }
 	}
     }
-    #we always want to copy these searchdb prop files files to the params directory now
-    $self->Shotmap::Run::cp_search_db_properties();
+    if( $full_pipe ){
+	#we always want to copy these searchdb prop files files to the params directory now
+	$self->Shotmap::Run::cp_search_db_properties();
+    }
     return $self;
 }
 
@@ -140,18 +143,18 @@ sub run_search{
 	#build the search submission script
 	my $script = $self->Shotmap::Run::build_remote_script( "search" );	
 	$self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path($search_method) );
-	foreach my $sample_id(@{ $self->get_sample_ids() }) {
-	    $self->Shotmap::Run::run_search_remote($sample_id, $search_method, $db_splits, $waittime, $verbose, $force_search);
-	    $self->Shotmap::Notify::print( "Progress report: $search_method for sample ${sample_id} completed on " . `date` );
+	foreach my $sample_alt_id(@{ $self->get_sample_alt_ids() }) {
+	    $self->Shotmap::Run::run_search_remote($sample_alt_id, $search_method, $db_splits, $waittime, $verbose, $force_search);
+	    $self->Shotmap::Notify::print( "Progress report: $search_method for sample ${sample_alt_id} completed on " . `date` );
 	}  
     } else {
 	$self->Shotmap::Notify::printBanner("RUNNING LOCAL SEARCH");
-	foreach my $sample_id (@{$self->get_sample_ids()}){
-	    my $in_dir   = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "orfs");
-	    my $out_dir  = File::Spec->catdir($self->ffdb, "projects", $self->db_name(), $self->project_id(), ${sample_id}, "searchresults");
-	    $self->Shotmap::Notify::notify("Running search for sample ID $sample_id" );
+	foreach my $sample_alt_id (@{$self->get_sample_alt_ids()}){
+	    my $in_dir   = File::Spec->catdir($self->project_dir, ${sample_alt_id}, "orfs");
+	    my $out_dir  = File::Spec->catdir($self->project_dir, ${sample_alt_id}, "searchresults");
+	    $self->Shotmap::Notify::notify("Running search for sample ID $sample_alt_id" );
 	    #force search is called from environment in spawn_local_threads
-	    $self->Shotmap::Run::run_search($sample_id, $search_method,    $waittime, $verbose);
+	    $self->Shotmap::Run::run_search($sample_alt_id, $search_method,    $waittime, $verbose);
 	}	
     }
     return $self;
@@ -206,15 +209,27 @@ sub stage_search_db{
 sub format_search_db{
     my( $self ) = @_;
     my $search_method = $self->search_method;
+    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $search_method ) . "_1.fa"; #only ever 1 for local search
+    #rapsearch reqs dbs to have a separate suffix from $db_file
     if( $search_method eq "rapsearch" ){
 	#First see if we need to do this
-	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $search_method ) . "_1.fa"; #only ever 1 for local search
 	my $fmt_db  = "${db_file}." . $self->search_db_name_suffix;
-	unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do
+	unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do	    
+	    $self->Shotmap::Notify::printBanner("FORMATTING SEQUENCE DATABASE");
+	    $self->Shotmap::Notify::print( "Formatting searchdb for $search_method" );
 	    $self->Shotmap::Run::format_search_db( $search_method );
+	    $self->Shotmap::Notify::print( "Formatting complete" );
+	}
+    } elsif( $search_method eq "blast" || $search_method eq "last" ){
+	#First see if we need to do this
+	unless( -e "${db_file}" && !($self->force_build_search_db ) ){ 
+	    $self->Shotmap::Notify::printBanner("FORMATTING SEQUENCE DATABASE");
+	    $self->Shotmap::Notify::print( "Formatting searchdb for $search_method" );
+	    $self->Shotmap::Run::format_search_db( $search_method );
+	    $self->Shotmap::Notify::print( "Formatting complete" );       
 	}
     } else {
-        die( "Local execution is not currently configured for anything but rapsearch in Shotmap::Search::format_search_db" );
+	
     }
 }
 

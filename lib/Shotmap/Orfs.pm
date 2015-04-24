@@ -28,9 +28,9 @@ sub load_orfs{
     if( $self->use_db ){
 	unless( $self->is_slim ){
 	    $self->Shotmap::Notify::printBanner("LOADING TRANSLATED READS");
-	    foreach my $sample_id (@{ $self->get_sample_ids() }){
+	    foreach my $sample_alt_id (@{ $self->get_sample_alt_ids() }){ 
 		my $projID     = $self->project_id();
-		my $in_orf_dir = "$local_ffdb/projects/$dbname/$projID/$sample_id/orfs";
+		my $in_orf_dir = "$local_ffdb/projects/$dbname/$projID/$sample_alt_id/orfs";
 		my $orfCount   = 0;
 		foreach my $in_orfs(@{ $self->Shotmap::DB::get_split_sequence_paths($in_orf_dir, 1) }){
 		    warn "Processing orfs in <$in_orfs>...";
@@ -39,18 +39,18 @@ sub load_orfs{
 		    my $orfs = Bio::SeqIO->new(-file => $in_orfs, -format => 'fasta'); #we should move this out of bioperl for speed...
 
 		    if( $self->bulk_load() ){
-			if( !$dryRun) { $self->Shotmap::Run::bulk_load_orf( $in_orfs, $sample_id, $self->trans_method ); }
+			if( !$dryRun) { $self->Shotmap::Run::bulk_load_orf( $in_orfs, $sample_alt_id, $self->trans_method ); }
 			else { $self->Shotmap::Notify::dryNotify(); }
 		    }
 		    elsif ($self->is_multiload()){
-			if (!$dryRun) { $self->Shotmap::Run::load_multi_orfs($orfs, $sample_id, $self->trans_method); }
+			if (!$dryRun) { $self->Shotmap::Run::load_multi_orfs($orfs, $sample_alt_id, $self->trans_method); }
 			else { $self->Shotmap::Notify::dryNotify(); }
 		    }
 		    else {
 			while (my $orf = $orfs->next_seq()) {
 			    my $orf_alt_id  = $orf->display_id();
 			    my $read_alt_id = Shotmap::Run::parse_orf_id($orf_alt_id, $self->trans_method );
-			    if (!$dryRun) { $self->Shotmap::Run::load_orf($orf_alt_id, $read_alt_id, $sample_id); }
+			    if (!$dryRun) { $self->Shotmap::Run::load_orf($orf_alt_id, $read_alt_id, $sample_alt_id); }
 			    else { $self->Shotmap::Notify::dryNotify(); }
 			    $self->Shotmap::Notify::print_verbose( "Added " . ($orfCount++) . " orfs to the DB...\n" );
 			}
@@ -84,22 +84,22 @@ sub translate_reads{
 	    $self->Shotmap::Run::transfer_file($script, $self->remote_connection() . ":" . $self->remote_script_path($trans_method) );
 	    $self->Shotmap::Run::translate_reads_remote($waittime, $remoteLogDir, $filter_length, $script );
 	} else {
-	    foreach my $sampleID (@{$self->get_sample_ids()}){
-		my $raw_reads_dir   = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "raw");
+	    foreach my $sample_alt_id (@{$self->get_sample_alt_ids()}){
+		my $raw_reads_dir   = File::Spec->catdir($self->project_dir, ${sample_alt_id}, "raw");
 		my $orfs_output_dir;
 		if( $should_split_orfs ){
-		    $orfs_output_dir = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "unsplit_orfs");
+		    $orfs_output_dir = File::Spec->catdir($self->project_dir, ${sample_alt_id}, "unsplit_orfs");
 		} else {
-		   $orfs_output_dir =  File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
+		   $orfs_output_dir =  File::Spec->catdir($self->project_dir, ${sample_alt_id}, "orfs");
 		}
-		$self->Shotmap::Notify::notify("Translating reads for sample ID $sampleID\n");
+		$self->Shotmap::Notify::notify("Translating reads for sample ID $sample_alt_id\n");
 		$self->Shotmap::Notify::print_verbose( "$raw_reads_dir -> $orfs_output_dir\n");
 		$self->Shotmap::Run::translate_reads($raw_reads_dir, $orfs_output_dir, $waittime); #make this function work...
 		#no longer need the function below (or --split-orfs), as metatrans handles this set of functions internally
 		if( 0 ){
 		    if( $should_split_orfs ){
-			my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sampleID}, "orfs");
-			$self->Shotmap::Notify::notify("Splitting orfs for sample ID $sampleID");
+			my $split_out = File::Spec->catdir(${local_ffdb}, "projects", $self->db_name(), $self->project_id(), ${sample_alt_id}, "orfs");
+			$self->Shotmap::Notify::notify("Splitting orfs for sample ID $sample_alt_id");
 			$self->Shotmap::Notify::print_verbose( "$orfs_output_dir -> $split_out");
 			$self->Shotmap::Run::split_orfs_local($orfs_output_dir, $split_out);
 		    }

@@ -30,6 +30,7 @@ print STDERR ">> ARGUMENTS TO shotmap.pl: perl shotmap.pl @ARGV\n";
 
 # Initialize a new pipeline
 my $pipe = Shotmap->new();
+$pipe->full_pipe(1);
 $pipe->Shotmap::Notify::printBanner( "Initializing the shotmap pipeline" );
 $pipe->Shotmap::Notify::check_env_var( $ENV{'SHOTMAP_LOCAL'} );
 $pipe->Shotmap::Load::get_options( @ARGV );
@@ -45,15 +46,18 @@ goto_step( $pipe );
 $pipe->Shotmap::Reads::load_project();
 # Find orfs
  TRANSLATE: $pipe->Shotmap::Orfs::translate_reads();
-# Load orfs into DB
  LOADORFS: $pipe->Shotmap::Orfs::load_orfs();
 # Build search database and load into DB
+unless( $pipe->iso_db_build ){
  BUILDSEARCHDB: $pipe->Shotmap::Search::build_search_db();
+}
 # Stage search database on remote server
 if( $pipe->remote ){ 
  REMOTESTAGE: $pipe->Shotmap::Search::stage_search_db(); 
 } else { 
- LOCALSTAGE: $pipe->Shotmap::Search::format_search_db();
+    unless( $pipe->iso_db_build ){
+      LOCALSTAGE: $pipe->Shotmap::Search::format_search_db();
+    }
 }
 # Build search script
  #BUILDSEARCHSCRIPT: $pipe->Shotmap::Search::build_search_script();
@@ -71,6 +75,10 @@ if( $pipe->remote ){
  CLASSIFYREADS: $pipe->Shotmap::Results::classify_reads();
 # Calculate family abundances
  ABUNDANCE: $pipe->Shotmap::Results::calculate_abundances();
+if( $pipe->lightweight ){
+    $pipe->Shotmap::DB::delete_sample_subpath( "/raw/" );
+    $pipe->Shotmap::DB::delete_sample_subpath( "/orfs/" );
+}
 # Calculate diversity
  CALCDIVERSITY: $pipe->Shotmap::Results::calculate_diversity();
 $pipe->Shotmap::Notify::printBanner("ANALYSIS COMPLETED!");
@@ -83,7 +91,10 @@ sub goto_step{
  ## Note that this is only useful if we have a process ID! 
  ## block tries to jump to a module in handler for project that has already done some work
     if (defined($pipe->opts->{"goto"}) && $pipe->opts->{"goto"}) {
-	(defined($pipe->project_id) && $pipe->project_id) or die "You CANNOT specify --goto without also specifying an input PID (--pid=NUMBER).\n";
+	if( $pipe->is_iso_db ){
+	    (defined($pipe->project_id) && $pipe->project_id) 
+		or die "You CANNOT specify --goto without also specifying an input PID (--pid=NUMBER).\n";
+	}
 	if (!$pipe->dryrun) {
 	    $pipe->Shotmap::Run::back_load_project($pipe->project_id);
 	    $pipe->Shotmap::Run::back_load_samples();
@@ -120,7 +131,9 @@ sub goto_step{
 	}
 	if ($goto eq "X" or $goto eq "SEARCH")  {     
 	    warn "Skipping to remote search step!\n"; 
-	    $pipe->Shotmap::Load::stage_check; 
+	    if( $pipe->remote ){
+		$pipe->Shotmap::Load::stage_check; 
+	    }
 	    goto EXECUTESEARCH; 
 	}
 	if ($goto eq "P" or $goto eq "PARSE")   {     

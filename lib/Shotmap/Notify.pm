@@ -82,8 +82,9 @@ sub dieWithUsageError {
     my ($self, $msg) = @_;
     chomp($msg);
     print("[TERMINATED DUE TO USAGE ERROR]: " . $msg . "\n");
-    print STDOUT <DATA>;
-    die($self->Shotmap::Notify::safeColor("[TERMINATED DUE TO USAGE ERROR]: " . $msg . " ", "yellow on_red"));
+    #print STDOUT <DATA>;
+    #($self->Shotmap::Notify::safeColor("[TERMINATED DUE TO USAGE ERROR]: " . $msg . " ", "yellow on_red"));
+    exit(0);
 }
 
 sub exec_and_die_on_nonzero {

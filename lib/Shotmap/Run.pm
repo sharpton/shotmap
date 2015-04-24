@@ -237,6 +237,7 @@ sub get_partitioned_samples{
 	    }
 	    my $is_fasta = $self->Shotmap::Run::check_fasta_file( "$path/$file", "nt", $is_compressed );
 	    if( !$is_fasta ){
+		$self->Shotmap::Notify::warn( "$file doesn't look like a properly formatted fasta file, passing\n" );
 		next;
 	    }
 	    #get sample name here, simple parse on the period in file name
@@ -295,7 +296,7 @@ sub check_fasta_file{
     }
     close $fh;
     if( !$is_fasta ){
-	warn( "$file doesn't look like a properly formatted fasta file\n" );
+	#do nothing, put control statement in main routine.
     }    
     return $is_fasta;
 }
@@ -309,10 +310,10 @@ sub load_project{
 	my $proj = $self->Shotmap::DB::create_project($name, $self->project_desc() );
 	$pid  = $proj->project_id()
     } else {
+	#for nodb runs, the pid is the name of the directory the user pointed to which contains sample equences
 	$pid = $self->Shotmap::DB::create_flat_file_project( $name, $self->project_desc() ); #write a function that determines this!	
     }
     #store vars in object
-    #$self->project_path( $path );
     $self->project_id( $pid );
     $self->Shotmap::DB::build_project_ffdb();
     #process the samples associated with project
@@ -324,9 +325,14 @@ sub load_project{
 
 #MODIFIED
 sub get_project_metadata{
-    my( $self )  = @_;
-    my $output   = File::Spec->catdir( $self->ffdb, "projects", $self->db_name, $self->project_id(), "parameters", "sample_metadata.tab" );
-
+    my( $self, $output )  = @_;
+    my $final_results = 0; #is this the metadata table being placed in the final output directory?
+    if( defined( $output ) ){
+	$final_results = 1;
+    }
+    if( !defined( $output ) ){
+	$output   = File::Spec->catdir( $self->project_dir, "parameters", "sample_metadata.tab" );
+	}
     open( OUT, ">$output" ) || die "Can't open $output for write: $!\n";
     my $data   = {}; #will push rows to data, need to know all fields before printing header
     my $fields = {};
@@ -336,7 +342,7 @@ sub get_project_metadata{
 	my $metadata  = $sample_hr->{$sample_alt_id}->{"metadata"};
 	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
 	    if( !( defined( $metadata ) ) ){
-		warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
+		$self->Shotmap::Notify::print( "Couldn't find input metadata for sample ${sample_alt_id}, so I'm only going to provide shotmap output statistics");
 		$fields = {};
 		goto PRINTMETA;
 	    }
@@ -346,53 +352,39 @@ sub get_project_metadata{
 		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
 		$fields->{$field_name}++;
 	    }
-    }
-    if( 0 ){
-	my $samples  = $self->Shotmap::DB::get_samples_by_project_id( $self->project_id() );
-	while( my $row = $samples->next ){
-	    my $sample_id     = $row->sample_id;
-	    my $sample_alt_id = $row->sample_alt_id;
-	    $data->{$sample_id}->{"alt_id"} = $sample_alt_id;
-	    my $metadata      = $row->metadata;
-	    if( !( defined( $metadata ) ) ){
-		warn( "Couldn't find metadata for sample ${sample_id}, so I'm not going to process metadata in this run!\n" );
-		$fields = {};
-		goto PRINTMETA;
-	    }
-	    my( @fields )  = split( ",", $metadata );
-	    foreach my $field( @fields ){
-		my( $field_name, $field_value ) = split( "\=", $field );
-		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
-		$fields->{$field_name}++;
-	    }
-	}
     }
   PRINTMETA:;
     if( defined( $fields ) ){ #then we found metadata
 	#print the header
-	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", sort(map{ uc($_) } keys(%{$fields})), "\n" );
-	foreach my $sample_id( keys( %{ $data } ) ){
-	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
+	if( $self->ags_method eq "microbecensus" ){
+	    print OUT join( "\t", "Sample.Name", "Sample.ID", "Processed.Reads", "Classified.Sequences", "Total.Abundance", "Avg.Genome.Size", sort(map{ uc($_) } keys(%{$fields})), "\n" );
+	} else {
+	    print OUT join( "\t", "Sample.Name", "Sample.ID",  "Processed.Reads",  "Classified.Sequences", "Total.Abundance", sort(map{ uc($_) } keys(%{$fields})), "\n" );
+	}
+    }
+    else {
+	print OUT join( "\t", "Sample.Name", "Sample.ID", "\n" );
+    }
+    foreach my $sample_id( keys( %{ $data } ) ){
+	my $row = "";
+	my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
+	$row .= $sample_alt_id . "\t" .  $sample_id . "\t";
+	if( $final_results ){ #only for final metadata file
+	    $row .= $self->sample_stats( $sample_alt_id, "total_reads" )     . "\t";
+	    $row .= $self->sample_stats( $sample_alt_id, "class_reads" )     . "\t";
+	    $row .= $self->sample_stats( $sample_alt_id, "total_abundance" ) . "\t";
+	    if( $self->ags_method eq "microbecensus" ){
+		$row .= $self->sample_ags( $sample_alt_id, "ags" ) . "\t";
+	    }
 	    my @values = sort(keys( %{$fields} ));
 	    foreach my $field( @values ){
-		if( $field eq $values[-1] ){
-		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\n";
-		} else{
-		    print OUT $data->{$sample_id}->{"metadata"}->{$field} . "\t";
-		}
+		$row .= $data->{$sample_id}->{"metadata"}->{$field} . "\t";
 	    }   
 	}
-	close OUT;
+	$row =~ s/\s+$//; #get rid of the final tab
+	print OUT $row . "\n";	
     }
-    else{
-	print OUT join( "\t", "SAMPLE.ID", "SAMPLE.ALT.ID", "\n" );
-	foreach my $sample_id( keys( %{ $data } ) ){
-	    my $sample_alt_id = $data->{$sample_id}->{"alt_id"};
-	    print OUT $sample_id . "\t" .  $sample_alt_id . "\t";
-	}
-	close OUT;
-    }
+    close OUT;
     return $output;
 }
 
@@ -619,20 +611,15 @@ sub back_load_project(){
     my $ffdb = $self->ffdb();
     my $dbname = $self->db_name();
     $self->project_id( $project_id );
-    $self->project_dir("$ffdb/projects/$dbname/$project_id");
+    if( $self->is_iso_db ){
+	$self->project_dir("$ffdb/projects/$dbname/$project_id");
+    } else {
+	$self->project_dir("$ffdb");
+    }
     $self->params_dir( $self->project_dir . "/parameters" );
     $self->params_file( $self->params_dir . "/parameters.xml" );
     if( $self->remote ){
-	$self->remote_scripts_dir( $self->remote_project_path . "/scripts" ); 
-#	$self->remote_script_path(      "hmmscan",      $self->remote_project_path() . "/run_hmmscan.sh" );
-#	$self->remote_script_path(    "hmmsearch",    $self->remote_project_path() . "/run_hmmsearch.sh" );
-#        $self->remote_script_path(        "blast",        $self->remote_project_path() . "/run_blast.sh" );
-#        $self->remote_script_path(     "formatdb",     $self->remote_project_path() . "/run_formatdb.sh" );
-#        $self->remote_script_path(       "lastdb",       $self->remote_project_path() . "/run_lastdb.sh" );
-#        $self->remote_script_path(         "last",         $self->remote_project_path() . "/run_last.sh" );
-#	$self->remote_script_path(    "rapsearch",    $self->remote_project_path() . "/run_rapsearch.sh");
-#	$self->remote_script_path( "prerapsearch", $self->remote_project_path() . "/run_prerapsearch.sh");
-	
+	$self->remote_scripts_dir( $self->remote_project_path . "/scripts" ); 	
 	$self->remote_project_log_dir(     $self->remote_project_path() . "/logs" );
     }
     #do some extra work for old types of jobs
@@ -717,16 +704,21 @@ sub back_load_samples{
 		  $file =~ m/\.sh/    || $file =~ m/parameters/ || 
 		  $file =~ m/scripts/ 
 	    );
-	my $sample_id = $file;
-	my $sample_alt_id;
+	my $sample = $file;
+	my ( $sample_id, $sample_alt_id );
 	if( $self->use_db ){
-	    my $samp    = $self->Shotmap::DB::get_sample_by_sample_id( $sample_id );
+	    my $samp       = $self->Shotmap::DB::get_sample_by_sample_id( $sample );
+	    $sample_id     = $sample;
 	    $sample_alt_id = $samp->sample_alt_id();
 	} else {
-	    my $samp = $self->Shotmap::DB::get_sample_by_id_flatfile( $sample_id );
+	    my $samp = $self->Shotmap::DB::get_sample_by_id_flatfile( $sample );
+	    $sample_id     = $samp->{"id"};
 	    $sample_alt_id = $samp->{"sample_alt_id"};
 	}
-	$samples{$sample_alt_id}->{"id"} = $sample_id;
+	#get the path to the raw sample data
+	my $sample_data = glob( $self->raw_data() . "/".  $sample_alt_id . "*" );
+	$samples{$sample_alt_id}->{"path"} = $sample_data;
+	$samples{$sample_alt_id}->{"id"}   = $sample_id;
     }
     $self->set_samples( \%samples );
 
@@ -785,7 +777,6 @@ sub translate_reads {
 	if( -e "${infile}.gz" ){
 	    $infile = "${infile}.gz";
 	}
-	print $infile . "\n";
 	#ADD ADDITIONAL METHODS
         if( $method eq '6FT' ){	   
 	    $cmd    = $self->python . " ${bin}/metatrans.py -m 6FT $infile $outfile";
@@ -1253,7 +1244,7 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
     }
     while(<$res_fh>){
 	chomp $_;
-	my( $read, $orf, $famid, $score, $evalue, $coverage );
+	my( $read, $orf, $famid, $score, $evalue, $coverage, $readlen );
 	if( $_ =~ m/(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)\,(.*?)/ ){
 	    $orf      = $1;
 	    $read     = $2;
@@ -1261,11 +1252,16 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 	    $score    = $6;
 	    $evalue   = $7;
 	    $coverage = $8;
+	    if( $orf =~ m/\-rl(\d+?)\_/ ){
+		$readlen = $1;
+	    } else {
+		die( "Can't parse read length from $orf\n" );
+	    }
 	} else {
 	   warn( "Can't parse orf_alt_id, famid, or score from $result_file where line is $_\n" );
 	   next;
 	}
-	if ( ! $self->Shotmap::Run::check_passing_hit( $score, $evalue, $coverage ) ){	    
+	if ( ! $self->Shotmap::Run::check_passing_hit( $readlen, $score, $evalue, $coverage ) ){	    
 	    next;
 	}
 	if( $hit_type eq "best_hit" && $level eq "orf" ){
@@ -1318,23 +1314,30 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 }
 
 sub check_passing_hit{
-    my( $self, $score, $evalue, $coverage ) = @_;
+    my( $self, $length, $score, $evalue, $coverage ) = @_;
     my $pass = 1;
-    if( defined( $self->class_evalue ) ){
-	if( $evalue > $self->class_evalue ){
+    if( $self->adapt_class ){
+	my $threshold = $self->Shotmap::Run::get_length_based_cutoff_score( $length );
+	if( $score < $threshold ){
 	    $pass = 0;
 	}
+    } else {
+	if( defined( $self->class_evalue ) ){
+	    if( $evalue > $self->class_evalue ){
+		$pass = 0;
+	    }
+	}
+	if( defined( $self->class_coverage ) ){
+	    if( $coverage < $self->class_coverage ){
+		$pass = 0;
+	    }
+	}
+	if( defined( $self->class_score ) ){
+	    if( $score < $self->class_score ){
+		$pass = 0;
+	    }
+	}   
     }
-    if( defined( $self->class_coverage ) ){
-	if( $coverage < $self->class_coverage ){
-	    $pass = 0;
-	}
-    }
-    if( defined( $self->class_score ) ){
-	if( $score < $self->class_score ){
-	    $pass = 0;
-	}
-    }   
     return $pass;
 }
 
@@ -1394,25 +1397,36 @@ sub build_search_db{
 	}
     }
     if( $self->remote ){
-	warn "Building $type DB $db_name, placing $split_size per split\n";
+	$self->Shotmap::Notify::notify_verbose( "Building $type DB $db_name, placing $split_size per split\n" );
     } else {
-	warn "Bulding $type DB $db_name, since a local process, this will be a single file\n";
+	$self->Shotmap::Notify::notify_verbose( "Bulding $type DB $db_name, since this a local process, this will be a single file\n" );
     }
-
-    #Have you built this DB already?
-
+    #if( $self->is_iso_db ){
+	#$raw_db_path = File::Spec->catdir($raw_db_path, $self->search_db_name( $type ) );
+    #}
+    (defined( $raw_db_path ) ) || die "Wasn't able to calculate the location to place the database";
+    #Have you built this DB already?[
     if( -d $raw_db_path && !($force) ){
 	die "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --force-searchdb option.\n";
+    } else {
+	mkdir( $raw_db_path );
     }
 
     #create the HMMdb dir that will hold our split hmmdbs
-    $self->Shotmap::DB::build_db_ffdb( $raw_db_path );
+    #$self->Shotmap::DB::build_db_ffdb( $raw_db_path );
     #update the path to make it easier to build the split hmmdbs (e.g., points to an incomplete file name)
     #save the raw path for the database_length file when using blast
 
-    my $db_path_with_name     = "$raw_db_path/$db_name";
+    my $db_path_with_name= "${raw_db_path}/${db_name}";
+#    if( $self->is_iso_db ){
+#	$db_path_with_name = $raw_db_path;
+#    } else {
+#	$db_path_with_name = "$raw_db_path/$db_name";
+#    }
     #get the paths associated with each family
-    my $family_path_hashref = _build_family_ref_path_hash( $ref_ffdb, $type );
+    $self->Shotmap::Notify::print_verbose( "Building family reference path hash" );
+    my $family_path_hashref = $self->Shotmap::Run::build_family_ref_path_hash( $ref_ffdb, $type );
+    $self->Shotmap::Notify::print_verbose( "Done!" );
     #constrain analysis to a set of families of interest
     my @families = ();
     if( defined( $self->family_subset() ) ){
@@ -1432,10 +1446,14 @@ sub build_search_db{
     my $id    = ();
     my $seq   = '';	   
     my $redunts;
-    #build a map of family lengths
-    open( FAMLENS, ">${raw_db_path}/family_lengths.tab" ) || die "Can't open ${raw_db_path}/family_lengths.tab for write: $!\n";
+    #build a map of family lengths    
+    my $family_length_file = "${raw_db_path}/family_lengths.tab"; 
+    my $seq_length_file    = "${raw_db_path}/sequence_lengths.tab";
+    $self->Shotmap::Notify::print_verbose( "Initializing family length file here: $family_length_file" );
+    open( FAMLENS, ">$family_length_file" ) || die "Can't open $family_length_file for write: $!\n";
     #build a map of family member sequence lengths, not relevant for type = hmm
-    open( SEQLENS, ">${raw_db_path}/sequence_lengths.tab" ) || die "Can't open ${raw_db_path}/sequence_lengths.tab for write:$!\n";
+    $self->Shotmap::Notify::print_verbose( "Initializing sequence length file here: $seq_length_file" );
+    open( SEQLENS, ">$seq_length_file" ) || die "Can't open $seq_length_file for write:$!\n";
     #blast requires tmp files for creation of NR database
     if( $type eq "blast" ){
 	$tmp_path = "${db_path_with_name}.tmp";
@@ -1448,6 +1466,7 @@ sub build_search_db{
 	    $redunts = *REDUNTS;
 	}
     }       
+    $self->Shotmap::Notify::print_verbose( "Processing families..." );
     foreach my $family( @families ){
 	#find the HMM/sequences associated with the family (compressed)
 	my $family_db_file = undef;
@@ -1466,9 +1485,9 @@ sub build_search_db{
 		if( ( defined( $split_size ) && $count >= $split_size ) || $family eq $families[-1]) {
 		    $n_proc++; 	    #build the DB
 		    my $split_db_path;
-		    if( $type eq "hmm" ){
-			$split_db_path = Shotmap::Run::cat_db_split($db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
-		    } 
+		    $split_db_path = Shotmap::Run::cat_db_split(
+			$db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0
+			); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
 		    gzip_file($split_db_path); # We want DBs to be gzipped.
 		    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
 		    @split = (); # clear this out
@@ -1477,47 +1496,24 @@ sub build_search_db{
 	    } else {
 		#this is a local procedure and we only want a single, large db
 		if( $family eq $families[-1] ) {
-                    $n_proc++;      #build the DB                                                                                                                                                                                 
-                    my $split_db_path;
-                    if( $type eq "hmm" ){
-                        $split_db_path = Shotmap::Run::cat_db_split($db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
-                    }
-                    gzip_file($split_db_path); # We want DBs to be gzipped.                                                                                                                                                       
-                    unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy                                                                                                                       
-                    @split = (); # clear this out                                                                                                                                                                                 
-                    $count = 0; # clear this too   
+                    $n_proc++;      
+		    my $split_db_path;
+		    $split_db_path = Shotmap::Run::cat_db_split(
+			$db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0
+			); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
+                    gzip_file($split_db_path); 
+                    unlink($split_db_path); 
+                    @split = (); 
+                    $count = 0; 
 		}	    
 	    }
 	} elsif( $type eq "blast" ) {
-#	    my $path = "$ref_ffdb/seqs/${family}.fa.gz";
 	    my $path = $family_path_hashref->{$type}->{$family};	    
 	    if( -e $path ){
 		$family_db_file = $path; # <-- save the path, if it exists
-		if ($reps_only) {
-		    #do we only want rep sequences from big families?
-		    #first see if there is a reps file for the family
-		    my $reps_seq_path = $path;
-		    $reps_seq_path    =~ s/seqs_all/seqs_reps/;
-		    $family_db_file   = $reps_seq_path;
-		    #if so, see if we need to build the seq file
-		    #OBSOLETE
-		    if( 0 ){
-			my $reps_list_path = "${ref_ffdb}/reps/list/${family}.mcl";
-			if( -e $reps_seq_path ){
-			    #we add the .gz extension in the gzip command inside grab_seqs_from_lookup_list
-			    if(! -e "${reps_seq_path}.gz" ){
-				$self->Shotmap::Notify::print_verbose( "Building reps sequence file for $family\n" );
-				_grab_seqs_from_lookup_list( $reps_list_path, $family_db_file, $reps_seq_path );
-				(-e "${reps_seq_path}.gz") or 
-				    die("The gzipped file STILL doesn't exist, even after we tried to make it. Error grabbing " .
-					"representative sequences from $reps_list_path. Trying to place in $reps_seq_path.");
-			    }
-			    $family_db_file = "${reps_seq_path}.gz"; #add the .gz path because of the compression we use in grab_seqs_from_loookup_list
-			}
-		    }
-		}
 	    }
 	    (defined($family_db_file)) or die( "Can't find the BLAST database corresponding to family $family\n" );
+	    $self->Shotmap::Notify::print_verbose( "...working on $family_db_file" );
 	    #process the families and produce split dbs along the way
 	    my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
 	    if( $family_db_file =~ m/\.gz$/ ){
@@ -1530,13 +1526,21 @@ sub build_search_db{
 		$suffix = ".fa";
 	    } elsif( $family_db_file =~ m/\.fasta$/ || $family_db_file =~ /\.fasta\.gz$/ ){
 		$suffix = ".fasta";
-	    } else {
-		die ("I could not determine the suffix associated with $family_db_file\n" );
+	    } elsif( $family_db_file =~ m/\.pep$/ || $family_db_file =~ /\.pep\.gz$/ ){
+		$suffix = ".pep";
+	    } elsif( $family_db_file =~ m/\.aa$/ || $family_db_file =~ /\.aa\.gz$/ ){
+		$suffix = ".aa";
+	    }
+	    else {
+		$self->Shotmap::Notify::warn("This doesn't appear to be a fasta file: $family_db_file. Skipping.\n" );
+		next;
 	    }	   
-	    if( $nr_db ){	
-		my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
+	    if( $nr_db ){
+		$self->Shotmap::Notify::print_verbose( "...making nonredundant" );
+		    my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
 		$family_db_file = $nr_tmp;
 	    }
+	    $self->Shotmap::Notify::print_verbose( "...in file" );
 	    open( FILE, "zcat --force $family_db_file |") # zcat --force can TRANSPARENTLY read both .gz and non-gzipped files!
 		|| die "Unable to open the file \"$family_db_file\" for reading: $! --"; 
 	    my $fam_init_len = $length; #used to calculate $family_length
@@ -1662,6 +1666,19 @@ sub format_search_db{ #local process only
 	my $db_suffix = $self->search_db_name_suffix;
 	$cmd = "prerapsearch -d ${db_file} -n ${db_file}.${db_suffix}"; # > /dev/null 2>&1";
     }
+    elsif( $type eq "last" ){
+	$cmd = "lastdb -p $db_file $db_file";
+    }
+    elsif( $type eq "blast" ){
+	$cmd = "makeblastdb -dbtype prot -in $db_file";
+    }
+    elsif( $type eq "hmmscan" || $type eq "hmmsearch" ){
+	#do nothing
+	return;
+    }
+    else{
+	die( "I don't know how to run $type in Shotmap::Run::format_search_db" );
+    }
     $self->Shotmap::Notify::print_verbose( $cmd );
     my $results = IPC::System::Simple::capture( $cmd );    
     (0 == $EXITVAL) or die("Error executing $cmd: $results\n");
@@ -1674,11 +1691,13 @@ sub get_db_filepath_prefix{
     my ( $db_name, $db_dir, $db_filestem );
     if (($type eq "blast") or ($type eq "last") or ($type eq "rapsearch")) {
 	$db_name        = $self->search_db_name("blast");
-	$db_dir         = File::Spec->catdir($self->ffdb(), $BLASTDB_DIR, $db_name);
+	$db_dir         = $self->search_db_path( "blast" );
+	#File::Spec->catdir($self->ffdb(), $BLASTDB_DIR, $db_name);
     }
     if (($type eq "hmmsearch") or ($type eq "hmmscan")) {
 	$db_name        = $self->search_db_name("hmm");
-	$db_dir         = File::Spec->catdir($self->ffdb(), $HMMDB_DIR, $db_name);
+	$db_dir         = $self->search_db_path( "hmm" );
+	#$db_dir         = File::Spec->catdir($self->ffdb(), $HMMDB_DIR, $db_name);
     }
     $db_filestem = File::Spec->catfile( $db_dir, $db_name ); #only ever 1 for local search
     return $db_filestem;
@@ -1700,25 +1719,26 @@ sub _get_family_length{
 	#we calculate length in build_search_db since we open files there anyhow
     }
     else{
-	die "Passed an unknown type to _get_family_length (received ${type})\n";
+	die "Passed an unknown type to get_family_length (received ${type})\n";
     }    
     return $family_length;
 }
 
 #this recurses through all subdirs under ref-ffdb to look for the seqs and hmms of interest. Be careful with how
 #ref-ffdb is structured!
-sub _build_family_ref_path_hash{ 
-    my ( $ref_ffdb, $type ) = @_;
+sub build_family_ref_path_hash{ 
+    my ( $self, $ref_ffdb, $type ) = @_;
     #open the ref_ffdb and look for family-related files (hmms and seqs)
     my $family_paths = {};
     my $recurse_lvl = 1; #we use these two vars to limit the number of dirs we look into. Otherwise, code can get lost.
     my $recurse_lim = 1; #turned to 1 from 3 to simplify structure - only work with the top level directory 
-    $family_paths = _get_family_path_from_dir( $ref_ffdb, $type, $recurse_lvl, $recurse_lim, $family_paths ); 
+    $family_paths = $self->Shotmap::Run::get_family_path_from_dir( $ref_ffdb, $type, $recurse_lvl, $recurse_lim, $family_paths ); 
     return $family_paths; #a hashref
 }
 
-sub _get_family_path_from_dir{
-    my $dir = shift;
+sub get_family_path_from_dir{
+    my $self = shift;
+    my $dir  = shift;
     my $type = shift;
     my $recurse_lvl  = shift; #how many recursions are we on
     my $recurse_lim  = shift; #how many total recursions do we allow?
@@ -1726,20 +1746,20 @@ sub _get_family_path_from_dir{
     opendir( DIR, $dir ) || die "Can't opendir on $dir\n";
     my @files = readdir( DIR );
     closedir DIR;
-    print( "Grabbing family paths from $dir\n" );
+    $self->Shotmap::Notify::print_verbose( "Grabbing family paths from $dir\n" );
     foreach my $file( @files ){ 
 	next if ( $file =~ m/^\./ );
 	#if directories, recurse:
 	my $path = $dir . "/" . $file;
 	if( -d $path ){
-	    print "entering $path\n";
+	    $self->Shotmap::Notify::print_verbose("entering $path\n");
 	    my $sub_recurse_lvl = $recurse_lvl + 1; #do this so that each of the sister subdirs get processed fairly
 	    if( $sub_recurse_lvl >= $recurse_lim ){
-		print "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n";
+		$self->Shotmap::Notify::print_verbose( "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n" );
 		next;
 	    }
 	    else{
-		$family_paths = _get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
+		$family_paths = $self->Shotmap::Run::get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
 	    }
 	    next;
 	}
@@ -1761,7 +1781,8 @@ sub _get_family_path_from_dir{
 	    if( $file =~ m/(.*)\.fa/  || 
 		$file =~ m/(.*)\.faa/ || 
 		$file =~ m/(.*)\.pep/ ||
-		$file =~ m/(.*)\.aa/ ){
+		$file =~ m/(.*)\.aa/  ||
+		$file =~ m/(.*)\.fasta/ ){
 		$family = $1;
 	    }
 	    my $seq_path = "${dir}/${file}";
@@ -1773,64 +1794,6 @@ sub _get_family_path_from_dir{
 	die( "I couldn't identify any properly formatted reference family data files in $dir!" );
     } else {
 	print( "Identified $count reference family data files\n" );
-    }
-    return $family_paths;
-}
-
-sub _get_family_path_from_dir_obsolete{
-    my $dir = shift;
-    my $type = shift;
-    my $recurse_lvl  = shift; #how many recursions are we on
-    my $recurse_lim  = shift; #how many total recursions do we allow?
-    my $family_paths = shift; #hashref
-    opendir( DIR, $dir ) || die "Can't opendir on $dir\n";
-#    my @paths = glob( "${path}/*" );
-    my @paths = readdir( DIR );
-    closedir DIR;
-    foreach my $p( @paths ){ #top level must be dirs. will skip any files here
-	next if ( $p =~ m/^\./ );
-	my $path = $dir . "/" . $p;
-	next unless( -d "${path}" ); 
-	#are the top level dirs what we're looking for?
-	#print "Looking in $path\n";
-	if( $path =~ m/hmms_full$/ ){
-	    if( $type eq "hmm" ){ #find hmms and build the db		
-		print( "Grabbing family paths from $path\n" );
-		opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
-		my @files = readdir( SUBDIR );
-		closedir SUBDIR;
-		foreach my $file( @files ){
-		    next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		    next unless( $file =~ m/(.*)\.hmm/ );
-		    my $family = $1;
-		    my $hmm_path = "${path}/${family}.hmm";
-		    $family_paths->{$type}->{$family} = $hmm_path;
-		}
-	    }
-	}
-	elsif( $path =~ m/seqs/ ){ #then this dir contains seqs that we want to process
-	    if( $type eq "blast" ){ #find the seqs and build the db
-		print( "Grabbing family paths from $path\n" );
-		opendir( SUBDIR, $path ) || die "Can't opendir subdir $path: $!\n";
-		my @files = readdir( SUBDIR );
-		closedir SUBDIR;
-		foreach my $file( @files ){
-		    next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
-		    next unless( $file =~ m/(.*)\.fa/ || $file =~ m/(.*)\.faa/ );
-		    my $family = $1;
-		    my $seq_path = "${path}/${file}";
-		    $family_paths->{$type}->{$family} = $seq_path;
-		}		
-	    }  
-	}
-	else{ #don't have what we're looking for in the top level dirs, so let's recurse a level
-	    my $sub_recurse_lvl = $recurse_lvl + 1; #do this so that each of the sister subdirs get processed fairly
-	    if( $sub_recurse_lvl >= $recurse_lim ){
-		#print "Won't go into $path because recursion limit hit. Recursion number is $sub_recurse_lvl\n";
-		next;
-	    }
-	    $family_paths = _get_family_path_from_dir( $path, $type, $sub_recurse_lvl, $recurse_lim, $family_paths ); 
-	}
     }
     return $family_paths;
 }
@@ -1950,9 +1913,12 @@ sub _build_nr_seq_db{
     }
     open( OUT, ">$family_nr" ) || die "Can't open $family_nr for write: $!\n";
     my $dict    = {};
-    my $famid   =  _get_famid_from_familydb_path( $family, $suffix );
-    my $baseid  = basename( $family, $suffix );
-
+    my $famid;
+    if( $compressed ){
+	$famid = _get_famid_from_familydb_path( $family, $suffix . ".gz" );
+    } else {
+	$famid  = _get_famid_from_familydb_path( $family, $suffix );
+    }
     my $sequence;
     my $header;
     while( <$fh> ){
@@ -2086,7 +2052,7 @@ sub compress_hmmdb{
 #copy a project's ffdb over to the remote server
 sub load_project_remote {
     my ($self) = @_;
-    my $project_dir_local = File::Spec->catdir($self->ffdb(), "projects", $self->db_name(), $self->project_id());
+    my $project_dir_local = $self->project_dir;
     my $remote_dir        = File::Spec->catdir($self->remote_ffdb(), "projects", $self->db_name(),  $self->project_id());
     my $ssh_remote_dir    = $self->remote_connection() . ":" . $remote_dir;
     warn("Pushing $project_dir_local to the remote (" . $self->remote_host() . ") server's ffdb location in <$remote_dir>\n");
@@ -2275,10 +2241,9 @@ sub run_search_remote {
 
 sub run_search{
     my( $self, $sample_id, $type, $waittime, $verbose ) = @_;
-    ($type eq "rapsearch" ) || die "Invalid type passed in! The invalid type was: \"$type\".";    
     my $nprocs   = $self->nprocs();
     #GET IN/OUT VARS
-    my $orfs_dir   = File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs");
+    my $orfs_dir        = File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs");
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "${type}", "${type}_${sample_id}"); #file stem that we add to below
     my $master_out_dir  = File::Spec->catdir(  $self->get_sample_path($sample_id), "search_results", ${type});
     (-d $orfs_dir)       or die "Unexpectedly, the input directory <$orfs_dir> was NOT FOUND! Check to see if this directory really exists.";
@@ -2339,15 +2304,31 @@ sub run_search{
 	    #7-7-2014: The RAPsearch authors added an  option on our behalf to 2.19 that filters hits by minimum score. So, let's use that instead:
             $cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
         }
-	if( $type eq "rapsearch_accelerated" ){
+	elsif( $type eq "rapsearch_accelerated" ){
 	    my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
             $cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-	}
-
+	}       
         #ADD ADDITIONAL METHODS HERE    
-        
+        elsif( $type eq "blast" ){
+	    $cmd = "blastp -query $infile -db $db_file -out $outfile -outfmt 6 > $log_file 2>&1";
+	} 
+	elsif( $type eq "last" ){
+	    my $min_aln_score    = $self->parse_score;
+	    my $max_multiplicity = 10;
+	    $cmd = "lastal -e $min_aln_score -f 0 -m $max_multiplicity $db_file $infile -o $outfile > $log_file 2>&1";
+	}
+	elsif( $type eq "hmmsearch" ){
+	    $cmd = "hmmsearch --noali --domtblout $outfile  $db_file $infile > $log_file 2>&1";
+	}
+	elsif( $type eq "hmmscan" ){
+	    $cmd = "hmmscan -Z --noali --domtblout $outfile $db_file $infile > $log_file 2>&1";
+	}
+	else {
+	    die( "I don't know how to process $type in Shotmap::Run::run_search" );
+	}
 	#execute
+	( defined( $cmd ) ) || die( "Couldn't figure out which command to run. $type was input\n" );
 	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
 #	my $results = IPC::System::Simple::capture("$cmd");
 #        (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
@@ -2372,7 +2353,7 @@ sub run_search{
 }
 
 sub parse_results {
-    my ($self, $sample_id, $type, $waitTimeInSeconds, $verbose ) = @_;
+    my ($self, $sample_alt_id, $type, $waitTimeInSeconds, $verbose ) = @_;
     my $nprocs       = $self->nprocs();
     my $proj_dir     = $self->project_dir;
     my $scripts_dir  = $self->local_scripts_dir;
@@ -2380,9 +2361,9 @@ sub parse_results {
     my $t_coverage   = $self->parse_coverage;
     my $t_evalue     = $self->parse_evalue;
     my $trans_meth   = $self->trans_method;
-    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_id}"); #file stem that we add to below
+    my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_alt_id}"); #file stem that we add to below
     my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
-    my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs")) . "split_"; 
+    my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_alt_id), "orfs")) . "split_"; 
    
     my $pm = Parallel::ForkManager->new($nprocs);
     $pm->run_on_finish(
@@ -2398,16 +2379,16 @@ sub parse_results {
 	#set some loop specific variables
 	my $log_file = $log_file_prefix . "_${i}.log";	
 	my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
-	my $infile   = File::Spec->catfile( $self->get_sample_path($sample_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
+	my $infile   = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
 	if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
 	    $infile = $infile . ".m8";
 	}
 	my $incompressed = $infile . ".gz";
-	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_id), "orfs", $orfbasename . $i . ".fa" );
+	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "orfs", $orfbasename . $i . ".fa" );
 	my $cmd  = "perl $script_file "
 	    . "--results-tab=$incompressed "
 	    . "--orfs-file=$query_orfs_file "
-	    . "--sample-id=$sample_id "
+	    . "--sample-alt-id=$sample_alt_id "
 	    . "--algo=$type "
 	    . "--parse-type=best_hit "
 	    . "--trans-method=$trans_meth "
@@ -2583,7 +2564,7 @@ sub parse_results_remote {
 	. " --nsplits=$nsplits "
 	. " --scriptpath=${remote_script_path} "
 	. " -w $waitTimeInSeconds "
-	. " --sample-id=$sample_id "
+	. " --sample-alt-id=$sample_id "
 #	. " --class-id=$classification_id "
 	. " --algo=$search_method "
 	. " --transmeth=$trans_method "
@@ -2654,9 +2635,12 @@ sub classify_reads_flatfile{
     $self->Shotmap::Notify::notify( "Classifying reads from flatfile for sample ID ${sample_id}\n" );
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo);
     #my $output_file    = $search_results . "/classmap_cid_" . $class_id . ".tab";
-    my $outdir         = File::Spec->catfile($self->project_dir . "/output" );
-    my $output_file    = $outdir . "/ClassificationMap_Sample_${sample_id}_cid_${class_id}.tab";
-    
+    my $outdir         = File::Spec->catdir($self->project_dir . "/output/Classification_Maps/" );
+    if( $self->use_db || $self->iterate_output ){
+	$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+    }
+    mkdir( $outdir );
+    my $output_file    = $outdir . "/ClassificationMap_Sample_${sample_id}.tab";
     my $top_type    = $self->top_hit_type; #best_hit or best_in_fam
     my $class_level = $self->class_level;  #read or orf
     #if remote, use splitcat files in search_results/algo dir
@@ -2681,7 +2665,7 @@ sub build_classification_maps_by_sample{
     my ($self, $sample_id, $class_id, $members_rs ) = @_; 
     #create the outfile
     #my $map    = {}; #maps project_id -> sample_id -> read_id -> orf_id -> famid NO LONGER NEEDED SINCE WE USE R TO PARSE MAP
-    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
+    my $output = $self->project_dir . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
     if( defined( $self->postrarefy_samples ) ){
 	#my @samples   = keys( %$post_rare_reads );
 	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
@@ -2722,7 +2706,7 @@ sub calculate_abundances{
     my ( $self, $sample_id, $class_id, $abund_type, $norm_type, $members_rs, $dbh ) = @_;
     my $abundance_parameter_id = $self->Shotmap::DB::get_abundance_parameter_id( $abund_type, $norm_type )->abundance_parameter_id();
     #some bookkeeping for our classification map
-    my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
+    my $output = $self->project_dir . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}";
     if( defined( $self->postrarefy_samples ) ){
 	#my @samples   = keys( %$post_rare_reads );
 	#my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
@@ -2840,8 +2824,12 @@ sub calculate_abundances_flatfile{
 	    die "Something went wrong during rarefaction; got a null rare_ids hash";
 	}
 	my $outdir     = File::Spec->catdir( 
-	    $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abundance_parameter_id}"
-	    );
+	    $self->project_dir, "output" );
+#"cid_${class_id}_aid_${abundance_parameter_id}"
+	if( $self->use_db || $self->iterate_output ){
+	    $outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abundance_parameter_id}" );
+	}
+	$outdir = File::Spec->catdir( $outdir, "Rarefied_sequences" );
 	if( ! -d $outdir ){
 	    File::Path::make_path($outdir);
 	}
@@ -2873,7 +2861,9 @@ sub calculate_abundances_flatfile{
     $statistics->{"total_seqs"} = $read_count;
     #we no longer spend the disc to produce rarefaction specific class map. just print read/orf ids    
     if( 0 ){
-	my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . $self->project_id() . "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}_AbundanceID_${abundance_parameter_id}.tab";
+	my $output = $self->ffdb() . "/projects/" . $self->db_name . "/" . 
+	    $self->project_id() . 
+	    "/output/ClassificationMap_Sample_${sample_id}_ClassID_${class_id}_AbundanceID_${abundance_parameter_id}.tab";
 	if( defined( $self->postrarefy_samples ) ){
 	    #my @samples   = keys( %$post_rare_reads );
 	    #my $rare_size = keys( %{ $post_rare_reads->{ $samples[0] } } );
@@ -2882,7 +2872,11 @@ sub calculate_abundances_flatfile{
 	}
 	$output .= ".tab";
 	open( OUT, ">$output" ) || die "Can't open $output for write: $!";    
-	print OUT join("\t", "PROJECT_ID", "SAMPLE_ID", "READ_ID", "ORF_ID", "TARGET_ID", "FAMID", "ALN_LENGTH", "READ_COUNT", "\n" );
+	print OUT join("\t", 
+		       "PROJECT_ID", "SAMPLE_ID", "READ_ID", 
+		       "ORF_ID", "TARGET_ID", "FAMID", 
+		       "ALN_LENGTH", "READ_COUNT", 
+		       "\n" );
     }
 
     $self->Shotmap::Notify::print( "\tCalculating abundances..."); 
@@ -2891,7 +2885,10 @@ sub calculate_abundances_flatfile{
     while(<MAP>){
 	$count++;
 	chomp $_;
-	my ( $orf_alt_id, $read_alt_id, $sample, $target_id, $famid, $score, $evalue, $coverage, $aln_length ) = split( "\,", $_ );
+	my ( $orf_alt_id, $read_alt_id, $sample, 
+	     $target_id, $famid, $score, $evalue, 
+	     $coverage, $aln_length 
+	    ) = split( "\,", $_ );
 	if( defined( $self->postrarefy_samples ) ){
 	    if( $rare_type =~ "read" ){ #read or class_read
 		next unless defined( $rare_ids->{$read_alt_id} );
@@ -2905,7 +2902,10 @@ sub calculate_abundances_flatfile{
 
 	#see note above about no longer needing this
 	if( 0 ){
-	    print OUT join("\t", $self->project_id(), $sample_id, $read_alt_id, $orf_alt_id, $target_id, $famid, $aln_length, $read_count, "\n" );
+	    print OUT join("\t", $self->project_id(), $sample_id, 
+			   $read_alt_id, $orf_alt_id, $target_id, 
+			   $famid, $aln_length, $read_count, 
+			   "\n" );
 	}	
 	my ( $target_length, $family_length );
 	if( $norm_type eq 'target_length' ){
@@ -2914,6 +2914,9 @@ sub calculate_abundances_flatfile{
 #		$target_length = $self->Shotmap::DB::get_target_length( $target_id );
 #	   } else {
 		$target_length = $length_hash->{$target_id};
+		if( !defined( $target_length ) ){
+		    die( "Can't calculate the length of hit $target_id" );
+		}
 #	   }
 	} elsif( $norm_type eq 'family_length' ){
 #	    if( $self->use_db ){
@@ -2982,6 +2985,17 @@ sub insert_abundance_hash_into_database{
 	next if( $famid eq "total" );
 	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
+	if( $self->ags_method eq "microbecensus" ){
+	   my $read_len = $self->sample_ags( $sample_id, "read_length");
+	   my $ags      = $self->sample_ags( $sample_id, "ags" );
+	   my $n_reads  = $self->sample_ags( $sample_id, "n_reads_sampled" );
+	   my $total_bp = $read_len * $n_reads;
+	   #do the correction
+	   $raw         = $raw / ( $total_bp / $ags );
+	}
+	else{
+	    #do nothing or add additional methods in future.
+	}
 	$self->Shotmap::DB::insert_abundance( $sample_id, $famid, $raw, $ra, $abund_param_id, $class_id );
     }
     return $self;
@@ -2990,28 +3004,98 @@ sub insert_abundance_hash_into_database{
 sub build_sample_abundance_map_flatfile{
     my( $self, $sample_id, $class_id, $abund_param_id, $abundances, $statistics ) = @_;
     #dump family abundance data for each sample id to flat file
+    
     my $outdir     = File::Spec->catdir( 
-	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abund_param_id}"
-	);
+	$self->project_dir, "output" );
+    if( $self->use_db || $self->iterate_output ){
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    $outdir = File::Spec->catdir( $outdir, "Abundances" );
     File::Path::make_path($outdir);
-    my $output = $outdir . "/Abundance_Map_sample_${sample_id}_cid_${class_id}_aid_${abund_param_id}.tab";
-    open( ABUND, ">$output"  ) || die "Can't open $output for write: $!\n";
-    print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "COUNTS", 
-		            "ABUNDANCE", "REL.ABUND", "TOT.ABUND", 
-		            "CLASS.SEQS", "TOT.SEQS",
-		      "\n" );
+    #get the classification/abundance statistics, store in memory, 
+    #will print in print_sample_abundance_statistics
+    my $stats_output = $outdir . "/Abundance_Statistics_Sample_{$sample_id}.tab";
     my $total       = $abundances->{"total"};
     my $tot_reads   = $statistics->{"total_seqs"};
     my $class_reads = $statistics->{"class_seqs"};
+    #save some classification statistics for updated metadata output
+    $self->sample_stats( $sample_id, "total_abundance", $total );
+    $self->sample_stats( $sample_id, "total_reads", $tot_reads );
+    $self->sample_stats( $sample_id, "class_reads", $class_reads );
+    #print the abundance data frame
+    my $output = $outdir . "/Abundance_Data_Frame_sample_${sample_id}.tab";
+    open( ABUND, ">$output"  ) || die "Can't open $output for write: $!\n";
+    print ABUND join( "\t", "Sample.Name", "Family.ID", "Counts", 
+		      "Abundance", "Relative.Abundance", 
+		      #"TOT.ABUND", "CLASS.SEQS", "TOT.SEQS",
+		      "\n" );
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
 	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
+	if( $self->ags_method eq "microbecensus" ){
+	    my $read_len = $self->sample_ags( $sample_id, "read_length");
+	    my $ags      = $self->sample_ags( $sample_id, "ags" );
+	    my $n_reads  = $self->sample_ags( $sample_id, "n_reads_sampled" );
+	    my $total_bp = $read_len * $n_reads;
+	    #do the correction                                                                                                                                                                                                            
+	    $raw         = $raw / ( $total_bp / $ags );
+	} else {
+	    #do nothing or add additional methods
+	}
 	my $count = $statistics->{"counts"}->{$famid};
-	print ABUND join( "\t", $sample_id, $famid, $count, $raw, $ra, $total, $class_reads, $tot_reads, "\n" );
+	print ABUND join( "\t", $sample_id, $famid, $count, $raw, $ra, 
+			  #$total, $class_reads, $tot_reads, 
+			  "\n" );
     }
     close ABUND;
     return $output;
+}
+
+sub print_sample_abundance_statistics{
+    my( $self, $class_id, $abund_param_id ) = @_;       
+    my $outdir     = File::Spec->catdir( 
+	$self->project_dir, "output" );
+    if( $self->use_db || $self->iterate_output ){
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    $outdir = File::Spec->catdir( $outdir, "Abundances" );
+    File::Path::make_path($outdir);
+    #print the classification/abundance statistics
+    my $stats_output = $outdir . "/Abundance_Statistics.tab";
+    open( STATS, ">$stats_output" ) || die "Can't open $stats_output for write:\n";
+    print STATS join( "\t", "Sample.Name", "Total.Processed.Reads", "Classified.Reads", "Total.Sample.Abundance", "\n" );
+    foreach my $sample_id( @{ $self->get_sample_alt_ids() } ){
+	my $total_abund = $self->sample_stats( $sample_id, "total_abundance" );
+	my $total_reads = $self->sample_stats( $sample_id, "total_reads"     );
+	my $class_reads = $self->sample_stats( $sample_id, "class_reads"     );
+	print STATS join( "\t", $sample_id, $total_reads, $class_reads, $total_abund, "\n" );
+    }
+    close STATS;
+    return;
+}
+
+sub load_sample_abundance_statistics{
+    my( $self, $class_id, $abund_param_id ) = @_;       
+    my $outdir     = File::Spec->catdir( 
+	$self->project_dir, "output" );
+    if( $self->use_db || $self->iterate_output ){
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    $outdir = File::Spec->catdir( $outdir, "Abundances" );
+    #print the classification/abundance statistics
+    my $stats_output = $outdir . "/Abundance_Statistics.tab";
+    open( STATS, "$stats_output" ) || die "Can't open $stats_output for write:\n";
+    while(<STATS>){
+	chomp $_;
+	next if ( $_ =~ m/^Sample\.Name/ || $_ =~ m/^$/ );
+	my( $sample_id, $tot_reads, $class_reads, $total ) = split( "\t", $_ );
+	$self->sample_stats( $sample_id, "total_abundance", $total   );
+	$self->sample_stats( $sample_id, "total_reads", $tot_reads   );
+	$self->sample_stats( $sample_id, "class_reads", $class_reads );       
+    }
+    close STATS;
+    return;
 }
 
 sub get_post_rarefied_reads_flatfile{
@@ -3235,12 +3319,13 @@ sub get_post_rarefied_reads{
 sub build_intersample_abundance_map{
     my( $self, $class_id, $abund_param_id ) = @_;
     #dump family abundance data for each sample id to flat file
-    my $outdir     = File::Spec->catdir( 
-	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", "cid_${class_id}_aid_${abund_param_id}"
-	);
-    #my $abundances = $self->Shotmap::DB::get_sample_abundances( $sample_id, $class_id, $abund_param_id );
+    my $outdir     = File::Spec->catdir( $self->project_dir, "output" );
+    if( $self->use_db || $self->iterate_output ) {
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    $outdir = File::Spec->catdir( $outdir, "Abundances" );
     File::Path::make_path($outdir);
-    my $sample_abund_out  = $outdir . "/Abundance_Map_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    my $sample_abund_out  = $outdir . "/Abundance_Map_All_Samples.tab";
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
     my $max_rows          = 10000;
     my $dbh               = $self->Shotmap::DB::build_dbh();
@@ -3273,13 +3358,15 @@ sub build_intersample_abundance_map_flatfile{
     my( $self, $class_id, $abund_param_id ) = @_;
     #dump family abundance data for each sample id to flat file
     my $param_str  = "cid_${class_id}_aid_${abund_param_id}";
-    my $outdir     = File::Spec->catdir( 
-	$self->ffdb(), "projects", $self->db_name, $self->project_id(), "output", $param_str
-	);
+    my $outdir     = File::Spec->catdir( $self->project_dir, "output" );
+    if( $self->use_db || $self->iterate_output ) {
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    $outdir = File::Spec->catdir( $outdir, "Abundances" );
     if( ! -d $outdir ){
 	die( "I couldn't locate sample flatfile abundance tables in ${outdir}. Are you sure they were built?" );
     }
-    my $sample_abund_out  = $outdir . "/Abundance_Map_InterSample_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    my $sample_abund_out  = $outdir . "/Abundance_Map_All_Samples.tab";
     
     open( ABUND, ">$sample_abund_out"  ) || die "Can't open $sample_abund_out for write: $!\n";
     print ABUND join( "\t", "SAMPLE.ID", "FAMILY.ID", "COUNTS", 
@@ -3295,6 +3382,7 @@ sub build_intersample_abundance_map_flatfile{
 	next unless( $file =~ m/$param_str/ );
 	next if( $file =~ m/\.map$/ ); #in case of a re-run, skip R ouput files
 	open( FILE, "${outdir}/${file}" ) || die "Can't open ${outdir}/${file} for read: $!\n";
+	print "$file\n";
 	while( <FILE> ){
 	    next if(  $_ =~ m/^SAMPLE\.ID/ );
 	    my @data = split( "\t", $_ );
@@ -3414,34 +3502,43 @@ sub calculate_diversity{
     my $r_lib   = $ENV{"SHOTMAP_LOCAL"} . "/ext/R/";
     my $verbose = $self->verbose;
     #set output directory
-    my $outdir          = File::Spec->catdir( $self->ffdb(), "projects", $self->db_name, $self->project_id(), "output/", "cid_${class_id}_aid_${abund_param_id}" );
+    my $outdir = File::Spec->catdir( $self->project_dir, "output/" );
+    if( $self->use_db || $self->iterate_output ){
+	$outdir         = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}");
+    }    
     File::Path::make_path($outdir);
+    File::Path::make_path($outdir . "/Metadata/");
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    #does one already exist? if so, use it (this allows some additional customization, but is a bit hacky)
-    my $metadata_table;
-    my $potential = $self->params_dir . "/sample_metadata.tab";
-    if( -e $potential ){
-	warn( "Using the metadata table located at $potential. If you prefer I use a different table, please first delete this file\n");
-	$metadata_table = $potential;
-    } else {       
-	$metadata_table = $self->Shotmap::Run::get_project_metadata();    
-    }
+    my $metadata_table = File::Spec->catfile( $outdir, "Metadata", "sample_metadata.tab" );
+    $self->Shotmap::Run::get_project_metadata( $metadata_table );    
 
-    my $abund_map   = $outdir . "/Abundance_Map_InterSample_cid_" . "${class_id}_aid_${abund_param_id}.tab";
+    #prep the output
+    my $abund_dir     = File::Spec->catdir( $outdir, "Abundances" );
+    my $diversity_dir = File::Spec->catdir( $outdir, "Alpha_diversity" );
+    my $families_dir  = File::Spec->catdir( $outdir, "Families" );
+    my $beta_dir      = File::Spec->catdir( $outdir, "Beta_diversity" );
+    File::Path::make_path($abund_dir);
+    File::Path::make_path($diversity_dir);
+    File::Path::make_path($families_dir);
+    File::Path::make_path($beta_dir);
+
+    #get the input - abundance dfs
+    my @abund_maps = glob( $abund_dir . "/Abundance_Data_Frame*" );
+    #make a temporary catted file
+    my $tmp_file = $abund_dir . "/tmp_abundance_dfs.tab";
+    $self->Shotmap::Run::cat_data_frame_files( \@abund_maps, $tmp_file );
 
     #CALCULATE DIVERSITY AND COMPARE SAMPLES
     #open output directory that contains per sample diversity data
-    my $sample_path_stem = "Inter_Sample_Results";
-    File::Path::make_path($outdir . "/${sample_path_stem}/");
-    my $sample_diversity_prefix  = $outdir . "/${sample_path_stem}/Sample_Diversity_cid_${class_id}_aid_${abund_param_id}";
-    my $compare_diversity_prefix = $outdir . "/${sample_path_stem}/Sample_Comparison_cid_${class_id}_aid_${abund_param_id}";
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${abund_map} ${sample_diversity_prefix} ${compare_diversity_prefix} ${metadata_table} $verbose $r_lib < ${script}";
+    my $cmd               = "R --slave --args ${tmp_file} ${diversity_dir} ${metadata_table} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
+
+    #produce updated metadata table that includes the diversity statistics calculated above. Maybe wrap into the above script?
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
 
@@ -3460,7 +3557,7 @@ sub calculate_diversity{
     #produce plots and output tables for this analysis
     my $test_type      = "wilcoxon.test";
     $script            = File::Spec->catdir( $scripts_dir, "R", "compare_families.R" );
-    $cmd               = "R --slave --args ${abund_map} ${family_abundance_prefix} ${metadata_table} $test_type $verbose $r_lib < ${script}";
+    $cmd               = "R --slave --args ${tmp_file} ${family_abundance_prefix} ${metadata_table} $test_type $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 
@@ -3473,14 +3570,40 @@ sub calculate_diversity{
     my $scale            = 1;
     my $pca_prefix       = $outdir . "/${ordin_path_stem}/Sample_Ordination";
     $script              = File::Spec->catdir( $scripts_dir, "R", "ordinate_samples.R" );    
-    $cmd                 = "R --slave --args ${abund_map} ${pca_prefix} ${metadata_table} ${center} ${scale} $verbose $r_lib < ${script}";
+    $cmd                 = "R --slave --args ${tmp_file} ${pca_prefix} ${metadata_table} ${center} ${scale} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );       
 }
 
+sub cat_data_frame_files{
+    my( $self, $ar_files2cat, $catted_file ) = @_; 
+    my @files_to_cat = @{ $ar_files2cat };
+    open( TMP, ">$catted_file" ) || die "Can't open $catted_file for write: $!\n";
+    my $big_count = 0; #we only want the header of the first file, so keep track
+    foreach my $map( @files_to_cat ){
+	open( MAP, $map ) || die "Can't open $map for read: $!\n";
+	my $little_count = 0;
+	while(<MAP>){
+	    #get rid of the headers for files other than the first
+	    if( $little_count == 0 &&
+		$big_count    == 1 ){
+		$little_count = 1;
+		next;
+	    }
+	    if( $big_count == 0 ){
+		$big_count = 1;
+	    }
+	    print TMP $_;
+	}
+	close MAP;
+    }
+    close TMP;
+    return $catted_file;
+}
+
 sub count_seqs_in_file{
     my ( $self, $file ) = @_;
-    open( FILE, "$file" ) || die "Can't open $file for read: $!\n";
+    open( FILE, "zcat --force $file |" ) || die "Can't open $file for read: $!\n";
     my $counter = 0;
     while(<FILE>){
 	if( $_ =~ m/^>/ ){
@@ -3547,15 +3670,21 @@ sub split_sequence_file{
     my $seq_count_across_splits = 0;
     while( <SEQS> ){
 	#have we reached the prerarefy sequence count, if that is set?
-	if( defined( $self->Shotmap::prerarefy_samples() ) && $seq_count_across_splits == $self->Shotmap::prerarefy_samples() ){
+	if( defined( $self->Shotmap::prerarefy_samples() ) && 
+	    $seq_count_across_splits == $self->Shotmap::prerarefy_samples() ){
 	    last;
 	}	   
 	chomp $_;
-	if( $_ =~ m/^(\>.*)/ ){
+	if( $_ =~ m/^(\>.*?)\s/ ){
 	    if( defined( $header ) ){
-		print OUT "$header\n$sequence\n";
-		$seq_ct++;
-		$seq_count_across_splits++;
+		my $seqlen = length( $sequence );
+		my $check  = $self->Shotmap::Run::check_seqlen_for_print( $seqlen );
+		my $header = $self->Shotmap::Run::update_seq_header_w_len( $header, $seqlen ); 
+		if( $check ){
+		    print OUT "$header\n$sequence\n";
+		    $seq_ct++;
+		    $seq_count_across_splits++;
+		}
 		$sequence = ();
 	    }
 	    $header = $1;
@@ -3564,7 +3693,12 @@ sub split_sequence_file{
 	    $sequence = $sequence . $_;
 	}
 	if( eof ) {
-	    print OUT "$header\n$sequence\n";
+	    my $seqlen = length( $sequence );
+	    my $check  = $self->Shotmap::Run::check_seqlen_for_print( $seqlen );
+	    my $header = $self->Shotmap::Run::update_seq_header_w_len( $header, $seqlen ); 
+	    if( $check ){
+		print OUT "$header\n$sequence\n";
+	    }
 	    close OUT;
 	    #unless( $self->remote ){
 	    Shotmap::Run::gzip_file( $splitout );
@@ -3589,6 +3723,21 @@ sub split_sequence_file{
     }    
     close SEQS;
     return \@output_names;
+}
+
+sub check_seqlen_for_print( $$ ){
+    my( $self, $seqlen ) = @_;
+    my $check = 1;
+    if( $seqlen < $self->read_length_filter ){
+	$check = 0;
+    }
+    return $check;
+}
+
+sub update_seq_header_w_len($$){
+    my( $self, $header, $seqlen ) = @_;
+    $header = $header . "-rl${seqlen}";
+    return $header;
 }
 
 sub build_remote_script{
@@ -3688,6 +3837,66 @@ sub build_remote_script{
     my $results = Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 
     return $out_script;
+}
+
+sub run_microbecensus{
+    my( $self, $infile, $outfile, $logfile ) = @_;
+    #no need to set up a fork, as microbecensus can't run in parallel yet
+    my $nprocs = $self->nprocs;
+    my $cmd = "run_microbe_census.py -t $nprocs $infile $outfile > $logfile 2>&1";
+    $self->Shotmap::Notify::print( "Waiting for microbecensus to finish..." );
+    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
+    my $results = IPC::System::Simple::capture("$cmd");                                                                                                                                                                                
+    (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");                                                                                                                                
+    $self->Shotmap::Notify::print( "...microbecensus complete. Proceeding" );
+    return $outfile;
+}
+
+sub parse_microbecensus{
+    my( $self, $sample_alt_id, $ags_output ) = @_;
+    open( IN, $ags_output ) || die "can't open AGS file $ags_output for read: $!\n";
+    #there should only be two lines in this file!
+    while(<IN>){
+	chomp $_;
+	next if ( $_ =~ m/^reads/ );
+	my @data        = split( "\t", $_ );
+	my $reads_sampled = $data[0];
+	my $read_length   = $data[1];
+	my $ags           = $data[2];	
+	#set the values
+	$self->sample_ags( $sample_alt_id, "read_length", $read_length );
+	$self->sample_ags( $sample_alt_id, "ags", $ags );
+	$self->sample_ags( $sample_alt_id, "n_reads_sampled", $reads_sampled );
+	if( $self->verbose ){
+	    $self->Shotmap::Notify::print_verbose( 
+		"Sample: $sample_alt_id\n" .
+		"ags: "           . $self->sample_ags( $sample_alt_id, "ags" )         . "\n" .
+		"read_length: "   . $self->sample_ags( $sample_alt_id, "read_length" ) . "\n" .
+		"sampled_reads: " . $self->sample_ags( $sample_alt_id, "n_reads_sampled" ) . "\n"
+		);
+	}
+}
+    close IN;
+}
+
+sub get_length_based_cutoff_score($$){
+    my( $self, $length ) = @_;
+    my $threshold;
+    foreach my $ra_range( @{ $self->readlen_map->{"ranges"} } ){
+	my( $lower, $upper ) = @{ $ra_range };
+	if( $length == $upper ){
+	    next; #non-inclusive upper limit. it isn't in this bin, but the next sized bin
+	}
+	my $is_between = ( sort{ $a <=> $b} $lower, $upper, $length )[1] == $length;
+	if( $is_between ){
+	    $threshold = $self->readlen_map->{"thresholds"}->{$lower};
+	    last;
+	}
+    }
+    if( !defined( $threshold ) ){
+	$self->Shotmap::Notify::warn( "Can't determine the threshold for a read of length $length!\n" );
+    }
+    return $threshold;
 }
 
 1;

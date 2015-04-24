@@ -29,18 +29,26 @@ if( $pipe->use_db ){
 	print "Testing MySQL connection....\n";
 	chomp( $db_pass );
     }
-
     my $DBIstring = "DBI:mysql:host=" . $pipe->db_host; #don't want dbname in string for subsequent autocreate
     my $dbh = DBI->connect( $DBIstring, $pipe->dbuser, $db_pass )
 	or die "Connection Error: $DBI::errstr\n";
     print "Looks like we can connect with these database settings.\n";
 }
-my %switches = %{ get_switch_array() };
+my %switches    = %{ get_switch_array() };
+my %db_keys     = %{ get_db_keys() };
+my %remote_keys = %{ get_remote_keys() };
+
 print "Building conf-file...\n";
 my $conf_file = $pipe->{"opts"}->{"conf-file"};
 open( OUT, ">$conf_file" ) || die "Can't open $conf_file for write: $!\n";
 foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
     my $value = $pipe->{"opts"}->{$key};
+    if( !$pipe->use_db ){
+	next if $db_keys{ $key };
+    }
+    if( !$pipe->remote ){
+	next if $remote_keys{ $key };
+    }
     if( defined( $value ) ){
 	if( defined( $switches{$key} ) ){
 	    if( $value == 0 ){
@@ -58,8 +66,38 @@ foreach my $key( keys( %{ $pipe->{"opts"} } ) ){
 }    
 close OUT;
 
-`chmod 0600 $conf_file`;
-print "Configuration file created here with permissions 0600: $conf_file\n";
+if( $pipe->use_db ){
+    `chmod 0600 $conf_file`;
+    print "Configuration file created here with permissions 0600: $conf_file\n";
+} else {
+   print "Configuration file created here: $conf_file\n";
+}
+
+#should only need to include those that would have a default value
+sub get_db_keys{
+    my %db_keys = (
+	"dbuser"     => 1,
+	"dbpass"     => 1,
+	"bulk"       => 1,
+	"slim"       => 1,
+	"multi"      => 1,
+	"bulk-count" => 1,
+	"dbschema"   => 1
+	);
+    return \%db_keys;
+}
+
+sub get_remote_keys{
+    my %remote_keys = (
+	"ruser"          => 1,
+	"scratch"        => 1,
+	"wait"           => 1,
+	"use-array"      => 1,
+	"scratch-path"   => 1,
+	"small-transfer" => 1
+	);
+    return \%remote_keys;
+}
 
 sub get_switch_array{
     my %switches = (
@@ -84,6 +122,7 @@ sub get_switch_array{
 	"clobber"        => 1,
 	"dryrun"         => 1,
 	"reload"         => 1,
+	"adapt"          => 1,
     );
     
     return \%switches;

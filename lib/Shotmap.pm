@@ -77,6 +77,12 @@ sub new{
     $self->{"database"}           = 0; #should a relational database be used to manage the data?
     $self->{"is_test"}            = 0;
     $self->{"is_conf_build"}      = 0;
+    $self->{"clobber"}            = 0;
+    $self->{"full_pipe"}          = 0; #a complete shotmap run, or just building the db?
+    $self->{"iso_db_build"}       = 0; #are we only building/formatting a search database?
+    $self->{"adapt"}              = 0;
+    $self->{"adaptive_classification"} = 0;
+    $self->{"read_length_filter"}      = 0;
     bless($self);
     return $self;
 }
@@ -118,6 +124,15 @@ sub get_sample_ids {
     return \@sample_ids; # <-- array reference!
 }
 
+sub get_sample_alt_ids{
+    my( $self) = @_;
+    my @sample_alts = ();
+    foreach my $samp (keys(%{$self->{"samples"}})) {
+	push(@sample_alts, $samp);
+    }
+    return \@sample_alts; # <-- array reference!
+}
+
 sub bulk_insert_count{
     my ($self, $count) = @_;
     if( defined( $count ) ){
@@ -155,11 +170,8 @@ sub force_build_search_db{
 
 sub get_sample_path($) { # note the mandatory (numeric?) argument!
     my ($self, $sample_id) = @_;
-    (defined($self->ffdb())) or die "ffdb was not defined! This can't be called until AFTER you call set_ffdb.";
-    (defined($sample_id)) or die "get_sample_path has ONE MANDATORY argument! It can NOT be called with an undefined input sample_id! In this case, Sample id was not defined!";
-    (defined($self->project_id())) or die "Project ID was not defined!";
-    (defined($self->db_name())) or die "Database name was not defined!";
-    return(File::Spec->catfile($self->ffdb(), "projects", $self->db_name(), $self->project_id(), "$sample_id")); # concatenates items into a filesystem path
+    (defined( $self->project_dir ) ) || die "The project directory was not set!";
+    return(File::Spec->catfile($self->project_dir, "$sample_id")); # concatenates items into a filesystem path
 }
 
 sub project_id{
@@ -787,14 +799,33 @@ sub verbose{
 sub search_db_path{
     my ($self, $type) = @_;
     (defined($type)) or die( "You didn't specify the type of db that you want the path of\n" );
-    (defined($self->ffdb())) or die("ffdb was not defined!");
-    (defined($self->search_db_name($type))) or die("db ${type} is not defined!");
-    if( $type eq "hmm" ){
-	return($self->ffdb() . "/HMMdbs/" . $self->search_db_name("hmm"));
+    (defined($self->search_db_name($type))) or die("search db name for ${type} is not defined!");
+    (defined($self->search_db_path_root)) or die("search_db_path_root not defined!");
+    if( $self->iso_db_build ){
+	return $self->search_db_path_root;
+    } else {
+	if( $type eq "hmm" ){
+	    return($self->search_db_path_root . "/HMMdbs/" . $self->search_db_name("hmm"));
+	}
+	if( $type eq "blast" ){
+	    return($self->search_db_path_root . "/BLASTdbs/" . $self->search_db_name("blast"));
+	}
     }
-    if( $type eq "blast" ){
-	return($self->ffdb() . "/BLASTdbs/" . $self->search_db_name("blast"));
+}
+
+sub search_db_path_root{
+    my ($self, $path ) = @_;
+    my $key = "search_db_path_root";   
+    $self->set_value( $key, $path );
+    return $self->{ $key };
+}
+
+sub iso_db_build{
+    my( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"iso_db_build"} = $value;
     }
+    return $self->{"iso_db_build"};
 }
 
 sub top_hit_type{
@@ -867,6 +898,7 @@ sub build_remote_ffdb {
     my $rffdb      = $self->{"rffdb"};
     my $connection = $self->remote_connection();
     Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb"         , $verbose); # <-- 'mkdir' with the '-p' flag won't produce errors or overwrite if existing, so simply always run this.
+    
     Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/projects", $verbose);
     Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/HMMdbs"  , $verbose);   
     Shotmap::Run::execute_ssh_cmd( $connection, "mkdir -p $rffdb/BLASTdbs", $verbose);
@@ -996,6 +1028,97 @@ sub bash_source{
     return $self->{ $key };    
 }
 
+sub clobber{
+    my( $self, $value ) = @_;
+    my $key = "clobber";
+    $self->set_value( $key, $value);
+    return $self->{ $key };
+}
+
+sub sample_ags{
+    #sample is the sample_alt_id
+    #ags_method is the ags method used to calculate ags (e.g., microbecensus)
+    #ags_key is either "ags", "read_length", or "n_reads_sampled"; all are need to AGS correct abundances    
+    my( $self, $sample, $ags_key, $ags_value ) = @_;
+    if( defined( $ags_value ) ){
+	$self->{"ags_values"}->{$sample}->{$ags_key} = $ags_value;
+    }
+    return $self->{"ags_values"}->{$sample}->{$ags_key};
+}
+
+sub ags_method{
+    my( $self, $value ) = @_;
+    my $key = "ags";
+    $self->set_value( $key, $value);
+    return $self->{ $key };
+}
+
+sub sample_stats{
+    #sample is the sample_alt_id
+    #ags values are either:
+    ##total_abundance (the total abundance in the sample, across all families (denominator in RA calculation)
+    ##total_reads (the number of reads used to assess abundance)
+    ##class_reads (the number of reads used that were classified)
+    my( $self, $sample, $stat_key, $stat_value ) = @_;
+    if( !defined( $sample ) ){
+	#so we can test if there is data in this object or not
+	return undef;
+    }
+    if( defined( $stat_value ) ){
+	$self->{"stat_values"}->{$sample}->{$stat_key} = $stat_value;
+    } else {
+	if( !defined( $self->{"stat_values"}->{$sample}->{$stat_key} ) ){
+	    die "I don't seem to have a statistic vale for the key $stat_key for sample $sample\n";
+	}
+    }
+    
+    return $self->{"stat_values"}->{$sample}->{$stat_key};   
+}
+
+sub full_pipe{
+    my( $self, $value ) = @_;
+    my $key = "full_pipe";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+sub iterate_output{
+    my( $self, $value ) = @_;
+    my $key = "iterate_output";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+#is this an isolated ffdb (e.g., within rawdata directory) or was ffdb specified by user?
+sub is_iso_db{
+    my( $self, $value ) = @_;
+    my $key = "is_iso_db";
+    $self->set_value( $key, $value );
+    return $self->{ $key };    
+}
+
+sub adapt{
+    my( $self, $value ) = @_;
+    my $key = "adapt";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+sub adapt_class{
+    my( $self, $value ) = @_;
+    my $key = "adaptive_classification";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
+#filter out reads less than this value
+sub read_length_filter{
+    my( $self, $value ) = @_;
+    my $key = "read_length_filter";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+}
+
 sub set_value{
     my( $self, $key, $value ) = @_;
     if( defined( $value ) ){
@@ -1010,5 +1133,53 @@ sub set_value{
     return $value
 }
 
+# ADAPTIVE CLASSIFICATION DATA
+sub readlen_map{
+    my( $self ) = @_;
+    my $map->{"ranges"} = [
+	( 
+	[ 0  , 60  ],
+	[ 60 , 70  ],
+	[ 70 , 80  ],
+	[ 80,  90  ],  
+	[ 90 , 100 ],
+	[ 100, 125 ],
+	[ 125, 150 ],
+	[ 150, 175 ],
+	[ 175, 200 ],
+	[ 200, 225 ],
+	[ 225, 250 ],
+	[ 250, 275 ],
+	[ 275, 300 ],
+	[ 300, 350 ],
+	[ 350, 400 ],
+	[ 400, 500 ],
+	[ 500, 1000000] #artifically long for now
+	)
+	];   
+   $map->{"thresholds"} = {
+	'0'  => 26.8,
+	'60'  => 28.3,
+	'70'  => 29.0,
+	'80'  => 30.3,
+	'90'  => 31.0,
+	'100' => 31.3,
+	'125' => 32.8,
+	'150' => 34.0,
+	'175' => 35.3,
+	'200' => 36.0,
+	'225' => 36.0,
+	'250' => 36.8,
+	'275' => 37.5,
+	'300' => 39.0,
+	'350' => 40.3,
+	'400' => 42.0,
+	'500' => 42.8
+    };
+    return $map;
+}
+
+
 1;
+
 

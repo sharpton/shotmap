@@ -208,7 +208,7 @@ for( a in 1:length( meta.names ) ){
     rownames(rnd.p) <- rownames( test.data )
     rnd.p <- as.data.frame( rnd.p )
     if( "qvalue" %in% procs ){    	    	
-    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+    	qvals        <- qvalue( rnd.p[,1] )$qvalues
 	rnd.p$qvalue <- qvals
     }
     rnd.p2          <- data.frame( test.type=test.type, rnd.p)
@@ -237,7 +237,7 @@ for( a in 1:length( meta.names ) ){
     rownames(rnd.p) <- rownames( test.data )
     rnd.p <- as.data.frame( rnd.p )
     if( "qvalue" %in% procs ){    	    	
-    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+    	qvals        <- qvalue( rnd.p[,1] )$qvalues
 	rnd.p$qvalue <- qvals
     }
     rnd.p2          <- data.frame( test.type="kruskal.test", rnd.p)
@@ -266,7 +266,7 @@ for( a in 1:length( meta.names ) ){
     rownames(rnd.p) <- rownames( test.data )
     rnd.p <- as.data.frame( rnd.p )
     if( "qvalue" %in% procs ){    	    	
-    	qvals        <- qvalue( rnd.p[,1] )$pvalues
+    	qvals        <- qvalue( rnd.p[,1] )$qvalues
 	rnd.p$qvalue <- qvals
     }
     rnd.cor       <- round(rawp0$cor.estimate, 4 )

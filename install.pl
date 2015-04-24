@@ -364,8 +364,7 @@ if( $algs ){
     $alg = "microbecensus";
     print "Installing ${alg}...\n";
     if( $clean ){
-	clean_src( "bin/microbe_census;" .
-		   "bin/ags_functions.py"   ,
+	clean_src( "bin/run_microbe_census.py" ,
 		   $algs->{$alg}, 
 		   "${pkg}" . basename( $srcs->{$alg} )  );
     }    
@@ -374,10 +373,12 @@ if( $algs ){
 	decompress_src( $pkg, basename( $srcs->{$alg} ) );
     }
     if( $build ){
-	#do nothing
+	build_src( $algs->{$alg}, "python setup.py install;" .
+		   #not sure I'm hot on the idea of auto writing to people's ~/.bash_profile. Better solution?
+		   "echo -e \"\nexport PYTHONPATH=\$PYTHONPATH:" . $algs->{$alg} . "\" >> ~/.bash_profile;" .
+		   "echo -e \"\nexport PATH=\$PATH:" . $algs->{$alg} . "/scripts/\" >> ~/.bash_profile" );
     }
-    link_src( $algs->{$alg} . "/src/ags_functions.py;" . 
-	      $algs->{$alg} . "/src/microbe_census"    , 
+    link_src( $algs->{$alg} . "/scripts/run_microbe_census.py" ,
 	      $bin );
     print "\t...done with ${alg}\n";
     
