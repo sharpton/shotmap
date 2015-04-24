@@ -1,0 +1,13 @@
+#!/bin/bash 
+# 
+#$ -S /bin/bash 
+#$ -l arch=linux-x64 
+#$ -l h_rt=360:00:00	
+#$ -l scratch=3G
+#$ -pe smp 2
+#$ -cwd 
+#$ -r y
+#$ -o /dev/null 
+#$ -e /dev/null 
+#$ -l mem_free=5G
+ulimit -c 0

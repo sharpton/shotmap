@@ -1,0 +1,21 @@
+#!/bin/bash
+# BEGIN SGE OPTIONS DECLARATIONS
+# Export all environment variables
+#$ -V
+#
+#
+# Shell Environment
+#$ -S /bin/bash
+#
+# Use current working directory
+#$ -cwd
+#
+#Output files for stdout and stderr
+#$ -o /home/micro/sharptot/test.out
+#$ -e /home/micro/sharptot/test.err
+#
+# END SGE OPTIONS DECLARATIONS
+#
+PATH=/home/micro/sharptot/bin:/home/micro/sharptot/scripts:/usr/local/bin:/usr/bin:/bin:/local/cluster/bin:/local/cluster/genome/bin:/local/cluster/mpich/bin:/usr/local/share/ncbi/bin:/local/cluster/RAxML/bin:/local/cluster/velvet/velvet:/local/cluster/abyss/bin:/local/cluster/edena2.1.1_linux64:/local/cluster/RECON1.05/scripts:/usr/X11R6/bin:/usr/X/bin:/local/cluster/mockler/bin:/local/cluster/454/bin:/local/cluster/trinityrnaseq:/local/cluster/sge/bin/lx24-amd64:/home/micro/sharptot/lib/perl/perl5/bin:/local/cluster/sge/bin/lx24-amd64:/local/cluster/sge/bin/lx24-amd64:/usr/local/rvm/gems/ruby-1.9.3-p547/bin:/usr/local/rvm/gems/ruby-1.9.3-p547@global/bin:/usr/local/rvm/rubies/ruby-1.9.3-p547/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/local/rvm/bin:/bin:/local/cluster/jre1.6.0_23/bin:/usr/bin:/usr/local/bin:/home/micro/sharptot/scripts:/home/micro/sharptot/bin:/local/cluster/bin:/local/cluster/mpich/bin:/usr/local/share/ncbi/bin:/local/cluster/genome/bin:/local/cluster/RECON1.05/scripts:/local/cluster/MUMmer:/local/cluster/amos/bin:/local/cluster/velvet/velvet:/local/cluster/abyss/bin:/local/cluster/mira/bin:/local/cluster/edena2.1.1_linux64:/local/cluster/MAKER/bin:/local/cluster/mcl/bin:/local/cluster/YASRA/bin:/local/cluster/RAxML/bin:/local/cluster/tmhmm/bin:/local/cluster/wgs/Linux-amd64/bin:/local/cluster/mpich2-1.2.1p1/bin:/local/cluster/mockler/bin:/local/cluster/carrington/bin:/local/cluster/Roche/454/bin:/local/cluster/MaSuRCA/bin:/local/cluster/shore:/local/cluster/SHOREmap:/local/cluster/BEAST/bin:/local/cluster/BEDTools/bin:/local/cluster/genomemapper:/local/cluster/iprscan/bin:/local/cluster/trinityrnaseq:/local/cluster/Cerulean/bin:/local/cluster/Quake/bin:/local/cluster/glimmer/bin:/local/cluster/RAPSearch2.16_64bits/bin:/local/cluster/last-418/bin:/local/cluster/rnammer:/local/cluster/SHRiMP/bin:/local/cluster/cd-hit:/local/cluster/augustus/bin:/local/cluster/ETA/bin:/local/cluster/structure_linux_console/bin:/local/cluster/stampy:/local/cluster/GARM:/usr/X11R6/bin:/usr/X/bin:/usr/local/share/ncbi/bin:/local/cluster/RECON1.05/scripts:/local/cluster/oases:/local/cluster/miRanda/bin:/local/cluster/ea-utils/bin:/local/cluster/MOSAIK/bin:/local/cluster/amber12/bin:/usr/lib64/lam/bin:/local/cluster/variscan-2.0.3/bin/Linux-i386:/local/cluster/Roche/454/bin:/local/cluster/homer/bin:/local/cluster/infernal/binaries:/local/cluster/rtax:/local/cluster/pandaseq/bin:/local/cluster/AmpliconNoise/ampliconnoise/Scripts:/local/cluster/AmpliconNoise/ampliconnoise:/local/cluster/pplacer-v1.1:/local/cluster/microbiomeutil/WigeoN:/local/cluster/microbiomeutil/TreeChopper:/local/cluster/microbiomeutil/NAST-iEr:/local/cluster/microbiomeutil/ChimeraSlayer:/local/cluster/AmosCmp16Spipeline:/local/cluster/Tisean_3.0.0/bin:/local/cluster/allpathslg/bin:/local/cluster/NAMD:/local/cluster/vcf/bin:/local/cluster/nextclip/bin:/local/cluster/prokka-1.9/bin:/local/cluster/iRODS/clients/icommands/bin:./:/home/micro/sharptot/bin
+export PATH
+
