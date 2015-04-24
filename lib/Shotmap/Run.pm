@@ -3680,6 +3680,8 @@ sub split_sequence_file{
 		my $seqlen = length( $sequence );
 		my $check  = $self->Shotmap::Run::check_seqlen_for_print( $seqlen );
 		my $header = $self->Shotmap::Run::update_seq_header_w_len( $header, $seqlen ); 
+		print $header;
+		    
 		if( $check ){
 		    print OUT "$header\n$sequence\n";
 		    $seq_ct++;
