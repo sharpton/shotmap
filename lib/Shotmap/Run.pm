@@ -3899,4 +3899,13 @@ sub get_length_based_cutoff_score($$){
     return $threshold;
 }
 
+sub cat_file_array{
+    my( $self, $file_array, $outfile ) = @_;
+    my $cmd     = "cat " . join( " ", @$file_array ) . " > $outfile";
+    my $results = IPC::System::Simple::capture($cmd);
+    (0 == $EXITVAL) or die("Error catting files into $outfile" );
+
+    return $outfile;
+}
+
 1;

@@ -310,8 +310,14 @@ sub estimate_ags{
 	if( ! -d $ags_path ){
 	    File::Path::make_path($ags_path);
 	}
+	#build the input
+	my $reads_dir = File::Spec->catdir($self->get_sample_path($sample_alt_id), "raw" );
+	my @raw_files = glob( $reads_dir . "/*" );
+	my $tmp       = File::Spec->catfile( $ags_path, "_mc.tmp.gz" );
+	$self->Shotmap::Run::cat_file_array( \@raw_files, $tmp );
 	#get the input path       
-	my $in_file = $samples->{$sample_alt_id}->{"path"};
+	#my $in_file = $samples->{$sample_alt_id}->{"path"};
+	my $in_file  = $tmp;
 	if( $ags_method eq "microbecensus" ){
 	    #need to create the log directory
 	    my $log_dir    = File::Spec->catdir( $self->get_project_dir, "logs", "microbecensus");
@@ -321,6 +327,7 @@ sub estimate_ags{
 	    $self->Shotmap::Run::run_microbecensus( $in_file, $ags_output, $log_file );
 	    $self->Shotmap::Run::parse_microbecensus( $sample_alt_id, $ags_output );
 	}
+	unlink( $tmp );
     }
 }
 

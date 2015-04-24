@@ -80,6 +80,7 @@ sub new{
     $self->{"clobber"}            = 0;
     $self->{"full_pipe"}          = 0; #a complete shotmap run, or just building the db?
     $self->{"iso_db_build"}       = 0; #are we only building/formatting a search database?
+    $self->{"iterate_output"}     = 0;
     $self->{"adapt"}              = 0;
     $self->{"adaptive_classification"} = 0;
     $self->{"read_length_filter"}      = 0;
