@@ -9,12 +9,12 @@ use Getopt::Long;
 my $testing = 0;
 
 my $perlmods  = 1; #should we install perl modules
-my $rpackages = 1; #should we install R modules
-my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 1; #wipe old installations of algs?
-my $get       = 1; #download alg source code?
-my $build     = 1; #build alg source code?
-my $test      = 1; #should we run make checks during build?
+my $rpackages = 0; #should we install R modules
+my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
+my $clean     = 0; #wipe old installations of algs?
+my $get       = 0; #download alg source code?
+my $build     = 0; #build alg source code?
+my $test      = 0; #should we run make checks during build?
 my $db        = 0;
 my $all       = 0;
 my $source    = 0;

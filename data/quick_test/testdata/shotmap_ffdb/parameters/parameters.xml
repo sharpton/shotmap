@@ -26,8 +26,8 @@
    <id>1</id>
    <abundance_type>coverage</abundance_type>
    <normalization_type>target_length</normalization_type>
-   <rarefaction_type>null</rarefaction_type>
-   <rarefaction_depth>null</rarefaction_depth>
+   <rarefaction_type>pre-rarefaction</rarefaction_type>
+   <rarefaction_depth>10000</rarefaction_depth>
   </abundance_id>
  </abundance_parameters>
 </xml>
