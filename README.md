@@ -1,4 +1,4 @@
-shotmap
+shotMAP
 =======
 
 A Shotgun Metagenome Annotation Pipeline
@@ -19,44 +19,74 @@ Shotmap can also optionally manage the information and data associated with this
 Quickstart
 ----------
 
-Once you have a configuration file built (see below), all you need to do to annotate your metagenome is:
+The fastest way to get shotmap working on your data is to first build a search database (which only needs to be done one time):
+
+    perl $SHOTMAP_LOCAL/scripts/build_shotmap_searchdb.pl -r=</directory/path/to/reference/database> -d=</directory/path/to/search/database>
+
+And then execute shotMAP:
      
-     perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configutation_file>
+     perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i=</directory/path/to/metagenomes> -d=</directory/path/to/search/database>
 
-Detailed Workflow Synopsis (section under development)
-______________________________________________________
 
-Shotmap conducts the following steps:
+Detailed Workflow Synopsis
+__________________________
 
-1. Initialize a user-defined flatfile database (i.e., ffdb) that stores the results of the analysis. 
+ShotMAP conducts the following steps:
+
+1. Initialize a flatfile database (ffdb) that stores the results of the analysis. 
+By default, this is located in the directory that contains the metagenomic samples.
 2. Obtain the raw metagenomes (fasta formatted, can be gzipped). 
-Several metagenomes can be processed simultaneously. Each metagenome represents a single sample within an analysis project. 
-Shotmap assigns the project and each sample with an internal identifier. Sample data is stored within the project subdirectory
-within the ffdb.
-3. Split each metagenome files into a set of smaller files (user defined).  These files are located in the raw/ subdirectory within the ffdb.
-3. Use Microbe Census to calculate the average genome size of each metagenome (in development). The results are stored in ags/.
-4. Use MetaTrans to predict protein coding seqeunces in each metagenome. This software can (currently) run one of three
-different gene prediction methods: six-frame translation via transeq (6FT); 6FT, but splitting on stop codons (6FT_split), and prodigal.
-The results are stored in orfs/.
+All metagenomes in the directory specified by -i will be processed by shotmap.
+While several metagenomes can be processed simultaneously, each sample should be represented by a single file.
+The data for each project is stored within a sample subdirectory within the shotMAP ffdb:
+ffdb/sample/
+The directory containing the input metagenomes may optionally include a mapping file
+(see the section on ShotMAP Mapping Files for more information).
+3. Split each metagenome file into a set of smaller files to improve parallelization.  
+These files are located in the ffdb/sample/raw/ subdirectory.
+4. Predict protein coding seqeunces in each metagenome. 
+ShotMAO software can currently run one of three different gene prediction methods: 
+six-frame translation via transeq (6FT); 6FT, but splitting on stop codons (6FT_split), and prodigal.
+The results are stored in the ffdb/sample/orfs/.
+5. Search all metagenomic predicted peptides against each target in a shotMAP formatted search database.
+[Note: This database can be built using the program $SHOTMAP_LOCAL/scripts/build_shotmap_searchdb.pl, which
+takes as input a protein family database (e.g., protein sequences or HMMs), and formats the database to in a 
+mannar appropriate for how the user wants to analyze their data. 
+See the secion Building a ShotMAP Search Database
+for more information]. 
+Search results are stored within ffdb/sample/search_results/.
+6. Classify metagenomic sequences into protein families. 
+By default, shotMAP assigns metagenomic reads to the family that contains the read's best hit. 
+This produces a classification map (ffdb/output/Classification_Map_Sample*) 
+that lists which family each classified read is a member of.
+7. Use Microbe Census to calculate the average genome size of each metagenome. 
+The results are stored in ffdb/sample/ags.
+8. Calculates the abundance of each protein family in each sample. 
+By default, shotMAP calculates the average genome size normalized coverage of each family in each sample. 
+ShotMAP also quantifies the relative abundance of each family, as well as the number of times a read is 
+classified into a family (i.e., the family's count).
+The output of this step can be found in ffdb/output/Abundances/.
+10. Calculate the functional alpha-diversity of each sample. 
+Various diversity-associated summary statistics are calucated and placed in the
+/ffdb/output/Alpha_diversity directory. 
+If multiple samples are included, shotmap conducts statistical comparison of their differences
+in functional diversity. If a mapping file is included, shotMAP will evaluate how diveristy 
+associates with sample covariates.
+11. Identify families that stratify samples, and cluster samples by their interfamily variation.
+[Note: These analyses are only attempted if multiple samples are included in an analysis, 
+though the script run_stats_tests.pl can be run at a later date on any set of samples]
+The results of this analysis are found in ffdb/output/Families and ffdb/output/Beta_diversity
+
+Building a ShotMAP Search Database
+----------------------------------
+
 5. Build a reference protein family search database using user-defined parameters if one hasn't already been created. This
 can either be a protein sequence databases similar to a BLAST database or a HMMER v3 HMM database. Shotmap also indexes the database
 in a manner appropriate for the user-defined search algorithm (i.e., runs prerapsearch for rapsearch).
-6. Search all metagenomic predicted peptides against each sequence/HMM in the search database using a user-defined search algorithm. The
-results are stored within search_results/.
-7. Parse search results using user-defined settings to identify metagenomic sequences that are homologs of search database families. These
-results are also stored within search_results/ (see *.mysqld files).
-8. Classify sequences using user-defined settings. For now, shotmap assigns metagenomic reads to the family to which they exhibit the best hit.
-This produces a classification map (output/Classification_Map_Sample*) that lists which family each classified read is a member of.
-9. Calculates each reference family's abundance in each sample using user-defined parameters (see Abundance_Map* files). 
-These results are placed in a subdirectory witin output/ (i.e., cid_1_aid_1) that indicates the results associated with a specific
-set of classification and abundance parameters. See parameters/parameters.xml for a mapping of the specific parameters to these subdirectory identifiers.
-10. Calculate the functional diversity of each sample. Various diversity-associated summary statistics are calucated and placed in the
-output/cid.../Inter_Sample_Results directory. If multiple samples are included, shotmap conducts statistical comparison of their differences
-in functional diversity.
-11. Identify families that stratify samples of various types (using sample metadata as a guide) and cluster samples based on their interfamily variation.
-These analyses are only attempted if multiple samples are included in a project and the results are stored in output/cid.../Inter_Family_Results and
-output/cid.../Sample_Ordination. Note that the repository includes scripts that will run these analyses using Abundance Maps produced through the
-analysis of distinct projects.
+
+
+ShotMAP Mapping Files
+---------------------
 
 Installation
 ------------

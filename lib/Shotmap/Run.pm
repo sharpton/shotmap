@@ -777,6 +777,14 @@ sub translate_reads {
 	if( -e "${infile}.gz" ){
 	    $infile = "${infile}.gz";
 	}
+	if( ! -e $infile ){
+	    $self->Shotmap::Notify::warn( 
+		"I could not find $infile for processing with translate_reads. This is not "  .
+		"necessairly an error (we may have fewer input files that you expect), " .
+		"but I recommend verifying"
+		);
+	    $pm->finish;
+	}
 	#ADD ADDITIONAL METHODS
         if( $method eq '6FT' ){	   
 	    $cmd    = $self->python . " ${bin}/metatrans.py -m 6FT $infile $outfile";
@@ -2277,6 +2285,14 @@ sub run_search{
         #do some work here                                                                                 
         my $log_file = $log_file_prefix . "_${i}.log";
 	my $infile  = File::Spec->catfile( $orfs_dir, $inbasename . $i . ".fa" );
+	if( ! -e $infile ){
+	    $self->Shotmap::Notify::warn( 
+		"I could not find $infile for processing with run_search. This is not "  .
+		"necessairly an error (we may have fewer input files that you expect), " .
+		"but I recommend verifying"
+		);
+	    $pm->finish;
+	}
 	#create output directory
 	my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
 	File::Path::make_path($outdir);
@@ -2286,22 +2302,6 @@ sub run_search{
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
-	    #7-01-2014: see note in Shotmap::Search::build_search_script for why we do this stuff below
-	    #RAPsearch has no direct way to correct the evalue based on the database length. So, we instead need to adjust the evalue reporting
-	    #threshold (rapsearch -e). This is a little hacky as we'll use the number of sequences in the database (actully number digits of total seqs) 
-	    #as an adjustment proxy.
-	    #This shouldn't influence the final analysis, as our adjustment will be large. So, when we parse, we'll have more hits than we actually need
-	    #to consider. This errs on the side of increasing the report size (lots of false hits) to maximize the inclusion of true hits, and we
-	    #let the parser do the work.
-	    #my $db_size = $self->Shotmap::DB::get_database_size_from_seqlen_table( $self->params_dir . "/sequence_lengths.tab" ); 
-	    #my $digits  = length( $db_size );	    
-
-	    #actually, for now we'll just force -e. not ideal solution, but when digits is largish (e.g., >=7), rapsearch breaks	    
-            #using digits was creating strange coredumps in rapsearch. 4.0 was the largest, stable number.
-	    
-	    #$cmd = "rapsearch -b=0 -e 4.0 -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-
-	    #7-7-2014: The RAPsearch authors added an  option on our behalf to 2.19 that filters hits by minimum score. So, let's use that instead:
             $cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
         }
 	elsif( $type eq "rapsearch_accelerated" ){
@@ -2382,6 +2382,14 @@ sub parse_results {
 	my $infile   = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
 	if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
 	    $infile = $infile . ".m8";
+	}
+	if( ! -e $infile && ! -e $infile . ".gz" ){
+	    $self->Shotmap::Notify::warn( 
+		"I could not find $infile for processing with parse_results. This is not "  .
+		"necessairly an error (we may have fewer input files that you expect), " .
+		"but I recommend verifying"
+		);
+	    $pm->finish;
 	}
 	my $incompressed = $infile . ".gz";
 	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "orfs", $orfbasename . $i . ".fa" );
@@ -3907,5 +3915,6 @@ sub cat_file_array{
 
     return $outfile;
 }
+
 
 1;

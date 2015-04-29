@@ -1069,7 +1069,7 @@ sub sample_stats{
 	$self->{"stat_values"}->{$sample}->{$stat_key} = $stat_value;
     } else {
 	if( !defined( $self->{"stat_values"}->{$sample}->{$stat_key} ) ){
-	    die "I don't seem to have a statistic vale for the key $stat_key for sample $sample\n";
+	    die "I don't seem to have a statistic value for the key $stat_key for sample $sample\n";
 	}
     }
     
