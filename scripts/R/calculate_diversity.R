@@ -10,6 +10,12 @@ metadata.tab      <- Args[6]
 verbose           <- Args[7]
 r.lib             <- Args[8]
 
+#samp.abund.map <- "/nfs1/Sharpton_Lab/projects/sharptot/shotmap-runs/shotmap_ms/IBD_cohort/resubmission/MetaHIT/organized_results/stats_all//no_ags//metahit_all-abundance-tables.tab"
+#outpath        <- "/nfs1/Sharpton_Lab/projects/sharptot/shotmap-runs/shotmap_ms/IBD_cohort/resubmission/MetaHIT/organized_results/stats_all//no_ags/"
+#metadata.tab   <- "/nfs1/Sharpton_Lab/projects/sharptot/shotmap-runs/shotmap_ms/IBD_cohort/resubmission/MetaHIT/metadata/merged_metadata.tab"
+#verbose        <- 1
+#r.lib          <- "/home/micro/sharptot/src/shotmap/ext/R"
+
 if( is.na( samp.abund.map ) ){
     print( "You must provide a sample abundance map!" )
     exit
@@ -88,14 +94,6 @@ autodetect <- function( val.list ) {
   return( type )
 }
 
-####get the metadata
-if( verbose  ){
-    print( "Grabbing metadata..." )
-}
-meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
-meta.names <- colnames( meta )
-nsamples   <- dim( meta )[1]
-
 ###get family abundances by samples
 if( verbose ){
     print( "Grabbing family abundance data..." )
@@ -104,6 +102,18 @@ abund.df   <- read.table( file=samp.abund.map, header=TRUE, check.names=FALSE )
 abund.map  <- acast(abund.df, Sample.Name~Family.ID, value.var="Abundance", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 count.map  <- acast(abund.df, Sample.Name~Family.ID, value.var="Counts", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
 ra.map     <- acast(abund.df, Sample.Name~Family.ID, value.var="Relative.Abundance", fill=0 ) #could try to do all work in the .df object instead, enables ggplot
+
+####get the metadata
+if( verbose  ){
+    print( "Grabbing metadata..." )
+}
+meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE )
+#only want samples that are in our abundance data frame
+meta       <- subset(meta, meta$Sample.Name %in% abund.df$Sample.Name )
+#order meta by samples in abund.map
+meta       <- meta[ match( rownames(abund.map), meta$Sample.Name ), ]
+meta.names <- colnames( meta )
+nsamples   <- dim( meta )[1]
 
 ### write the sample-by-data matrices
 #abundance table
@@ -389,6 +399,10 @@ if( is.null( meta ) ){
       }
       if( autodetect( meta[,meta.type] ) == "discrete" ){
         next
+      }
+      if( !(isTRUE(is.numeric( meta.div[, meta.type]))) |
+      	  !(isTRUE(is.numeric(meta.div[, div.type]  ))) ){
+      	next
       }
       ggplot( meta.div, aes_string( x = meta.type, y=div.type ) ) +
         geom_point( ) + #if color: geom_point(aes(fill = COLNAME) )

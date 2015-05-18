@@ -26,7 +26,7 @@ total_bp          <- as.numeric(Args[9])
 #total_bp       <- 20000000 * 70
 
 metadata.delim <- ""
-col.classes    <- c( "factor", "factor", rep( "numeric", 6 ) )
+col.classes    <- c( "factor", "factor", rep( "numeric", 3 ) )
 
 files <- list.files( in.dir )
 abund.map.files <- files[grep(glob2rx("*Abundance_Map*"), files)]
@@ -34,7 +34,7 @@ abund.map.files <- files[grep(glob2rx("*Abundance_Map*"), files)]
 ####get the metadata - use it to process abund maps (see below)
 meta       <- read.table( file=metadata.tab, header=TRUE, check.names=FALSE, sep=metadata.delim )
 meta.names <- colnames( meta )
-sample.alt.ids <- meta$SAMPLE.ID    #This must be in the metadata file!
+sample.alt.ids <- meta$Sample.Name    #This must be in the metadata file!
 
 if( !(is.na( reset.total_bp ) ) ){
     if( reset.total_bp == 1 ){   
@@ -43,7 +43,7 @@ if( !(is.na( reset.total_bp ) ) ){
 }
 
 if( is.null(sample.alt.ids)){
-    print( paste("ERROR: Could not find the field SAMPLE.NAME in your metadata file ", metadata.tab, sep=" ") );
+    print( paste("ERROR: Could not find the field Sample.Name in your metadata file ", metadata.tab, sep=" ") );
     exit();   
 }
 if( length( sample.alt.ids ) < length( abund.map.files ) ){

@@ -3850,8 +3850,8 @@ sub build_remote_script{
 sub run_microbecensus{
     my( $self, $infile, $outfile, $logfile ) = @_;
     #no need to set up a fork, as microbecensus can't run in parallel yet
-    my $nprocs = $self->nprocs;
-    my $cmd = "run_microbe_census.py -t $nprocs $infile $outfile > $logfile 2>&1";
+    my $threads = 1; 
+    my $cmd = "run_microbe_census.py -t $threads $infile $outfile > $logfile 2>&1";
     $self->Shotmap::Notify::print( "Waiting for microbecensus to finish..." );
     $self->Shotmap::Notify::print_verbose( "$cmd\n" );
     my $results = IPC::System::Simple::capture("$cmd");                                                                                                                                                                                
