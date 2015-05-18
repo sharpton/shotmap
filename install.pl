@@ -11,19 +11,20 @@ my $testing = 0;
 my $perlmods  = 1; #should we install perl modules
 my $rpackages = 1; #should we install R modules
 my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 1; #wipe old installations of algs?
+my $clean     = 0; #wipe old installations of algs?
 my $get       = 1; #download alg source code?
 my $build     = 1; #build alg source code?
 my $test      = 1; #should we run make checks during build?
-my $db        = 0;
-my $all       = 0;
-my $source    = 0;
+my $db        = 0; #should we install myql libraries? 
+my $all       = 0; 
+my $source    = 0; #should we build from source instead of x86 libraries
 
 my ($r_only);
 GetOptions(
     "use-db!" => \$db, #try to build the libraries needed for mysql communication
     "r-only!" => \$r_only, #only build the R packages
     "source!" => \$source,
+    "clean!"  => \$clean,
     );
 
 print "Note that this installer attempts to install precompiled x86 binaries when possible. If ".
@@ -314,7 +315,7 @@ if( $algs ){
     
     ######################
     # TRANSEQ
-    if( 0 ){
+    if( 1 ){ #not sure if we need to retain this since we added transeq to metatrans...
     $alg = "transeq";
     print "Installing ${alg}...\n";
     if( $clean ){
@@ -440,6 +441,11 @@ sub decompress_src{
 
     print "decompressing source...\n";
     chdir( $loc );
+    if( ! -e $stem ){
+	die "For some reason, I didn't download $stem into $loc. " . 
+	    "Please try to reproduce this error before contacting " . 
+	    "the author for assistance\n";
+    }
     if( $stem =~ m/\.tar\.gz/ ){
 	system( "tar xzf $stem" );
     }
