@@ -4,46 +4,26 @@ use strict;
 use File::Path;
 use File::Basename;
 use Cwd;
-use Getopt::Long;
+use Getopt::Long qw(GetOptionsFromString GetOptionsFromArray);
+use Carp;
+use Data::Dumper;
+
+$SIG{ __DIE__ } = sub { Carp::confess( @_ ) };
 
 my $testing = 0;
 
-my $perlmods  = 1; #should we install perl modules
-my $rpackages = 1; #should we install R modules
-my $algs      = 1; #should we install 3rd party gene prediction/search algorithms?
-my $clean     = 0; #wipe old installations of algs?
-my $get       = 1; #download alg source code?
-my $build     = 1; #build alg source code?
-my $test      = 1; #should we run make checks during build?
-my $db        = 0; #should we install myql libraries? 
-my $all       = 0; 
-my $source    = 0; #should we build from source instead of x86 libraries
+my $options = get_options( \@ARGV );
 
-my ($r_only);
-GetOptions(
-    "use-db!" => \$db, #try to build the libraries needed for mysql communication
-    "r-only!" => \$r_only, #only build the R packages
-    "source!" => \$source,
-    "clean!"  => \$clean,
-    );
-
-print "Note that this installer attempts to install precompiled x86 binaries when possible. If ".
-    "this doesn't work for your architecture, please rerun the installer and invoke --source\n";
-
-if( defined( $r_only ) ){
-    $all       = 0;
-    $rpackages = 1;
-}
-
-if( $all ){
-    $perlmods  = 1;
-    $rpackages = 1;
-    $algs      = 1;
-    $clean     = 1;
-    $get       = 1;
-    $build     = 1;
-    $test      = 1;
-}
+my $perlmods  = $options->{"perlmods"};
+my $rpackages = $options->{"rpacks"};
+my $algs      = $options->{"algs"};
+my $clean     = $options->{"clean"};
+my $get       = $options->{"get"};
+my $build     = $options->{"build"};
+my $test      = $options->{"test"};
+my $db        = $options->{"db"};
+my $source    = $options->{"source"};
+my $all       = $options->{"all"};
 
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
@@ -61,7 +41,14 @@ if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
 	     "something like the following:\n\n" .
 	     "export SHOTMAP_LOCAL=<path_to_shotmap_repository>\n" );
     } else{
-	system( "echo 'export SHOTMAP_LOCAL=${dir}' >> ~/.bash_profile" );
+	#I'm not a fan of automatically messing with people's bash_profiles
+	#system( "echo 'export SHOTMAP_LOCAL=${dir}' >> ~/.bash_profile" );
+	#"${pkg}/${mbcensus_stem}/";
+	#my $mbcensus_stem  = "MicrobeCensus";
+	#"echo -e \"\nexport PYTHONPATH=\$PYTHONPATH:" . $algs->{$alg} . "\" >> ~/.bash_profile;";
+	#"echo -e \"\nexport PATH=\$PATH:" . $algs->{$alg} . "/scripts/\" >> ~/.bash_profile" );
+	#NEED SIMILAR COMMAND FOR TRANSEQ AND PRODIGAL
+
     }
 }
 
@@ -141,285 +128,71 @@ if( $rpackages ){
 ######################
 # Install 3rd Party Applications
 if( $algs ){
+    my $alg_data = parse_alg_data( $root . "/installer_alg_data.txt", $source, $test);
+    if( 0 ){
+    foreach my $alg( keys( %$alg_data ) ){
+	my $src   = $alg_data->{$alg}->{"src"};
+	my $stem  = $alg_data->{$alg}->{"stem"};
+	my $links = $alg_data->{$alg}->{"links"};
+	my $build = $alg_data->{$alg}->{"build"};
+	my $bins  = $alg_data->{$alg}->{"bins"};	    
+	my $dload = $alg_data->{$alg}->{"download"};	    
 
-    my $rapsearch_src  = "https://github.com/zhaoyanswill/RAPSearch2";
-    my $hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1-linux-intel-x86_64.tar.gz";
-    my $blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-x64-linux.tar.gz";
-    my $last_src       = "http://last.cbrc.jp/last-475.zip";
-    my $transeq_src    = "ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz";
-    my $prodigal_src   = "https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz";
-    my $mbcensus_src   = "https://github.com/snayfach/MicrobeCensus.git";
-    my $metatrans_src  = "https://github.com/snayfach/metatrans.git";
-
-    if( $source ){
-	$hmmer_src      = "ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1.tar.gz";
-	$blast_src      = "ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/ncbi-blast-2.2.29+-src.tar.gz";
-    }
-
-    my $rapsearch_stem = "RAPSearch2";
-    my $hmmer_stem     = "hmmer-3.1b1-linux-intel-x86_64";
-    if( $source ){
-	$hmmer_stem     = "hmmer-3.1b1";
-    }
-    my $blast_stem     = "ncbi-blast-2.2.29+";
-    if( $source ){
-	$blast_stem     = "ncbi-blast-2.2.29+-src";
-    }
-    my $last_stem      = "last-475";
-    my $transeq_stem   = "EMBOSS-6.6.0";
-    my $prodigal_stem  = "Prodigal-2.6.1";
-    my $mbcensus_stem  = "MicrobeCensus";
-    my $metatrans_stem = "metatrans";
-
-    my $rapsearch = "${pkg}/${rapsearch_stem}/";
-    my $hmmer     = "${pkg}/${hmmer_stem}/";
-    my $blast     = "${pkg}/${blast_stem}/";
-    if( $source ){
-	$blast    = "${pkg}/${blast_stem}/c++/";
-    }
-    my $last      = "${pkg}/${last_stem}/";
-    my $transeq   = "${pkg}/${transeq_stem}/";
-    my $prodigal  = "${pkg}/${prodigal_stem}/";
-    my $microbecensus = "${pkg}/${mbcensus_stem}/";
-    my $metatrans     = "${pkg}/${metatrans_stem}/";
-
-    my $algs = {
-        "rapsearch" => $rapsearch,
-        "hmmer"     => $hmmer,
-        "blast"     => $blast,
-        "last"      => $last,
-        "transeq"   => $transeq,
-        "prodigal"  => $prodigal,
-        "microbecensus" => $microbecensus,
-        "metatrans"     => $metatrans,
-    };
-
-    my $srcs = {
-	"rapsearch" => $rapsearch_src,
-	"hmmer"     => $hmmer_src,
-	"blast"     => $blast_src,
-	"last"      => $last_src,
-	"transeq"   => $transeq_src,
-	"prodigal"  => $prodigal_src,
-	"microbecensus" => $mbcensus_src,
-	"metatrans"     => $metatrans_src,
-    };
-
-    ######################
-    # RAPsearch2
-    
-    my $alg = "rapsearch";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/prerapsearch;bin/rapsearch", $algs->{$alg} );
-    }
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "git" );
-    }
-    if( $build ){
-	build_src( $algs->{$alg}, "./install" );
-    }
-    link_src( $algs->{$alg} . "/bin/prerapsearch;" . 
-	      $algs->{$alg} . "/bin/rapsearch"     , 
-	      $bin );
-    print "\t...done with ${alg}\n";
-    
-    ######################
-    # HMMER v3 
-    
-    $alg = "hmmer";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/hmmsearch;" . 
-		   "bin/hmmscan", 
-		   $algs->{$alg}, 
-		   "${pkg}" . basename( $srcs->{$alg})  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "wget" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $source && $build ){
-	if( $test ){
-	    build_src( $algs->{$alg}, "./configure;make; make check" );	    
-	} else{ 
-	    build_src( $algs->{$alg}, "./configure;make" );	    
+	print "Installing ${alg}...\n";
+	#need a better way to automate this step...
+	my $alg_pkg = "${pkg}/${stem}/";
+	if( $alg eq "blast" && $source ){
+	    $alg_pkg = "${pkg}/${stem}/c++/";
 	}
-    }
-    if( $source ){
-	link_src( $algs->{$alg} . "/src/hmmsearch;" . 
-		  $algs->{$alg} . "/src/hmmscan"    , 
-		  $bin );
-    } else {
-	link_src( $algs->{$alg} . "/binaries/hmmsearch;" . 
-		  $algs->{$alg} . "/binaries/hmmscan"    , 
-		  $bin );
-    }
-
-    print "\t...done with ${alg}\n";
-    
-    ######################
-    # BLAST+
-    
-    $alg = "blast";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/blastp;"    .
-		   "bin/makeblastdb", 
-		   $algs->{$alg}, 
-		   "${pkg}" . basename( $srcs->{$alg})  ); 
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "wget" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $source && $build ){
-	if( $test ){
-	    build_src( $algs->{$alg}, "./configure;make check; make" );	    
-	} else{ 
-	    build_src( $algs->{$alg}, "./configure;make" );	    
+	if( $clean ){
+	    clean_src( $links,
+		       $alg_pkg, 
+		       "${pkg}" . basename( $src ) 
+		);
+	}    
+	if( $get ){
+	    get_src( $src, $pkg, $dload );
+	    decompress_src( $pkg, basename( $src ) );
 	}
-    }
-    if( $source ) {
-	link_src( $algs->{$alg} . "/ReleaseMT/bin/blastp;" . 
-		  $algs->{$alg} . "/ReleaseMT/bin/makeblastdb", 
-		  $bin );
-    } else {
-	link_src( $algs->{$alg} . "/bin/blastp;" . 
-		  $algs->{$alg} . "/bin/makeblastdb", 
-		  $bin );
-    }
-    print "\t...done with ${alg}\n";
-    
-    ######################
-    # LAST
-    
-    $alg = "last";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/lastal;" . 
-		   "bin/lastdb"  , 
-		   $algs->{$alg}, "${pkg}" . basename( $srcs->{$alg} )  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "wget" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $build ){
-	build_src( $algs->{$alg}, "make" );	    	
-    }
-    link_src( $algs->{$alg} . "/src/lastal;" . 
-	      $algs->{$alg} . "/src/lastdb" , 
-	      $bin );
-    print "\t...done with ${alg}\n";
-    
-    ######################
-    # TRANSEQ
-    if( 1 ){ #not sure if we need to retain this since we added transeq to metatrans...
-    $alg = "transeq";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/transeq", 
-		   $algs->{$alg},
-		   "${pkg}" . basename( $srcs->{$alg} )  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "wget" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $build ){
-	if( $test ){
-	    build_src( $algs->{$alg}, "./configure  --without-x; make; make check" );	    	
-	} else {
-	    build_src( $algs->{$alg}, "./configure --without-x; make" );	    	
+	if( $build ){
+	    unless( $build eq "NA" ){
+		build_src( $alg_pkg, $build );	    
+	    }
 	}
+	foreach my $target( split( "\;", $bins ) ){
+	    link_src( $alg_pkg . $target, 
+		      $bin );
+	}
+	print "\t...done with ${alg}\n";
     }
-    link_src( $algs->{$alg}. "/emboss/transeq;", $bin );
-    print "\t...done with ${alg}\n";
     }
-
-    ######################
-    # PRODIGAL
-    
-    $alg = "prodigal";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/prodigal", 
-		   $algs->{$alg} , 
-		   "${pkg}" . basename( $srcs->{$alg} )  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "wget" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $build ){
-	build_src( $algs->{$alg}, "make install INSTALLDIR=./bin/" ); 
-    }
-    link_src( $algs->{$alg} . "bin/prodigal" , 
-	      $bin );
-    print "\t...done with ${alg}\n";
-        
-    ######################
-    # MICROBECENSUS
-    
-    $alg = "microbecensus";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/run_microbe_census.py" ,
-		   $algs->{$alg}, 
-		   "${pkg}" . basename( $srcs->{$alg} )  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "git" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $build ){
-	build_src( $algs->{$alg}, "python setup.py install;" .
-		   #not sure I'm hot on the idea of auto writing to people's ~/.bash_profile. Better solution?
-		   "echo -e \"\nexport PYTHONPATH=\$PYTHONPATH:" . $algs->{$alg} . "\" >> ~/.bash_profile;" .
-		   "echo -e \"\nexport PATH=\$PATH:" . $algs->{$alg} . "/scripts/\" >> ~/.bash_profile" );
-    }
-    link_src( $algs->{$alg} . "/scripts/run_microbe_census.py" ,
-	      $bin );
-    print "\t...done with ${alg}\n";
-    
-    ######################
-    # METATRANS
-
-    $alg = "metatrans";
-    print "Installing ${alg}...\n";
-    if( $clean ){
-	clean_src( "bin/metatrans.py;" ,
-		   $algs->{$alg}, 
-		   "${pkg}" . basename( $srcs->{$alg} )  );
-    }    
-    if( $get ){
-	get_src( $srcs->{$alg}, $pkg, "git" );
-	decompress_src( $pkg, basename( $srcs->{$alg} ) );
-    }
-    if( $build ){
-	#do nothing
-    }
-    link_src( $algs->{$alg} . "/metatrans.py" , 
-	      $bin );
-    print "\t...done with ${alg}\n";
-
-}
-    
-sub link_src{
-    my $targets = shift; #must be path to target relative to shotmap root, semicolon sep list
-    my $linkdir = shift;
-    
-    print "creating symlinks...\n";
-    chdir( $linkdir );
-    foreach my $target( split( "\;", $targets ) ){
-	system( "chmod a+x ${target}" );
-	system( "ln -s ${target}" );
-    }
-    chdir( $ROOT );
-    return;
+    my $mc = $alg_data->{"microbecensus"}->{"stem"};
+    print( "The requested items have been installed. If you haven't already, please be sure " .
+	   "to make the following additions to your ~/.bash_profile:\n" .
+	   "###################################\n" . 
+	   "export SHOTMAP_LOCAL=${root}\n" .
+	   "export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/\n" .
+	   "export PATH=\$PATH:${pkg}/${mc}/scripts/\n" .
+	   "export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/\n" .
+	   "###################################\n" 
+	);
+    print( "If you like, you can copy and paste the following command to automate the above entries:\n" . 
+	   "###################################\n" . 
+	   "echo 'export SHOTMAP_LOCAL=${root}' >> ~/.bash_profile\n" .
+	   "echo 'export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/' >> ~/.bash_profile\n" .
+	   "echo 'export PATH=\$PATH:${pkg}/${mc}/scripts/' >> ~/.bash_profile\n" .
+	   "echo 'export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile\n" .
+	   "###################################\n" 
+	);
 }
 
+
+
+###############
+###############
+### SUBROUTINES
+
+    
 sub build_src{
     my $loc = shift; #path to the downloaded, decompressed source, relative to shotmap root
     my $cmds =  shift; #semicolon delimited list of commands
@@ -435,17 +208,24 @@ sub build_src{
     return;
 }
 
+sub check_name{
+    my $name = shift;
+    if( ! defined( $name ) ){
+	die "Could not find a name when parsing alg_data!";
+    }
+}
+
 sub decompress_src{
     my $loc = shift; #path to directory containing download, relative to shotmap root
     my $stem = shift; #name of the downloaded file
 
     print "decompressing source...\n";
     chdir( $loc );
-    if( ! -e $stem ){
-	die "For some reason, I didn't download $stem into $loc. " . 
-	    "Please try to reproduce this error before contacting " . 
-	    "the author for assistance\n";
-    }
+    #if( ! -e $stem ){
+	#die "For some reason, I didn't download $stem into $loc. " . 
+	#    "Please try to reproduce this error before contacting " . 
+	#    "the author for assistance\n";
+    #}
     if( $stem =~ m/\.tar\.gz/ ){
 	system( "tar xzf $stem" );
     }
@@ -458,6 +238,18 @@ sub decompress_src{
     chdir( $ROOT );
     return;
 }
+
+sub dereference_options{
+    my $options = shift; #hashref
+    foreach my $key( keys( %$options )){
+	my $value = $options->{$key};
+	if( defined( $value ) ){
+	    $options->{$key} = ${ $value };
+	}
+    }
+    return $options;
+}
+
 
 sub get_src{
     my $url = shift;
@@ -500,4 +292,172 @@ sub clean_src{
 
     chdir( $ROOT );
     return;
+}
+
+sub get_options{
+    my $ra_args  = shift;
+    my @args     = @{ $ra_args };
+
+    #DEFAULT VALUES
+    my $perlmods  = 0; #should we install perl modules
+    my $rpackages = 0; #should we install R modules
+    my $algs      = 0; #should we install 3rd party gene prediction/search algorithms?
+    my $clean     = 0; #wipe old installations of algs?
+    my $get       = 0; #download alg source code?
+    my $build     = 0; #build alg source code?
+    my $test      = 0; #should we run make checks during build?
+    my $db        = 0; #should we install myql libraries? 
+    my $all       = 1; 
+    my $source    = 0; #should we build from source instead of x86 libraries
+    
+    my %ops = (
+	"use-db"   => \$db, #try to build the libraries needed for mysql communication
+	"source"   => \$source,
+	"clean"    => \$clean,
+	"test"     => \$test,
+	"build"    => \$build,
+	"get"      => \$get,
+	"algs"     => \$algs,
+	"rpacks"   => \$rpackages,
+	"perlmods" => \$perlmods,
+	"all"      => \$all
+	);
+    
+    my @opt_type_array = (
+	"use-db!",
+	"source!",
+	"clean!",
+	"test!",
+	"build!",
+	"get!",
+	"algs!",
+	"rpacks!",
+	"perlmods!"
+	);
+    
+    print "Note that this installer attempts to install precompiled x86 binaries when possible. If ".
+	"this doesn't work for your architecture, please rerun the installer and invoke --source\n";
+    
+    GetOptionsFromArray( \@args, \%ops, @opt_type_array );
+    %ops = %{ dereference_options( \%ops ) };
+
+    if( $ops{"perlmods"} || 
+	$ops{"rpacks"}   ||
+	$ops{"algs"}     ||
+	$ops{"clean"}    ||
+	$ops{"get"}      ||
+	$ops{"build"}    ||
+	$ops{"test"}     ||
+	$ops{"source"}   ){
+	print "You specified a modular aspect of installation, so I will not run the entire " .
+	    "installation pipeline\n";
+	$ops{"all"} = 0;
+    }
+
+    #If we clean and want to build, we must also get.
+    if( $ops{"clean"} && 
+	$ops{"build"} ){
+	$ops{"get"} = 1;
+    }
+
+    if( $ops{"all"} ){
+	$ops{"perlmods"} = 1;
+	$ops{"rpacks"}   = 1;
+	$ops{"algs"}     = 1;
+	$ops{"clean"}    = 1;
+	$ops{"get"}      = 1;
+	$ops{"build"}    = 1;
+	$ops{"test"}     = 1;
+    }
+    return \%ops;
+}
+
+sub link_src{
+    my $targets = shift; #must be path to target relative to shotmap root, semicolon sep list
+    my $linkdir = shift;
+    
+    print "creating symlinks...\n";
+    chdir( $linkdir );
+    foreach my $target( split( "\;", $targets ) ){
+	system( "chmod a+x ${target}" );
+	system( "ln -s ${target}" );
+    }
+    chdir( $ROOT );
+    return;
+}
+
+sub parse_alg_data{
+    my $file     = shift;
+    my $source   = shift;
+    my $test     = shift;
+    my $alg_data = ();
+    open( IN, $file ) || die "Can't open $file for read: $!\n";
+    my $name;
+    while(<IN>){
+	chomp $_;
+	if( $_ =~ /^name/ ){
+	    (my $string, $name ) = split( "\:", $_ );
+
+	}  elsif( $_ =~ /^download/ ){
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"download"} = $value;
+	    	   
+	} elsif( $_ =~ /^x86\:/ ){
+	    next if( $source );
+	    check_name( $name );
+	    #srcs may have : in the http/ftp string
+	    my ($string, $value, @rest ) = split( "\:", $_ );
+	    $value = join( ":", $value, @rest );
+	    $alg_data->{$name}->{"src"} = $value;
+	} elsif( $_ =~ /^src\:/ ){
+	    next unless( $source );
+	    check_name( $name );
+	    my ($string, $value, @rest ) = split( "\:", $_ );
+	    $value = join( ":", $value, @rest );
+	    $alg_data->{$name}->{"src"} = $value;
+
+	} elsif( $_ =~ /^x86stem/ ){
+	    next if( $source );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"stem"} = $value;
+	} elsif( $_ =~ /^srcstem/ ){
+	    next unless( $source );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"stem"} = $value;
+
+	} elsif( $_ =~ /^x86bins/ ){
+	    next if( $source );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"bins"} = $value;
+	} elsif( $_ =~ /^srcbins/ ){
+	    next unless( $source );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"bins"} = $value;
+
+	} elsif( $_ =~ /^testcmds/ ){
+	    next unless( $test );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"build"} = $value;
+	} elsif( $_ =~ /^srccmds/ ){
+	    next if( $test );
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"build"} = $value;
+
+	} elsif( $_ =~ /^installed/ ){
+	    check_name( $name );
+	    my ($string, $value ) = split( "\:", $_ );
+	    $alg_data->{$name}->{"links"} = $value;
+	} elsif( $_ =~ m/^$/ ){
+	    $name    = undef;
+	}
+    }
+    close IN;
+    return $alg_data;
 }

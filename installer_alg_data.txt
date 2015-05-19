@@ -1,0 +1,95 @@
+name:transeq
+download:wget
+x86:ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz
+src:ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz
+x86stem:EMBOSS-6.6.0
+srcstem:EMBOSS-6.6.0
+srcbins:/emboss/transeq
+x86bins:/emboss/transeq
+testcmds:./configure  --without-x; make; make check
+srccmds:./configure --without-x; make
+installed:bin/transeq
+
+name:prodigal
+download:wget
+x86:https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz
+src:https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz
+x86stem:Prodigal-2.6.1
+srcstem:Prodigal-2.6.1
+x86bins:bin/prodigal
+srcbins:bin/prodigal
+testcmds:make install INSTALLDIR=./bin/
+srccmds:make install INSTALLDIR=./bin/
+installed:bin/prodigal
+
+name:metatrans
+download:git
+x86:https://github.com/snayfach/metatrans.git
+src:https://github.com/snayfach/metatrans.git
+x86stem:metatrans
+srcstem:metatrans
+x86bins:metatrans.py
+srcbins:metatrans.py
+testcmds:NA
+srccmds:NA
+installed:bin/metatrans.py
+
+name:microbecensus
+download:git
+x86:https://github.com/snayfach/MicrobeCensus.git
+src:https://github.com/snayfach/MicrobeCensus.git
+x86stem:MicrobeCensus
+srcstem:MicrobeCensus
+x86bins:/scripts/run_microbe_census.py
+srcbins:/scripts/run_microbe_census.py
+testcmds:python setup.py install
+srccmds:python setup.py install
+installed:bin/run_microbe_census.py
+
+name:rapsearch
+download:git
+x86:https://github.com/zhaoyanswill/RAPSearch2
+src:https://github.com/zhaoyanswill/RAPSearch2
+x86stem:RAPSearch2
+srcstem:RAPSearch2
+x86bins:bin/prerapsearch;bin/rapsearch
+srcbins:bin/prerapsearch;bin/rapsearch
+testcmds:./install
+srccmds:./install
+installed:bin/prerapsearch;bin/rapsearch
+
+name:blast
+download:wget
+x86:ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.2.29/ncbi-blast-2.2.29+-x64-linux.tar.gz
+src:ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.2.29/ncbi-blast-2.2.29+-src.tar.gz
+x86stem:ncbi-blast-2.2.29+
+srcstem:ncbi-blast-2.2.29+-src
+srcbins:/ReleaseMT/bin/blastp,/ReleaseMT/bin/makeblastdb
+x86bins:/bin/blastp;/bin/makeblastdb
+testcmds:./configure;make check; make
+srccmds:./configure;make
+installed:bin/blastp;bin/makeblastdb
+
+name:last
+download:wget
+x86:http://last.cbrc.jp/last-475.zip
+src:http://last.cbrc.jp/last-475.zip
+x86stem:last-475
+srcstem:last-475
+srcbins:/src/lastal;/src/lastdb
+x86bins:/src/lastal;/src/lastdb
+testcmds:make
+srccmds:make
+installed:bin/lastal;bin/lastdb
+
+name:hmmer
+download:wget
+x86:ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1-linux-intel-x86_64.tar.gz
+src:ftp://selab.janelia.org/pub/software/hmmer3/3.1b1/hmmer-3.1b1.tar.gz
+x86stem:hmmer-3.1b1-linux-intel-x86_64
+srcstem:hmmer-3.1b1
+srcbins:/src/hmmsearch;/src/hmmscan
+x86bins:/binaries/hmmsearch;/binaries/hmmscan
+testcmds:./configure;make; make check
+srccmds:./configure;make
+installed:bin/hmmsearch;bin/hmmscan
