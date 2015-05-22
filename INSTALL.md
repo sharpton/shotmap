@@ -28,3 +28,16 @@ perl install.pl
 echo 'export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/' >> ~/.bash_profile
 echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/scripts/' >> ~/.bash_profile
 echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile
+
+5. Notes
+
+The Perl module XML::Parser require the Expat XML Parser C library to be accessible on your system. 
+If you receive errors with XML::Parser, please have your system administrator install the expat
+libraries. This is relatively straight forward via apt:
+
+apt-get install libexpat1-dev
+
+Do we still need XML::Tidy? SUggestion here may be the change we want to try:
+http://www.perlmonks.org/?node_id=853750
+
+Add shotmap libraries and dependencies to PERL5LIB

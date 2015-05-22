@@ -129,7 +129,6 @@ if( $rpackages ){
 # Install 3rd Party Applications
 if( $algs ){
     my $alg_data = parse_alg_data( $root . "/installer_alg_data.txt", $source, $test);
-    if( 0 ){
     foreach my $alg( keys( %$alg_data ) ){
 	my $src   = $alg_data->{$alg}->{"src"};
 	my $stem  = $alg_data->{$alg}->{"stem"};
@@ -164,7 +163,6 @@ if( $algs ){
 		      $bin );
 	}
 	print "\t...done with ${alg}\n";
-    }
     }
     my $mc = $alg_data->{"microbecensus"}->{"stem"};
     print( "The requested items have been installed. If you haven't already, please be sure " .

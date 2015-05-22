@@ -20,6 +20,14 @@
    <method>rapsearch;best_best_hit</method>
    <search_database>sfams_v0_nr</search_database>
   </classification_id>
+  <classification_id>
+   <id>2</id>
+   <score>null</score>
+   <coverage>null</coverage>
+   <evalue>null</evalue>
+   <method>rapsearch;best_best_hit</method>
+   <search_database>test_family_database_nr</search_database>
+  </classification_id>
  </classification_parameters>
  <abundance_parameters>
   <abundance_id>

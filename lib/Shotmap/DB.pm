@@ -1345,6 +1345,7 @@ sub get_classification_id_flatfile{
 
 	$class_params->appendChild($new_cid);
 	#print to file
+	#$doc->print( $self->params_file() );
 	$doc->printToFile( $self->params_file() );
 	$doc->dispose;
 	$class_id = $new_id;
@@ -1392,6 +1393,7 @@ sub set_sample_parameters{
 	$sample_params->appendChild($new_sid);
 	#print to file
 	$self->Shotmap::Notify::print_verbose( "Added sample $sample_id to the parameters file\n" );
+	#$doc->print( $self->params_file() );
 	$doc->printToFile( $self->params_file() );
 	$doc->dispose;
     }   
@@ -1503,6 +1505,7 @@ sub get_abundance_parameter_id_flatfile{
 
 	$abund_params->appendChild($new_aid);
 	#print to file
+	#$doc->print( $self->params_file() );
 	$doc->printToFile( $self->params_file() );
 	$doc->dispose;
 	$abund_id = $new_id;
