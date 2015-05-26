@@ -1,0 +1,5 @@
+# Invoke %  R  --slave  --args  class.id  outdir  out.file.stem  metadata.tab <  calculate_diversity.R
+
+options(error=traceback)
+options(error=recover)
+
