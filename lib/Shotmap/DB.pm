@@ -883,23 +883,21 @@ sub build_sample_ffdb{
     foreach my $sampleName (keys(%{$self->get_sample_hashref()})) {
 	#my $thisSampleID = $self->get_sample_hashref()->{$sampleName}->{"id"};
 	#my $sampDir         = "$projDir/${thisSampleID}";
-	my $sampDir         = "${projDir}/${sampleName}";
+	my $sampDir         = "${projDir}/${sampleName}/";
 	my $raw_sample_dir  = "$sampDir/raw";
 	my $orf_sample_dir  = "$sampDir/orfs";
 	my $search_res      = "$sampDir/search_results";
 	my $unsplit_orfs    = "$sampDir/unsplit_orfs"; #not always used, always created in case used in alternative run
 
 	my $results_dir     = $search_res . "/" . $self->search_method;
-
-	if (-d $raw_sample_dir) {
-	    $self->Shotmap::Notify::warn("The directory \"$raw_sample_dir\" already exists!");
+	if( -d $sampDir ){
+	    $self->Shotmap::Notify::warn("The directory \"$sampDir\" already exists!");
 	    if ($self->{"clobber"}) { $self->Shotmap::Notify::warn("But you specified the CLOBBER option, so we will brutally overwrite it anyway!"); }
 	    else { 
-		die("Since the data already exists in $raw_sample_dir , we will not overwrite it, " .
+		die("Since the data already exists in $sampDir , we will not overwrite it, " .
 		    "unless you specify the flag --clobber (WHICH WILL OVERWRITE YOUR CURRENT DATA. USE CAUTION). " ); 
 	    }
 	}
-
 	foreach my $dirToMake ($sampDir, $search_res, $results_dir, $raw_sample_dir, $orf_sample_dir, $unsplit_orfs) {
 	    File::Path::make_path($dirToMake);
 	}
@@ -1282,6 +1280,7 @@ sub get_flatfile_sample_id{
     my ( $self, $samp ) = @_;
     my $path = $self->project_dir();
     my $sid  = $self->Shotmap::DB::create_flat_file_numeric_id( $path );
+    #my $sid  = $self->Shotmap::DB::create_flat_file_id( $path );
     return $sid;
 }
 

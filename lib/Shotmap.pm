@@ -1120,6 +1120,22 @@ sub read_length_filter{
     return $self->{ $key };
 }
 
+sub metadata_file{
+    my ( $self, $value ) = @_;
+    if( defined( $value ) ){
+	$self->{"mapping_file"} = $value;
+    }
+    return $self->{"mapping_file"};
+}
+
+sub input_type{
+    my( $self, $value ) = @_;
+    my $key = "input_type";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
+
+}
+
 sub set_value{
     my( $self, $key, $value ) = @_;
     if( defined( $value ) ){

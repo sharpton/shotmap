@@ -25,15 +25,19 @@ sub load_project{
     my( $self ) = @_;
     my $is_remote   = $self->remote();
     my $dryRun      = $self->dryrun();
-    my $project_dir = $self->raw_data();
+    my $project_dir = $self->raw_data(); #note: could actually be a file
     #LOAD PROJECT, SAMPLES, METAREADS
     #Grab the samples associated with the project
     $self->Shotmap::Notify::printBanner("LOADING PROJECT");
     $self->Shotmap::Notify::print_verbose( "Project directory: $project_dir\n" );
-    #Partitioned samples project
-    #get the samples associated with project. a project description can be left in DESCRIPT.txt    
-    if (!$dryRun) { $self->Shotmap::Run::get_partitioned_samples($project_dir); }
-    else { $self->Shotmap::Notify::dryNotify("Skipped getting the partitioned samples for $project_dir."); }
+    if (!$dryRun) { 
+	if( $self->input_type eq "directory" ){
+	    $self->Shotmap::Run::get_partitioned_samples( $project_dir ); 
+	} else { #is actually a file
+	    $self->Shotmap::Run::get_sample_from_file( $project_dir );
+	}
+    }
+    else { $self->Shotmap::Notify::dryNotify("Skipped getting the samples for $project_dir."); }
         
     if( $self->use_db ) { 
         #have any of these samples been processed already? 

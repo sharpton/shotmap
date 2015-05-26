@@ -70,20 +70,28 @@ sub check_vars{
 	or $self->Shotmap::Notify::dieWithUsageError(
 	    "Sorry, --dryrun is actually not supported, as it's a huge mess right now! My apologies."
 	);
-    #right now, we only require --rawdata  to be set at time of test or run, allows run-time looping over projects
+    #right now, we only require --input  to be set at time of test or run, allows run-time looping over projects
     unless( defined( $self->opts->{"pid"} ) || !$self->full_pipe ){ 
-	(-d $self->opts->{"rawdata"}) 
+	(-d $self->opts->{"input"} || -f $self->opts->{"input"} ) 
 	    or $self->Shotmap::Notify::dieWithUsageError(
-		"You must provide a properly structured raw data (--rawdata) directory! Sadly, the specified directory <" . 
-		$self->opts->{"rawdata"} . "> did not appear to exist, so we cannot continue!\n"
+		"You must provide a properly structured raw data (--input) directory! Sadly, the specified directory <" . 
+		$self->opts->{"input"} . "> did not appear to exist, so we cannot continue!\n"
 	    );
+	if( -d $self->opts->{"input"} ){
+	    $self->input_type( "directory" );
+	} elsif( -f $self->opts->{"input"} ){
+	    $self->input_type( "file" );
+	} else {
+	    die "Somehow I couldn't determine the type of input for " .
+		$self->opts->{"input"} . "\n";
+	}
     }    
     #but, if no ffdb or searchdb-dir is defined, then we need the rawdata to know where to place the searchdb
-    if( !defined( $self->opts->{"rawdata"}      ) &&
+    if( !defined( $self->opts->{"input"}      ) &&
 	!defined( $self->opts->{"ffdb"}         ) &&
 	!defined( $self->opts->{"searchdb-dir"} ) ){
 	$self->Shotmap::Notify::dieWithUsageError(
-	    "You must specify the location of the directory containing your input sequence data using --rawdata"
+	    "You must specify the location of the directory containing your input sequence data using --input"
 	    );
     }
 		  
@@ -92,7 +100,7 @@ sub check_vars{
 	    !defined( $self->opts->{"searchdb-dir"} ) ){
 		$self->Shotmap::Notify::notify_verbose(
 		    "I see you did not specify either --ffdb or --searchdb-dir. This is fine, " .
-		    "as I will create a ffdb within the directory specified by --rawdata. " .
+		    "as I will create a ffdb within the directory specified by --input. " .
 		    "But, it might be faster to use build_shotmap_searchdb.pl to build a search " .
 		    "database and specify its location with --searchdb-dir"
 		    );
@@ -190,8 +198,8 @@ sub check_vars{
 	if( !defined( $self->opts->{"pid"} ) ) { 
 	    #try to auto set the pid. Note that for mysql db usage, must still be defined.
 	    if( !$self->use_db ){
-		if( defined( $self->opts->{"rawdata"} ) ){
-		    my $path = $self->opts->{"rawdata"};
+		if( defined( $self->opts->{"input"} ) ){
+		    my $path = $self->opts->{"input"};
 		    my ($name, $dir, $suffix) = fileparse( $path );     #get project name and load
 		    $self->opts->{"pid"} = $name;
 		}
@@ -388,7 +396,7 @@ sub get_options{
 	#the following options are now obsolete
 	$hmm_db_split_size,    $blast_db_split_size, 
 
-	$family_subset_list,  
+	$family_subset_list,   $metadata_file,
 	$reps_only,            $nr_db,                 $db_suffix,            $is_remote,           $remote_hostname,
 	$remote_user,          $remoteDir,             $remoteExePath,        $use_scratch,         $waittime,
 	$multi,                $mult_row_insert_count, $bulk,                 $bulk_insert_count,   $slim,
@@ -417,9 +425,10 @@ sub get_options{
 	);
 
     my %options = (	
-	"ffdb"         => \$local_ffdb
-	, "refdb"      => \$local_reference_ffdb
-	, "rawdata"    => \$raw_data
+	"ffdb"           => \$local_ffdb
+	, "refdb"        => \$local_reference_ffdb
+	, "input"        => \$raw_data
+	, "metadata-file" => \$metadata_file
 	# Database-server related variables
 	, "db"         => \$db_type 
 	, "dbuser"     => \$db_username
@@ -512,7 +521,8 @@ sub get_options{
 	,    "dryrun"      => \$dryRun
 	,    "reload"      => \$reload
 	);
-    my @opt_type_array = ( "rawdata|i=s"      
+    my @opt_type_array = ( "input|i=s"      
+			  , "metadata-file|m=s"
 			  # SearchDB/FFDB path variables
 			  , "searchdb-dir|d=s"
 			  , "ffdb=s"
@@ -681,7 +691,10 @@ sub set_params{
     # Some run time parameters
     $self->dryrun( $self->opts->{"dryrun"} );
     $self->project_id( $self->opts->{"pid"} );
-    $self->raw_data( $self->opts->{"rawdata"} );
+    $self->raw_data( $self->opts->{"input"} );
+    if( defined( $self->opts->{"metadata-file"} ) ){
+	$self->metadata_file( $self->opts->{"metadata-file"} );
+    }
     $self->wait( $self->opts->{"wait"} );
     $self->scratch( $self->opts->{"scratch"} );
     $self->lightweight( $self->opts->{"lightweight"} );
@@ -985,8 +998,14 @@ sub load_defaults{
 	    ,      "normalization-type" => 'target_length'
 	    ,      "ags-method"         => 'microbecensus'
     };
-    if( defined( $options->{"rawdata"} ) ){
-	$defaults->{"ffdb"} = $options->{"rawdata"} . "/shotmap_ffdb/";
+    if( defined( $options->{"input"} ) ){
+	my $input = $options->{"input"};
+	if( -d $input ){
+	    $defaults->{"ffdb"} = $options->{"input"} . "/shotmap_ffdb/";
+	} elsif( -f $input ){
+	    my( $file, $path ) = fileparse( $input );
+	    $defaults->{"ffdb"} = $path . "/shotmap_ffdb/";
+	}
 	$self->is_iso_db(1); #on by default, turn off if ffdb specified by user
     }
     if( defined( $options->{"refdb"} ) ){

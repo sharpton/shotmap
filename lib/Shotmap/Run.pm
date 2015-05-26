@@ -175,6 +175,82 @@ sub exec_remote_cmd($$) {
     return $results; ## <-- this gets used! Don't remove it.
 }
 
+sub parse_sample_metadata{
+    my( $self ) = @_;
+    if( defined( $self->metadata_file ) ){
+	my $file = $self->metadata_file;
+	$self->Shotmap::Notify::print_verbose( "Parsing metadata from $file\n" );
+	my $text = '';
+	open( META, "$file" ) || die "Can't open sample metadata table for read: $!. Project is $file.\n";
+	while(<META>){
+	    $text .= $_;
+	    #check that the file is properly formatted	   
+	    if( $text !~ m/^Sample\.Name\t/ ){
+		die( "You did not specify a properly formatted metadata file. " .
+		     "Please ensure that the first column in the " .
+		     "first row is named 'Sample.Name' (without quotes) and that the " .
+		     "file is tab delimited.\n"
+		    ); 
+	    }	   
+	    if( $text =~ m/\,/ ){
+		die( "You have commas in your metadata file. This is not allowed. Please reformat " .
+		     "the file and try again.\n" );
+	    }
+	    my @rows  = split( "\n", $text );
+	    my $ncols = 0;
+	    foreach my $row( @rows ){
+		my @cols = split( "\t", $row );
+		my $row_n_col = scalar( @cols );
+		if( $ncols == 0 ){
+		    $ncols = $row_n_col;
+		} elsif( $ncols != $row_n_col) {
+		    die( "You do not have an equal number of tab-delimited columns in every row " .
+			 "of your metadata file. Please double check " .
+			 "your format.\n" 
+			);
+		} else { #looks good
+		    next;
+		}
+	    }
+	    undef $text if( $text eq '' );
+	    $self->sample_metadata($text);
+	}
+	close META;
+    } else {
+	$self->Shotmap::Notify::warn_verbose( "You didn't provide a sample metadata file, which is optional. " . 
+					      "and can be specified with the -m option"
+	    );
+    }
+    return $self;
+}
+
+sub get_sample_from_file{
+    my( $self, $path ) = @_;
+    my %samples = ();
+    if( ! defined( $path ) || ! -f $path ){
+	die "You either have not specified or I cannot file the raw data location. Please double check " .
+	    "how the option --input is set and that this directory exists\n";
+    }
+    my $is_compressed = 0;
+    if( $path =~ m/\.gz$/ ){
+	$is_compressed = 1;
+    }
+    my $is_fasta = $self->Shotmap::Run::check_fasta_file( "$path", "nt", $is_compressed );
+    if( !$is_fasta ){
+	$self->Shotmap::Notify::warn( "$path doesn't look like a properly formatted fasta file! Terminating!\n" );
+	die;
+    }
+    #get sample name here, simple parse on the period in file name
+    my $thisSample;
+    if( $is_compressed ){
+	$thisSample = basename($path, (".fa.gz", ".fna.gz"));
+    } else {
+	$thisSample = basename($path, (".fa", ".fna"));
+    }
+    $samples{$thisSample}->{"path"} = "$path";
+    $self->set_samples( \%samples );
+    return $self;
+}
 
 #currently uses @suffix with basename to successfully parse off .fa. may need to change
 sub get_partitioned_samples{
@@ -182,7 +258,7 @@ sub get_partitioned_samples{
     my %samples = ();        
     if( ! defined( $path ) || ! -d $path ){
 	die "You either have not specified or I cannot file the raw data location. Please double check " .
-	    "how the option --rawdata is set and that this directory exists\n";
+	    "how the option --input is set and that this directory exists\n";
     }
     opendir( PROJ, $path ) || die "Can't open the directory $path for read: $!\n";     #open the directory and get the sample names and paths, 
     my @files = readdir(PROJ);
@@ -200,36 +276,7 @@ sub get_partitioned_samples{
 	    close(DESC);
 	    undef $text if( $text eq '' );
 	    $self->project_desc($text);
-	} elsif( $file =~ m/sample_metadata\.tab/ ){  #if there's a sample metadata table, grab the information
-	    my $text = '';
-	    open( META, "$path/$file" ) || die "Can't open sample metadata table for read: $!. Project is $path.\n";
-	    while(<META>){
-		$text .= $_;
-	    }
-	    #check that the file is properly formatted	   
-	    if( $text !~ m/^Sample_name/ ){
-		die( "You did not specify a properly formatted sample_metadata.tab file. Please ensure that the first row contains properly " .
-		     "formatted column labels. See the manual for more information\n" );
-	    }	   
-	    my @rows  = split( "\n", $text );
-	    my $ncols = 0;
-	    foreach my $row( @rows ){
-		my @cols = split( "\t", $row );
-		my $row_n_col = scalar( @cols );
-		if( $ncols == 0 ){
-		    $ncols = $row_n_col;
-		} elsif( $ncols != $row_n_col) {
-		    die( "You do not have an equal number of tab-delimited columns in every row of your sample_metadata.tab file. Please double check " .
-			 "your format. See the manual for more information\n" );
-		} else { #looks good
-		    next;
-		}
-	    }
-	    close META;
-	    undef $text if( $text eq '' );
-	    $self->sample_metadata($text);
-	}
-	else { #is a sample sequence file
+	} else { #is a sample sequence file
 	    #is it properly formatted?
 	    my $is_compressed = 0;
 	    if( $file =~ m/\.gz$/ ){
@@ -254,13 +301,9 @@ sub get_partitioned_samples{
 	$self->Shotmap::Notify::warn( "You didn't provide a project description file, which is optional. " .
 	      "Note that you can describe your project in the database via a project_description.txt file. See manual for more informaiton\n" );
     }
-    if( !defined( $self->sample_metadata() ) ){
-	$self->Shotmap::Notify::warn( "You didn't provide a sample metadata file, which is optional. " . 
-	      "Note that you can describe your samples in the database via a sample_metadata.tab file. See manual for more informaiton\n" );
-    }
     $self->Shotmap::Notify::print_verbose("Adding samples to analysis object at path <$path>.");
     $self->set_samples( \%samples );
-    #return $self;
+    return $self;
 }
 
 sub check_fasta_file{
@@ -303,27 +346,40 @@ sub check_fasta_file{
 
 
 sub load_project{
-    my ($self, $path, $nseqs_per_samp_split) = @_;    # $nseqs_per_samp_split is how many seqs should each sample split file contain?
-    my ($name, $dir, $suffix) = fileparse( $path );     #get project name and load
+    # $nseqs_per_samp_split is how many seqs should each sample split file contain?
+    my ($self, $path, $nseqs_per_samp_split) = @_;    
+    #get project name and load
+    my ($name, $dir, $suffix) = fileparse( $path );     
     my $pid;  
     if( $self->use_db ){
-	my $proj = $self->Shotmap::DB::create_project($name, $self->project_desc() );
+	my $proj = $self->Shotmap::DB::create_project(
+	    $name, 
+	    $self->project_desc() 
+	    );
 	$pid  = $proj->project_id()
     } else {
-	#for nodb runs, the pid is the name of the directory the user pointed to which contains sample equences
-	$pid = $self->Shotmap::DB::create_flat_file_project( $name, $self->project_desc() ); #write a function that determines this!	
+	#for nodb runs, the pid is the name of the directory the 
+	#user pointed to which contains sample sequences
+	$pid = $self->Shotmap::DB::create_flat_file_project( 
+	    $name, 
+	    $self->project_desc() 
+	    ); 
     }
     #store vars in object
     $self->project_id( $pid );
+    #This has to come before load_samples
+    $self->Shotmap::Run::parse_sample_metadata( $self->metadata_file );
     $self->Shotmap::DB::build_project_ffdb();
     #process the samples associated with project
     $self->Shotmap::Run::load_samples();
     $self->Shotmap::DB::build_sample_ffdb(); #this also splits the sample file
-    $self->Shotmap::Run::get_project_metadata();
-    $self->Shotmap::Notify::print_verbose("Project with PID " . $pid . ", with files found at <$path>, was successfully loaded!\n");
+    #$self->Shotmap::Run::get_project_metadata(); we only do this at the end now
+    $self->Shotmap::Notify::print_verbose(
+	"Project " . $pid . 
+	", with files found at <$path>, was successfully loaded!\n"
+	);
 }
 
-#MODIFIED
 sub get_project_metadata{
     my( $self, $output )  = @_;
     my $final_results = 0; #is this the metadata table being placed in the final output directory?
@@ -346,8 +402,8 @@ sub get_project_metadata{
 		$fields = {};
 		goto PRINTMETA;
 	    }
-	    my( @fields )  = split( ",", $metadata );
-	    foreach my $field( @fields ){
+	    my( @data )  = split( ",", $metadata );
+	    foreach my $field( @data ){
 		my( $field_name, $field_value ) = split( "\=", $field );
 		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
 		$fields->{$field_name}++;
@@ -394,7 +450,7 @@ sub load_samples{
     my %samples = %{$self->get_sample_hashref()}; # de-reference the hash reference
     my $numSamples = scalar( keys(%samples) );
     my $plural = ($numSamples == 1) ? '' : 's'; # pluralize 'samples'
-    $self->Shotmap::Notify::notify("Processing $numSamples sample${plural} associated with project PID #" . $self->project_id() . " ");
+    $self->Shotmap::Notify::notify("Processing $numSamples sample${plural} associated with project " . $self->project_id() . " ");
     my $metadata = {};
     my $sid = 0; #for nodb sample creation
     #if it exists, grab each sample's metadata
@@ -407,6 +463,7 @@ sub load_samples{
 	    my $samp_alt_id = $cols[0];
 	    $samp_alt_id =~ s/\.fa$//; #want alt_id in this file to match that in the database.
 	    $samp_alt_id =~ s/\.fna$//;
+	    $samp_alt_id =~ s/\.fasta$//;
 	    my $metadata_string;
 	    for( my $i=1; $i < scalar(@cols); $i++){
 		my $key   = $colnames[$i];
@@ -505,7 +562,8 @@ sub load_samples{
 	} else {
 	    #flatfile stuff here
 	    if( $sid == 0 ){
-		$sid = $self->Shotmap::DB::get_flatfile_sample_id( $samp );
+		$sid = 1;
+		#$sid = $self->Shotmap::DB::get_flatfile_sample_id( $samp );
 	    } else {
 		$sid++;
 	    }
@@ -514,7 +572,7 @@ sub load_samples{
 	}
     }
     $self->set_samples(\%samples);
-    $self->Shotmap::Notify::notify("Successfully loaded $numSamples sample$plural associated with the project PID #" . $self->project_id() . " ");
+    $self->Shotmap::Notify::notify("Successfully loaded $numSamples sample$plural associated with the project " . $self->project_id() . " ");
     return $self;
 }
 
@@ -630,6 +688,9 @@ sub back_load_project(){
 	$self->Shotmap::DB::initialize_parameters_file( $self->params_file );
     }
     $self->Shotmap::Run::cp_search_db_properties();
+    if( defined( $self->metadata_file ) ){
+	$self->Shotmap::Run::parse_sample_metadata( $self->metadata_file );
+    }
 }
 
 sub cp_search_db_properties{
@@ -3518,18 +3579,18 @@ sub calculate_diversity{
     File::Path::make_path($outdir . "/Metadata/");
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table = File::Spec->catfile( $outdir, "Metadata", "sample_metadata.tab" );
+    my $metadata_table = File::Spec->catfile( $outdir, "Metadata", "sample_metadata_tmp.tab" );
     $self->Shotmap::Run::get_project_metadata( $metadata_table );    
 
     #prep the output
     my $abund_dir     = File::Spec->catdir( $outdir, "Abundances" );
-    my $diversity_dir = File::Spec->catdir( $outdir, "Alpha_diversity" );
-    my $families_dir  = File::Spec->catdir( $outdir, "Families" );
-    my $beta_dir      = File::Spec->catdir( $outdir, "Beta_diversity" );
+    #my $diversity_dir = File::Spec->catdir( $outdir, "Alpha_diversity" );
+    #my $families_dir  = File::Spec->catdir( $outdir, "Families" );
+    #my $beta_dir      = File::Spec->catdir( $outdir, "Beta_diversity" );
     File::Path::make_path($abund_dir);
-    File::Path::make_path($diversity_dir);
-    File::Path::make_path($families_dir);
-    File::Path::make_path($beta_dir);
+    #File::Path::make_path($diversity_dir);
+    #File::Path::make_path($families_dir);
+    #File::Path::make_path($beta_dir);
 
     #get the input - abundance dfs
     my @abund_maps = glob( $abund_dir . "/Abundance_Data_Frame*" );
@@ -3537,16 +3598,18 @@ sub calculate_diversity{
     my $tmp_file = $abund_dir . "/tmp_abundance_dfs.tab";
     $self->Shotmap::Run::cat_data_frame_files( \@abund_maps, $tmp_file );
 
-    #CALCULATE DIVERSITY AND COMPARE SAMPLES
+    #CALCULATE DIVERSITY AND PRODUCE UPDATED METADATA TABLE
     #open output directory that contains per sample diversity data
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${tmp_file} ${diversity_dir} ${metadata_table} $verbose $r_lib < ${script}";
+    my $cmd               = "R --slave --args ${tmp_file} ${outdir} ${metadata_table} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
+    unlink( $metadata_table ); #this was a tmp file
 
-    #produce updated metadata table that includes the diversity statistics calculated above. Maybe wrap into the above script?
+    ### 5-21-2015: WE NOW LEAVE ALL COMPARATIVE ANALYSES FOR A STANDALONE SCRIPT
+    return;
 
     #ADD BETA-DIVERSITY ANALYSES TO THE ABOVE OR AN INDEPENDENT FUNCTION
 
