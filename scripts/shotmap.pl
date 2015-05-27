@@ -73,6 +73,8 @@ if( $pipe->remote ){
  LOADRESULTS: $pipe->Shotmap::Results::load_results();
 # Classify reads into families
  CLASSIFYREADS: $pipe->Shotmap::Results::classify_reads();
+#calculating AGS if user has elected to do so
+ AGS: $pipe->Shotmap::Results::estimate_ags();
 # Calculate family abundances
  ABUNDANCE: $pipe->Shotmap::Results::calculate_abundances();
 if( $pipe->lightweight ){
@@ -140,7 +142,7 @@ sub goto_step{
 	    warn "Skipping to get parse results step!\n"; 
 	    goto PARSERESULTS; 
 	}
-	if ($goto eq "G" or $goto eq "GET")     {     
+	if ($goto eq "R" or $goto eq "GET")     {     
 	    warn "Skipping to get remote search results step!\n"; 
 	    goto GETRESULTS; 
 	}
@@ -151,6 +153,10 @@ sub goto_step{
 	if ($goto eq "C" or $goto eq "CLASSIFY"){     
 	    warn "Skipping to classifying reads step!\n"; 
 	    goto CLASSIFYREADS; 
+	}
+	if ($goto eq "G" or $goto eq "AGS"){    
+	    warn "Skipping to estimate genome size step!\n"; 
+	    goto AGS; 
 	}
 	if ($goto eq "A" or $goto eq "ABUNDANCE"){    
 	    warn "Skipping to calculating abundances step!\n"; 

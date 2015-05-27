@@ -525,7 +525,7 @@ sub get_options{
 			  , "metadata-file|m=s"
 			  # SearchDB/FFDB path variables
 			  , "searchdb-dir|d=s"
-			  , "ffdb=s"
+			  , "ffdb|o=s"
 			  , "refdb|r=s" 			  
 			  # Database-server related variables
 			  , "db=s"

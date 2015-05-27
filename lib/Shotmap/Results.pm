@@ -38,6 +38,10 @@ sub calculate_diversity{
 	    $self->abundance_type, $self->normalization_type
 	    );
     }
+    #we might also not have the sample statistics, which we need for R and AGS correctiong
+    if( !defined( $self->sample_stats ) ){
+	$self->Shotmap::Run::load_sample_abundance_statistics( $class_id, $abund_param_id );
+    }
     #if we used GOTO=D, then we may not have microbecensus data in memory. 
     #Parse it here, we want in metadata output
     if( $self->ags_method eq "microbecensus" ){
@@ -49,10 +53,6 @@ sub calculate_diversity{
 	    my $ags_output = File::Spec->catfile( $ags_path, $sample_alt_id . "_ags.mc" );
 	    $self->Shotmap::Run::parse_microbecensus( $sample_alt_id, $ags_output );
 	}
-    }
-    #we might also not have the sample statistics, which we need for R
-    if( !defined( $self->sample_stats ) ){
-	$self->Shotmap::Run::load_sample_abundance_statistics( $class_id, $abund_param_id );
     }
     #now generate the output
     $self->classification_id( $class_id );
@@ -110,8 +110,6 @@ sub calculate_abundances{
     my $db_name        = $self->search_db_name( $search_type );
     
     $self->Shotmap::Notify::printBanner("CALCULATING ABUNDANCES");
-    #start by calculating AGS if user has elected to do so
-    $self->Shotmap::Results::estimate_ags();
     #now calculate abundances and produce output
     my( $class_id, $abund_param_id );
     if( $self->use_db ){
@@ -303,17 +301,25 @@ sub estimate_ags{
     my $self = shift;   
     my $ags_method = $self->ags_method;
     return if( $ags_method eq "none");
+    $self->Shotmap::Notify::printBanner("ESTIMATING AVERAGE GENOME SIZE");
     my $samples = $self->get_sample_hashref;
     foreach my $sample_alt_id (@{$self->get_sample_alt_ids()}){
+	my $reads_dir = File::Spec->catdir($self->get_sample_path($sample_alt_id), "raw" );
+	if( ! -d $reads_dir ){
+	    $self->Shotmap::Notify::warn( "I can't find the shotmap processed reads at $reads_dir, " .
+					  "so I can't calculate average genome size. Are you sure you ".
+					  "need to run this step? I'm passing\n"
+		);
+	    next;
+	}
 	#create a place for the ags output
 	my $ags_path = File::Spec->catdir($self->get_sample_path($sample_alt_id), "ags", $ags_method);     
 	if( ! -d $ags_path ){
 	    File::Path::make_path($ags_path);
 	}
 	#build the input
-	my $reads_dir = File::Spec->catdir($self->get_sample_path($sample_alt_id), "raw" );
 	my @raw_files = glob( $reads_dir . "/*" );
-	my $tmp       = File::Spec->catfile( $ags_path, "_mc.tmp.gz" );
+	my $tmp       = File::Spec->catfile( $ags_path, "_mc.tmp.gz" );	
 	$self->Shotmap::Run::cat_file_array( \@raw_files, $tmp );
 	#get the input path       
 	#my $in_file = $samples->{$sample_alt_id}->{"path"};

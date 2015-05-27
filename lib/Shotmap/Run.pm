@@ -217,7 +217,7 @@ sub parse_sample_metadata{
 	}
 	close META;
     } else {
-	$self->Shotmap::Notify::warn_verbose( "You didn't provide a sample metadata file, which is optional. " . 
+	$self->Shotmap::Notify::print_verbose( "You didn't provide a sample metadata file, which is optional. " . 
 					      "and can be specified with the -m option"
 	    );
     }
@@ -397,17 +397,19 @@ sub get_project_metadata{
 	my $sample_id = $sample_hr->{$sample_alt_id}->{"id"};
 	my $metadata  = $sample_hr->{$sample_alt_id}->{"metadata"};
 	$data->{$sample_id}->{"alt_id"} = $sample_alt_id;
-	    if( !( defined( $metadata ) ) ){
-		$self->Shotmap::Notify::print( "Couldn't find input metadata for sample ${sample_alt_id}, so I'm only going to provide shotmap output statistics");
-		$fields = {};
-		goto PRINTMETA;
-	    }
+	if( !( defined( $metadata ) ) ){
+	    $self->Shotmap::Notify::print( "Couldn't find input metadata for sample ${sample_alt_id}, so I'm only going to provide shotmap output statistics");
+	    $fields = {};
+	    next;
+	    #goto PRINTMETA;
+	} else {
 	    my( @data )  = split( ",", $metadata );
 	    foreach my $field( @data ){
 		my( $field_name, $field_value ) = split( "\=", $field );
 		$data->{$sample_id}->{"metadata"}->{$field_name} = $field_value;
 		$fields->{$field_name}++;
 	    }
+	}
     }
   PRINTMETA:;
     if( defined( $fields ) ){ #then we found metadata
@@ -777,7 +779,12 @@ sub back_load_samples{
 	    $sample_alt_id = $samp->{"sample_alt_id"};
 	}
 	#get the path to the raw sample data
-	my $sample_data = glob( $self->raw_data() . "/".  $sample_alt_id . "*" );
+	my $sample_data;
+	if( -d $self->raw_data ){
+	    $sample_data = glob( $self->raw_data() . "/".  $sample_alt_id . "*" );
+	} else {
+	    $sample_data = $self->raw_data;
+	}
 	$samples{$sample_alt_id}->{"path"} = $sample_data;
 	$samples{$sample_alt_id}->{"id"}   = $sample_id;
     }
@@ -3098,6 +3105,12 @@ sub build_sample_abundance_map_flatfile{
 		      "Abundance", "Relative.Abundance", 
 		      #"TOT.ABUND", "CLASS.SEQS", "TOT.SEQS",
 		      "\n" );
+    if( $self->ags_method eq "microbecensus" ){
+	#Parse the ags data here in case of reload 
+	my $ags_path = File::Spec->catdir($self->get_sample_path($sample_id), "ags", $self->ags_method);     
+	my $ags_output = File::Spec->catfile( $ags_path, $sample_id . "_ags.mc" );
+	$self->Shotmap::Run::parse_microbecensus( $sample_id, $ags_output );
+    }
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
 	my $raw = $abundances->{$famid};
@@ -3105,9 +3118,10 @@ sub build_sample_abundance_map_flatfile{
 	if( $self->ags_method eq "microbecensus" ){
 	    my $read_len = $self->sample_ags( $sample_id, "read_length");
 	    my $ags      = $self->sample_ags( $sample_id, "ags" );
-	    my $n_reads  = $self->sample_ags( $sample_id, "n_reads_sampled" );
+	    #my $n_reads = $self->sample_ags( $sample_id, "n_reads_sampled" );
+	    my $n_reads  = $tot_reads;
 	    my $total_bp = $read_len * $n_reads;
-	    #do the correction                                                                                                                                                                                                            
+	    #do the correction
 	    $raw         = $raw / ( $total_bp / $ags );
 	} else {
 	    #do nothing or add additional methods
@@ -3451,7 +3465,6 @@ sub build_intersample_abundance_map_flatfile{
 	next unless( $file =~ m/$param_str/ );
 	next if( $file =~ m/\.map$/ ); #in case of a re-run, skip R ouput files
 	open( FILE, "${outdir}/${file}" ) || die "Can't open ${outdir}/${file} for read: $!\n";
-	print "$file\n";
 	while( <FILE> ){
 	    next if(  $_ =~ m/^SAMPLE\.ID/ );
 	    my @data = split( "\t", $_ );
@@ -3606,7 +3619,7 @@ sub calculate_diversity{
     my $cmd               = "R --slave --args ${tmp_file} ${outdir} ${metadata_table} $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
-    unlink( $metadata_table ); #this was a tmp file
+#    unlink( $metadata_table ); #this was a tmp file
 
     ### 5-21-2015: WE NOW LEAVE ALL COMPARATIVE ANALYSES FOR A STANDALONE SCRIPT
     return;
@@ -3913,7 +3926,7 @@ sub build_remote_script{
 sub run_microbecensus{
     my( $self, $infile, $outfile, $logfile ) = @_;
     #no need to set up a fork, as microbecensus can't run in parallel yet
-    my $threads = 1; 
+    my $threads = 8; 
     my $cmd = "run_microbe_census.py -t $threads $infile $outfile > $logfile 2>&1";
     $self->Shotmap::Notify::print( "Waiting for microbecensus to finish..." );
     $self->Shotmap::Notify::print_verbose( "$cmd\n" );
@@ -3946,7 +3959,7 @@ sub parse_microbecensus{
 		"sampled_reads: " . $self->sample_ags( $sample_alt_id, "n_reads_sampled" ) . "\n"
 		);
 	}
-}
+    }
     close IN;
 }
 

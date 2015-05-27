@@ -6,6 +6,10 @@
    <id>1</id>
    <sample_alt_id>sample_1</sample_alt_id>
   </sample_id>
+  <sample_id>
+   <id>2</id>
+   <sample_alt_id>sample_2</sample_alt_id>
+  </sample_id>
  </samples>
  <classification_parameters>
   <classification_id>
@@ -18,12 +22,5 @@
   </classification_id>
  </classification_parameters>
  <abundance_parameters>
-  <abundance_id>
-   <id>1</id>
-   <abundance_type>coverage</abundance_type>
-   <normalization_type>target_length</normalization_type>
-   <rarefaction_type>null</rarefaction_type>
-   <rarefaction_depth>null</rarefaction_depth>
-  </abundance_id>
- </abundance_parameters>
+	</abundance_parameters>
 </xml>
