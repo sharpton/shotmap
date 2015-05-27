@@ -76,7 +76,7 @@ categorical_diversity_analyses <- function( div.map, outpath ){
       #pval      <- kruskal.test( div.map[,meta.type], div.map[,div.type])$p.value
       pval <- pvalue( kruskal_test( div.map[,div.type] ~ div.map[,meta.type], data = div.map, distribution = approximate(B=5000) ) )
       
-      tmp.stats <- data.frame( meta.field = meta.type, div.field = div.type, pvalue=pval )
+      tmp.stats <- data.frame( meta.field = meta.type, div.field = div.type, pvalue=as.vector(pval) )
       kw.tests  <- rbind( kw.tests, tmp.stats )
     }
   }
@@ -104,7 +104,6 @@ categorical_family_analyses <- function( div.map, abund.map, outpath, plot.q.thr
                    sep=""))
       next
     }  
-    print( paste("...preparing ", test.type, " tests...", sep=""))
     ##RUN THE TEST
     classes.unsort        <- as.factor(div.map[,div.type])
     names(classes.unsort) <- div.map$Sample.Name
@@ -625,7 +624,7 @@ plot_diversity_stats <- function( div.map, outpath ){
     if( is_sample_field( div.type) ){
       next
     }
-    ggplot( div.map, aes_string(  x="Sample.Ordered", y= div.type ) ) +
+    ggplot( div.map, aes_string(  x="Sample.Name", y= div.type ) ) +
       geom_bar( stat="identity" ) +
       labs( title = paste( div.type, "across samples", sep="" ) ) +
       xlab( "Sample ID" )
@@ -638,6 +637,8 @@ plot_diversity_stats <- function( div.map, outpath ){
 ### prep_div_map()
 ### Formats div.map for downstream analyses
 ###############################################
+#This can be modified, as newer versions of shotmap don't require;
+#we assume order of samples in the metadata file is the desired order
 prep_div_map <- function( div.map ){
   tmp.map <- cbind( as.data.frame( rownames(div.map)), div.map ) 
   colnames(tmp.map) <- c( "Sample.Name", colnames(div.map) )
