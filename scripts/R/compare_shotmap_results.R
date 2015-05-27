@@ -19,12 +19,13 @@ abund.map <- read.table( file = abund.map.file
                          check.names = F
 )
 cat.fields <- read.table( file = cat.fields.file )
-set_categorical_fields( as.vector( cat.field) )
+set_categorical_fields( as.vector( cat.fields ) )
 
 # Set up the output infrastructure
 alpha.out  <- paste( outpath, "/Alpha_Diversity/", sep="")
 beta.out   <- paste( outpath, "/Beta_Diversity/", sep="")
 family.out <- paste( outpath, "/Families/", sep="")
+dir.create( outpath )
 dir.create( alpha.out )
 dir.create( beta.out )
 dir.create( family.out )
