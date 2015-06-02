@@ -1,7 +1,9 @@
-shotMAP
+ShotMAP
 =======
 
 A Shotgun Metagenome Annotation Pipeline
+
+Version: Beta
 
 Overview
 --------
@@ -35,7 +37,7 @@ ShotMAP conducts the following steps:
 
 1. Initialize a flatfile database (ffdb) that stores the results of the analysis. 
 By default, this is located in the directory that contains the metagenomic samples.
-2. Obtain the raw metagenomes (fasta formatted, can be gzipped). 
+2. Obtain the input metagenomes (fasta formatted, can be gzipped). These should be quality controlled by the user. 
 All metagenomes in the directory specified by -i will be processed by shotmap.
 While several metagenomes can be processed simultaneously, each sample should be represented by a single file.
 The data for each project is stored within a sample subdirectory within the shotMAP ffdb:
@@ -45,7 +47,7 @@ The directory containing the input metagenomes may optionally include a mapping 
 3. Split each metagenome file into a set of smaller files to improve parallelization.  
 These files are located in the ffdb/sample/raw/ subdirectory.
 4. Predict protein coding seqeunces in each metagenome. 
-ShotMAO software can currently run one of three different gene prediction methods: 
+ShotMAP software can currently run one of three different gene prediction methods: 
 six-frame translation via transeq (6FT); 6FT, but splitting on stop codons (6FT_split), and prodigal.
 The results are stored in the ffdb/sample/orfs/.
 5. Search all metagenomic predicted peptides against each target in a shotMAP formatted search database.
@@ -80,13 +82,22 @@ The results of this analysis are found in ffdb/output/Families and ffdb/output/B
 Building a ShotMAP Search Database
 ----------------------------------
 
-5. Build a reference protein family search database using user-defined parameters if one hasn't already been created. This
+Build a reference protein family search database using user-defined parameters if one hasn't already been created. This
 can either be a protein sequence databases similar to a BLAST database or a HMMER v3 HMM database. Shotmap also indexes the database
-in a manner appropriate for the user-defined search algorithm (i.e., runs prerapsearch for rapsearch).
+in a manner appropriate for the user-defined search algorithm (i.e., runs prerapsearch for rapsearch). This is a one-time step, as a
+ShotMAP indexed database can be used in subsequent metagenomic analyses. 
+
+perl $SHOTMAP_LOCAL/scripts/build_shotmap_searchdb.pl -r=</directory/path/to/reference/database> -d=</directory/path/to/search/database>
 
 
-ShotMAP Mapping Files
+ShotMAP Metadata Files
 ---------------------
+
+ShotMAP can accept user defined metadata, which it applies to the statistical tests it ultimately conducts. The format requirements are simple:
+
+1. It is a tab delimited file
+2. The first row is a header row that names each metadata field (no spaces please)
+3. The first column is named Sample.Name and contains the file name corresponding to each metagenomic sample
 
 Installation
 ------------
@@ -104,6 +115,24 @@ Where this is your github-checked-out copy of shotmap. Ideally, you place the ab
    perl install.pl > install.log 2> install.err
 
 This will take some time to run and will generate a lot of output. I recommend storing the output in a file like install.log so that you can review the results of the installation process.
+
+3. Add the following to your ~/.bash_profile
+
+export SHOTMAP_LOCAL=<path_to_the_shotmap_directory>
+export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg/MicrobeCensus
+export PATH=$PATH:${SHOTMAP_LOCAL}/pkg/MicrobeCensus/scripts/\n" .
+export PATH=$PATH:${SHOTMAP_LOCAL}/bin/
+export PATH=$PATH:${SHOTMAP_LOCAL}/lib/
+
+and then source your ~/.bash_profile
+
+source ~/.bash_profile
+
+You should now be be ready to run shotmap
+
+ADVANCED USERS ONLY:
+
+If you would like you specifically configure shotmap, you'll need to set up a configuration file (see below). There are some additional installation steps associated with this:
 
 3. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The following script builds a configuration file for you:
 
@@ -140,13 +169,10 @@ The following commands provide an example of how to run shotmap, using the test 
 
     perl install.pl
 
-    perl scripts/build_conf_file.pl perl build_conf_file.pl --nprocs=1 --rawdata=data/testdata/ --refdb=data/test_family_database/ --conf-file=test.conf
+    perl scripts/build_shotmap_searchdb.pl -r=data/test_family_database/ -d=data/test_family_smdb/
 
-    perl scripts/test_conf_file.pl --conf-file=test.conf
+    perl scripts/shotmap.pl -i ../data/stool_sim_single/ -d ../data/test_family_smdb/ --prerare-samps=10000 --nprocs=4     
 
-    perl shotmap.pl --conf-file=test.conf --build-searchdb
-
-This will create a flat file database of results in data/testdata/shotmap_ffdb/.
 
 Cloud (remote) Users (Advanced)
 -------------------------------

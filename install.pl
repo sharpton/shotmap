@@ -167,19 +167,21 @@ if( $algs ){
     my $mc = $alg_data->{"microbecensus"}->{"stem"};
     print( "The requested items have been installed. If you haven't already, please be sure " .
 	   "to make the following additions to your ~/.bash_profile:\n" .
-	   "###################################\n" . 
-	   "export SHOTMAP_LOCAL=${root}\n" .
-	   "export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/\n" .
-	   "export PATH=\$PATH:${pkg}/${mc}/scripts/\n" .
-	   "export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/\n" .
+	   "###################################\n"               . 
+	   "export SHOTMAP_LOCAL=${root}\n"                      .
+	   "export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/\n"    .
+	   "export PATH=\$PATH:${pkg}/${mc}/scripts/\n"          .
+	   "export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/\n"         .
+	   "export PERL5LIB=\$PERL5LIB:\${SHOTMAP_LOCAL}/lib/\n" .
 	   "###################################\n" 
 	);
     print( "If you like, you can copy and paste the following command to automate the above entries:\n" . 
-	   "###################################\n" . 
-	   "echo 'export SHOTMAP_LOCAL=${root}' >> ~/.bash_profile\n" .
-	   "echo 'export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/' >> ~/.bash_profile\n" .
-	   "echo 'export PATH=\$PATH:${pkg}/${mc}/scripts/' >> ~/.bash_profile\n" .
-	   "echo 'export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile\n" .
+	   "###################################\n"                                         . 
+	   "echo 'export SHOTMAP_LOCAL=${root}' >> ~/.bash_profile\n"                      .
+	   "echo 'export PYTHONPATH=\${PYTHONPATH}:${pkg}/${mc}/' >> ~/.bash_profile\n"    .
+	   "echo 'export PATH=\$PATH:${pkg}/${mc}/scripts/' >> ~/.bash_profile\n"          .
+	   "echo 'export PATH=\$PATH:\${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile\n"         .
+	   "echo 'export PERL5LIB=\$PERL5LIB:\${SHOTMAP_LOCAL}/lib/' >> ~/.bash_profile\n" .
 	   "###################################\n" 
 	);
 }
