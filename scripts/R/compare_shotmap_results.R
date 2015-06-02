@@ -13,7 +13,7 @@ cat.fields.file   <- Args[7]
 div.map   <- read.table( file = metadata.file,
                          header = T,
                         )
-abund.map <- read.table( file = abund.map.file
+abund.map <- read.table( file = abund.map.file,
                          header = T,
                          row.names = 1,
                          check.names = F
