@@ -1,0 +1,6 @@
+This represents a slimmed version of the SFams v0 database and is only intended for testing purposes.
+To learn more about the SFams database, please see Sharpton et al 2012 BMC Genomics:
+http://www.biomedcentral.com/1471-2105/13/264/abstract
+
+The entirity of the database (which is large) can be downloaded here:
+http://edhar.genomecenter.ucdavis.edu/sifting_families/Sfam_new_dir_structure/
