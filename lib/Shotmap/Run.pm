@@ -2985,23 +2985,21 @@ sub calculate_abundances_flatfile{
 	}	
 	my ( $target_length, $family_length );
 	if( $norm_type eq 'target_length' ){
-        #the database is relatively slow and redundant (multi looks for same seq/fam across samples, so we turned it off
-#	    if( $self->use_db ){
-#		$target_length = $self->Shotmap::DB::get_target_length( $target_id );
-#	   } else {
-		$target_length = $length_hash->{$target_id};
-		if( !defined( $target_length ) ){
-		    die( "Can't calculate the length of hit $target_id" );
-		}
-#	   }
+	    $target_length = $length_hash->{$target_id};
+	    if( !defined( $target_length ) ){
+		die( "Can't calculate the length of hit $target_id" );
+	    }
+	    if( $abund_type eq 'rpkg' ){
+		$target_length = $target_length / 1000;
+	    }
 	} elsif( $norm_type eq 'family_length' ){
-#	    if( $self->use_db ){
-#		$family_length = $self->Shotmap::DB::get_family_length( $famid );
-#	    } else {
-		$family_length = $length_hash->{$famid};
-#	    }
+	    $family_length = $length_hash->{$famid};
+	    if( $abund_type eq 'rpkg' ){
+		$family_length = $family_length / 1000;
+	    }
 	}
-	if( $abund_type eq 'binary' ){
+	if( $abund_type eq 'counts' || 
+	    $abund_type eq 'rpkg'   ){
 	    my $raw;
 	    if( $norm_type eq 'none' ){
 		$raw = 1;
@@ -3042,7 +3040,7 @@ sub calculate_abundances_flatfile{
 	if( $self->database() ){   
 	    #now, insert the data into mysql.
 	    $self->Shotmap::Notify::print( "\tInserting Abundance Data into database....\n" );
-	    $self->Shotmap::Run::insert_abundance_hash_into_database( $sample_id, $class_id, $abundance_parameter_id, $abundances );
+	    $self->Shotmap::Run::insert_abundance_hash_into_database( $sample_id, $class_id, $abundance_parameter_id, $abundances, $statistics );
 	}
     }
 
@@ -3055,19 +3053,21 @@ sub calculate_abundances_flatfile{
 }
 
 sub insert_abundance_hash_into_database{
-    my ( $self, $sample_id, $class_id, $abund_param_id, $abundances ) = @_;
+    my ( $self, $sample_id, $class_id, $abund_param_id, $abundances, $statistics ) = @_;
     my $total = $abundances->{"total"};
+    my $tot_reads   = $statistics->{"total_seqs"};
     foreach my $famid( keys( %{ $abundances } ) ){
 	next if( $famid eq "total" );
 	my $raw = $abundances->{$famid};
 	my $ra  = $raw / $total;
 	if( $self->ags_method eq "microbecensus" ){
-	   my $read_len = $self->sample_ags( $sample_id, "read_length");
-	   my $ags      = $self->sample_ags( $sample_id, "ags" );
-	   my $n_reads  = $self->sample_ags( $sample_id, "n_reads_sampled" );
-	   my $total_bp = $read_len * $n_reads;
-	   #do the correction
-	   $raw         = $raw / ( $total_bp / $ags );
+	    my $read_len = $self->sample_ags( $sample_id, "read_length");
+	    my $ags      = $self->sample_ags( $sample_id, "ags" );
+	    #my $n_reads  = $self->sample_ags( $sample_id, "n_reads_sampled" );
+	    my $n_reads  = $tot_reads;
+	    my $total_bp = $read_len * $n_reads;
+	    #do the correction
+	    $raw         = $raw / ( $total_bp / $ags );
 	}
 	else{
 	    #do nothing or add additional methods in future.

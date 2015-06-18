@@ -330,11 +330,12 @@ sub check_vars{
 	    "You must provide a proper abundance type on the command line (--abundance-type)"
 	);
     my $abund_type = $self->opts->{"abundance-type"};
-    if( $abund_type !~ "binary" &&
-	$abund_type !~ "coverage" ){
+    if( $abund_type !~ "counts"   &&
+	$abund_type !~ "coverage" && 
+	$abund_type !~ "rpkg"     ){
 	    $self->Shotmap::Notify::dieWithUsageError( 
 		"You must specify a correct abundance-type with --abundance-type. ".
-		"You provided <${abund_type}>. Instead, select from: <binary> <coverage>"
+		"You provided <${abund_type}>. Instead, select from: <counts> <rpkg> <coverage>"
 	);	
     }
     if (defined($self->opts->{"rarefaction-type"})){
