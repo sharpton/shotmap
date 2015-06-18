@@ -459,9 +459,13 @@ fold_change_norm <- function( abund.map ){
 ### Heatmap samples
 ##################################################
 heatmap_samples <- function(div.map, abund.map, outpath){
-  heatmap(as.matrix(abund.map[1:20,200:300]))
-  #heatmap(as.matrix(abund.map[,1:200]))  
-  heatmap(cor(as.matrix(t(abund.map[,1:10])), method="kendall"), symm=TRUE)
+  heatmap_samples <- function(div.map, abund.map, outpath){
+    filename <- paste(  outpath,"/Heatmaps.pdf", sep="" )
+    pdf( file = filename )
+    heatmap(as.matrix(abund.map))
+    heatmap(cor(as.matrix(t(abund.map)), method="kendall"), symm=TRUE)
+    dev.off()
+  }
 }
 
 ###############################################
