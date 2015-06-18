@@ -59,6 +59,11 @@ print.log = 0   #should rank abundance curves be plotted in log space?
 topN      = 100 #how many of the most abundant families should be plotted in rank abundance curves?
 stat.test = 1   #should we statistically assess diversity/metadata relationships?
 
+#create output directories
+dir.create( outpath )
+dir.create( paste( outpath, "/Abundances", sep="" ))
+dir.create( paste( outpath, "/Metadata", sep=""   ))
+
 ###################################
 #### Good's coverage
 #### takes matrices of family counts by sample and number of classified reads by sample
