@@ -12,10 +12,10 @@ installed:bin/transeq
 
 name:prodigal
 download:wget
-x86:https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz
-src:https://github.com/hyattpd/Prodigal/archive/v2.6.1.tar.gz
-x86stem:Prodigal-2.6.1
-srcstem:Prodigal-2.6.1
+x86:https://github.com/hyattpd/Prodigal/archive/v2.6.2.tar.gz
+src:https://github.com/hyattpd/Prodigal/archive/v2.6.2.tar.gz
+x86stem:Prodigal-2.6.2
+srcstem:Prodigal-2.6.2
 x86bins:bin/prodigal
 srcbins:bin/prodigal
 testcmds:make install INSTALLDIR=./bin/

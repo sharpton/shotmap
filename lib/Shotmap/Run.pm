@@ -1616,7 +1616,7 @@ sub build_search_db{
 		    my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
 		$family_db_file = $nr_tmp;
 	    }
-	    $self->Shotmap::Notify::print_verbose( "...in file" );
+	    $self->Shotmap::Notify::print_verbose( "...in file" );	    
 	    open( FILE, "zcat --force $family_db_file |") # zcat --force can TRANSPARENTLY read both .gz and non-gzipped files!
 		|| die "Unable to open the file \"$family_db_file\" for reading: $! --"; 
 	    my $fam_init_len = $length; #used to calculate $family_length
@@ -3107,7 +3107,7 @@ sub build_sample_abundance_map_flatfile{
 		      "\n" );
     if( $self->ags_method eq "microbecensus" ){
 	#Parse the ags data here in case of reload 
-	my $ags_path = File::Spec->catdir($self->get_sample_path($sample_id), "ags", $self->ags_method);     
+	my $ags_path   = File::Spec->catdir($self->get_sample_path($sample_id), "ags", $self->ags_method);     
 	my $ags_output = File::Spec->catfile( $ags_path, $sample_id . "_ags.mc" );
 	$self->Shotmap::Run::parse_microbecensus( $sample_id, $ags_output );
     }
