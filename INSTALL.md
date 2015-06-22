@@ -24,11 +24,12 @@ cd $SHOTMAP_LOCAL
 perl install.pl
 
 4) set a few extra environmental variables
-
+<pre><code>
 echo 'export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/' >> ~/.bash_profile
 echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/scripts/' >> ~/.bash_profile
 echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile
 echo 'export PERL5LIB=${PERL5LIB}:${SHOTMAP_LOCAL}/lib:${SHOTMAP_LOCAL}/ext/lib' >> ~/.bash_profile
+</code></pre>
 
 5) Notes
 
