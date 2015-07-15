@@ -46,7 +46,7 @@ The directory containing the input metagenomes may optionally include a mapping 
 (see the section on ShotMAP Mapping Files for more information).
 3. Split each metagenome file into a set of smaller files to improve parallelization.  
 These files are located in the ffdb/sample/raw/ subdirectory.
-4. Predict protein coding seqeunces in each metagenome. 
+4. Predict protein coding sequences in each metagenome. 
 ShotMAP software can currently run one of three different gene prediction methods: 
 six-frame translation via transeq (6FT); 6FT, but splitting on stop codons (6FT_split), and prodigal.
 The results are stored in the ffdb/sample/orfs/.
@@ -118,11 +118,13 @@ This will take some time to run and will generate a lot of output. I recommend s
 
 3. Add the following to your ~/.bash_profile
 
+```
 export SHOTMAP_LOCAL=<path_to_the_shotmap_directory>
 export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg/MicrobeCensus
 export PATH=$PATH:${SHOTMAP_LOCAL}/pkg/MicrobeCensus/scripts/\n" .
 export PATH=$PATH:${SHOTMAP_LOCAL}/bin/
 export PATH=$PATH:${SHOTMAP_LOCAL}/lib/
+```
 
 and then source your ~/.bash_profile
 
