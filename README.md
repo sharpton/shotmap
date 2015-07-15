@@ -121,7 +121,7 @@ This will take some time to run and will generate a lot of output. I recommend s
 ```
 export SHOTMAP_LOCAL=<path_to_the_shotmap_directory>
 export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg/MicrobeCensus
-export PATH=$PATH:${SHOTMAP_LOCAL}/pkg/MicrobeCensus/scripts/\n" .
+export PATH=$PATH:${SHOTMAP_LOCAL}/pkg/MicrobeCensus/scripts/
 export PATH=$PATH:${SHOTMAP_LOCAL}/bin/
 export PATH=$PATH:${SHOTMAP_LOCAL}/lib/
 ```
