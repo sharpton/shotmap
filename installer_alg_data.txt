@@ -1,9 +1,9 @@
 name:transeq
 download:wget
-x86:ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz
-src:ftp://emboss.open-bio.org/pub/EMBOSS/EMBOSS-6.6.0.tar.gz
-x86stem:EMBOSS-6.6.0
-srcstem:EMBOSS-6.6.0
+x86:ftp://emboss.open-bio.org/pub/EMBOSS/old/6.5.0/EMBOSS-6.5.7.tar.gz
+src:ftp://emboss.open-bio.org/pub/EMBOSS/old/6.5.0/EMBOSS-6.5.7.tar.gz
+x86stem:EMBOSS-6.5.7
+srcstem:EMBOSS-6.5.7
 srcbins:/emboss/transeq
 x86bins:/emboss/transeq
 testcmds:./configure  --without-x; make; make check
