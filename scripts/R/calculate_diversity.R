@@ -60,9 +60,9 @@ topN      = 100 #how many of the most abundant families should be plotted in ran
 stat.test = 1   #should we statistically assess diversity/metadata relationships?
 
 #create output directories
-dir.create( outpath )
-dir.create( paste( outpath, "/Abundances", sep="" ))
-dir.create( paste( outpath, "/Metadata", sep=""   ))
+dir.create( outpath, showWarnings = FALSE )
+dir.create( paste( outpath, "/Abundances", sep="" ), showWarnings = FALSE )
+dir.create( paste( outpath, "/Metadata", sep=""   ), showWarnings = FALSE)
 
 ###################################
 #### Good's coverage
