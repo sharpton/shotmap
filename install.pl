@@ -121,6 +121,7 @@ if( $perlmods ){
 ######################
 # R PACKAGES
 if( $rpackages ){
+    print( "Installing R packages...\n" );
     system( "Rscript ${inc}/packages.R ${rlib} ${mirror}" );
 }
 
