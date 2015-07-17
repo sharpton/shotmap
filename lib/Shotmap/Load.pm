@@ -796,11 +796,13 @@ sub set_params{
 	$self->search_db_name( $self->search_type, $db_name );
 	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
 	    if( $self->auto() && !$self->is_conf_build){ 
-		$self->Shotmap::Notify::warn(
-		    "You are apparently trying to conduct a pairwise sequence search, " .
-		    "but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
-		    "<${db_name}>. I will build one for you."
-		    );
+		unless( $self->is_iso_db ){ #build_search_db is implicit.
+		    $self->Shotmap::Notify::warn(
+			"You are apparently trying to conduct a pairwise sequence search, " .
+			"but aren't telling me to build a database and I can't find one that already exists with your requested name " . 
+			"<${db_name}>. I will build one for you."
+			);
+		}
 		$self->build_search_db( $self->search_type, 1 );
 	    } else {
 		unless( $self->is_test || $self->is_conf_build ){
