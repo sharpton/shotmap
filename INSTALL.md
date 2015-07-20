@@ -54,8 +54,6 @@ https://www.virtualbox.org/wiki/Downloads
 2) Download the 64-bit ShotMAP VM, which you will run within VirtualBox to access a linux
 environment (specifically, Ubuntu 14.04.2 LTS) that has ShotMAP preinstalled. 
 
-http://files.cgrb.oregonstate.edu/Sharpton_Lab/ShotMAP/ShotMAP_VM/ShotMAP_VM_v0.3_Clone.vdi.zip
-
 [ShotMAP VM version 0.3](http://files.cgrb.oregonstate.edu/Sharpton_Lab/ShotMAP/ShotMAP_VM/ShotMAP_VM_v0.3%20Clone.vdi.gz)
 
 3) Unzip the file you downloaded
