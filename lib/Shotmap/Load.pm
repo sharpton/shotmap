@@ -297,7 +297,7 @@ sub check_vars{
 	    !defined( $self->opts->{"searchdb-name"}) ){
 	    my $stem = ".fa";
 	    if( $self->search_type eq "hmm" ){
-		$stem = ".hmm";
+		$stem = ".hmm.gz";
 	    }
 	    #searchdb-dir was checked to be -d above
 	    #use the first database split to get the basename
