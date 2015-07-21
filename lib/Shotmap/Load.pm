@@ -295,15 +295,19 @@ sub check_vars{
     unless( $self->is_conf_build ){
 	if( defined(  $self->opts->{"searchdb-dir"} ) &&
 	    !defined( $self->opts->{"searchdb-name"}) ){
+	    my $stem = ".fa";
+	    if( $self->search_type eq "hmm" ){
+		$stem = ".hmm";
+	    }
 	    #searchdb-dir was checked to be -d above
 	    #use the first database split to get the basename
-	    my @files = glob( $self->opts->{"searchdb-dir"} . "/*_1.fa" ); 
+	    my @files = glob( $self->opts->{"searchdb-dir"} . "/*_1${stem}" ); 
 	    if( $self->full_pipe && !( @files ) ){
 		die( "There does not appear to be a properly formatted search database in the directory " .
 		     "specified by --searchdb-dir" );
 	    }
 	    my $name  = basename( $files[0] );
-	    $name =~ s/\_1\.fa$//;
+	    $name =~ s/\_1${stem}$//;
 	    $self->opts->{"searchdb-name"} = $name;
 	} else {
 	    (defined($self->opts->{"searchdb-name"})) 
