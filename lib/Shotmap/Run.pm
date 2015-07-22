@@ -298,8 +298,11 @@ sub get_partitioned_samples{
 	}	
     }
     if( !defined( $self->project_desc() ) ){
-	$self->Shotmap::Notify::warn( "You didn't provide a project description file, which is optional. " .
-	      "Note that you can describe your project in the database via a project_description.txt file. See manual for more informaiton\n" );
+	# Project description files are only for mysql runs, which involve advanced users. Ignore for now.
+	#$self->Shotmap::Notify::warn( "You didn't provide a project description file, which is optional. " .
+	#     "Note that you can describe your project in the database via a project_description.txt file. " .
+	#     "See manual for more information\n" 
+	#);
     }
     $self->Shotmap::Notify::print_verbose("Adding samples to analysis object at path <$path>.");
     $self->set_samples( \%samples );
