@@ -1844,7 +1844,9 @@ sub get_family_path_from_dir{
 	    next if ($file =~ m/tmp/ ); #don't want to grab any tmp files from old, failed run
 	    next unless( !-d $file );
 	    my $family = $file; #we'll try to parse, but default to file name
-	    if( $file =~ m/(.*)\.hmm/ ){
+	    if( $file =~ m/(.*)\.hmm$/    || 
+		$file =~ m/(.*)\.hmm.gz$/ || 
+		){
 		$family = $1;
 	    }
 	    my $hmm_path = "${dir}/$file";
