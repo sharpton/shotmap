@@ -2329,7 +2329,11 @@ sub run_search{
 	die( "Couldn't obtain a raw file input basename to input from $orfs_dir!");
     }
     #GET DB VARS
-    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "_1.fa"; #only ever 1 for local search
+    my $suffix = "_1.fa";
+    if( $self->search_type eq "hmm" ){
+	$suffix = "_1.hmm.gz";
+    }
+    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "${suffix}"; #only ever 1 for local search
     my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
     unless( -e $db_file ){ #if uncompressed version exists, go with it
 	if( -e "${db_file}.gz" ){
