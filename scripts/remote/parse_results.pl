@@ -88,13 +88,13 @@ while(<$res_fh>){
     }    
     if ( $algo eq "hmmsearch" ){
 	#regex is ugly, but very fast
-	if( $_ =~ m/(.*?)\s+(.*?)\s+(\d+?)\s+(\d+?)\s+(.*?)\s+(\d+?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s(.*)/ ){
+	if( $_ =~ m/^(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(\d+?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+(.*?)\s+.*$/ ){# (.*?)\s(.*)/ ){
 	    $qid    = $1;
 	    $qlen   = $3;
 	    $tid    = $4;
 	    $tlen   = $6;
 	    $evalue = $13; #this is dom_ievalue
-	    $score  = $8;  #this is dom score
+	    $score  = $14; #this is dom score
 	    $start  = $20; #this is env_start
 	    $stop   = $21; #this is env_stop
 	} else{
