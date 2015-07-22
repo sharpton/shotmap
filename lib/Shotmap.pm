@@ -307,6 +307,8 @@ sub search_db_name{
     my( $self, $type, $value ) = @_;
     if( $type eq "rapsearch" || $type eq "last" || $type eq "blast" ){
 	$type = "blast";
+    } elsif( $type eq "hmmsearch" || $type eq "hmmscan" ){
+	$type = "hmm";
     }
     my $string = "search_db_name_" . $type;
     if( defined( $value ) ){
