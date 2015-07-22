@@ -296,7 +296,9 @@ sub check_vars{
 	if( defined(  $self->opts->{"searchdb-dir"} ) &&
 	    !defined( $self->opts->{"searchdb-name"}) ){
 	    my $stem = ".fa";
-	    if( $self->search_type eq "hmm" ){
+	    #come back and autodetect the difference between hmm and fa
+	    if( $self->opts->{"search-method"} eq "hmmsearch" ||
+		$self->opts->{"search-method"} eq "hmmscan"   ){
 		$stem = ".hmm.gz";
 	    }
 	    #searchdb-dir was checked to be -d above
@@ -728,7 +730,7 @@ sub set_params{
 			  "last"      => 1,
     };
     my $hmm_methods   = { "hmmscan"    => 1,
-			 "hmmsearch"  => 1,
+			  "hmmsearch"  => 1,
     };
     $self->search_method( $search_method );
     if( defined( $blast_methods->{$search_method} ) ){
