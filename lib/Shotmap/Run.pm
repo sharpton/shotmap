@@ -2492,14 +2492,20 @@ sub parse_results {
 	} else {
 	    $cmd .= " --coverage=NULL ";
 	}
-	if( $type eq "rapsearch" ){	
+	#if( $type eq "rapsearch" ){	
 	    $cmd .= " &> $log_file"; 
 	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
-	}
+	#}
+
 	#execute
         #system( $cmd );
 	my $results = IPC::System::Simple::capture("$cmd");
         (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
+	if( ! -e $infile . ".mysqld" ){
+	    die( "parse_results.pl failed to produce an output file! This could mean that there are not hits that pass the parsing thresholds ".
+		 "or it could indicate an error."
+		);
+	}
 	gzip_file( $infile . ".mysqld" );
 	unlink( $infile . ".mysqld" );
        
@@ -3926,6 +3932,7 @@ sub build_remote_script{
     if( defined( $rpath ) ){
 	$cmd .= " --rpath="    . $rpath                . " ";
     }
+    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
     my $results = Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 
     return $out_script;

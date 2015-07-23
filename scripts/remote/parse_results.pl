@@ -142,7 +142,8 @@ while(<$res_fh>){
 	$famid = $tid;
     }	    
     #depending on parse_type, do we need to retain this result?
-    if( defined( $hitmap->{$qid}->{"topscore"} ) ){
+    if( defined( $hitmap->{$qid} )               && #deal with autovivification
+	defined( $hitmap->{$qid}->{"topscore"} ) ){
 	if( $parse_type eq 'best_hit' ){
 	    next unless $hitmap->{$qid}->{"topscore"} < $score;	
 	} elsif( $parse_type eq 'best_per_fam' ){
