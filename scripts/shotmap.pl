@@ -154,7 +154,7 @@ sub goto_step{
 	    warn "Skipping to classifying reads step!\n"; 
 	    goto CLASSIFYREADS; 
 	}
-	if ($goto eq "G" or $goto eq "AGS"){    
+	if ($goto eq "Z" or $goto eq "AGS"){    
 	    warn "Skipping to estimate genome size step!\n"; 
 	    goto AGS; 
 	}

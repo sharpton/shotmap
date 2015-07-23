@@ -683,7 +683,12 @@ sub set_params{
 	    "I see --auto is on, so I will automate as " .
 	    "much as possible. You can turn me off with --noauto" );
     }
+
     #set adaptor
+    #if any class-score is set, turn off adapt by default
+    if( defined( $self->opts->{"class-score"} ) ){
+	$self->opts->{"adapt"} = 0;
+    }
     $self->adapt( $self->opts->{"adapt"} );
     if( $self->adapt ){
 	$self->Shotmap::Notify::print_verbose( 

@@ -79,15 +79,50 @@ associates with sample covariates.
 though the script run_stats_tests.pl can be run at a later date on any set of samples]
 The results of this analysis are found in ffdb/output/Families and ffdb/output/Beta_diversity
 
+Running Shotmap
+---------------
+
+At its simplest level, you can run shotmap.pl as follows. The following command invokes all default values in shotmap. 
+
+    perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i <path_to_input_data> -d <path_to_search_database>
+
+Note that -d points to the path of the ShotMAP formatted search database, not the reference database. For more information,
+please see section [Building a ShotMAP Search Database].
+
+As there are many ways to tune shotmap through the variety of options it provides, it may be simplest to specify your parameters 
+through the use of a configuration file, which is simply a text file that contains a list of the command line parameters you want
+shotmap to invoke (see section [Configuration Files] for more information). Generally, most users will NOT need to bother building 
+a configuration file.
+
+    perl scripts/build_conf_file.pl        --conf-file=<path_to_configuration_file> [options]
+    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file>
+
+If desired, you override the configuration file settings at the command line when running shotmap:
+
+    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> [options]
+
+If you want to rerun or reprocess part of the workflow (say, with different options), you can jump to a particular step using the 
+--goto option. The command would subsequently look like the following:
+
+    perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i <path_to_input_data> -d <path_to_search_database> -o <path_to_output_ffdb> --goto=<goto_value>
+
+For a full list of the values that the --goto option can accept, see the [options] documentation. To obtain a project identifier, either see previous
+shotmap output, check your flat file data repository, or check your mysql database for the project identifier that corresponds to your data.
+
+
 Building a ShotMAP Search Database
 ----------------------------------
 
-Build a reference protein family search database using user-defined parameters if one hasn't already been created. This
-can either be a protein sequence databases similar to a BLAST database or a HMMER v3 HMM database. Shotmap also indexes the database
-in a manner appropriate for the user-defined search algorithm (i.e., runs prerapsearch for rapsearch). This is a one-time step, as a
-ShotMAP indexed database can be used in subsequent metagenomic analyses. 
+ShotMAP classifies sequences into a database of protein families. You must specify the database that ShotMAP should use (i.e., a reference database),
+and it must be properly formatted and indexed by ShotMAP before it can be effectively leveraged as a ShotMAP search database.
+To construct a search database, which you only need to do one time, use the build_shotmap_search_db.pl as follows:
 
-perl $SHOTMAP_LOCAL/scripts/build_shotmap_searchdb.pl -r=</directory/path/to/reference/database> -d=</directory/path/to/search/database>
+    perl $SHOTMAP_LOCAL/scripts/build_shotmap_search_db.pl -r <path_to_reference_database> -d <path_to_search_database> 
+
+Here, -r is the input and is a directory that contains a series of files, either fasta (.fa) for protein sequence classification, 
+or .hmm for HMMER v3 hmm classification, files. Each protein family should have a distinct file. ShotMAP collects the data in this directory 
+to produce an indexed search_database. Note that by default, ShotMAP assumes you will use RAPsearch2; if you plan to use a different algorithm
+(e.g., HMMER), then you will need to invoke the --search-method option when running build_shotmap_search_db.pl.
 
 
 ShotMAP Metadata Files
@@ -132,40 +167,9 @@ source ~/.bash_profile
 
 You should now be be ready to run shotmap
 
-ADVANCED USERS ONLY:
 
-If you would like you specifically configure shotmap, you'll need to set up a configuration file (see below). There are some additional installation steps associated with this:
-
-3. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The following script builds a configuration file for you:
-
-   perl scripts/build_conf_file.pl  --conf-file=<path_of_output_conf_file> [options]
-
-Note that this script can receive via the command line any of shotmap's options. The simplest configuration file (running the analysis on a local machine without using a mysql database and using as many defaults as possible) would look like the following:
-
-     perl scripts/build_conf_file.pl --conf-file=<path_of_output_conf_file> --nprocs=<number_of_processors> --rawdata=<directory_containing_metagenome> --refdb=<directory_containing_protein_families>
-
-Note: if you elect to use a mysql database, this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
-
-4. Test your configuration file and installation using the following script:
-
-   perl scripts/test_conf_file.pl --conf-file=<path_of_configuration_file>
-
-This will validate your shotmap settings and verify that your installation and infrastructure is properly configured. Note that there are many edge cases and this script may not yet adequately check them all. Please contact the author if you find that this script fails to detect problems with your configuration.
-
-5. Run shotmap:
-
-   perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> [options]
-
-Note that you can override configuration file settings by invoking command line options. The first time you run shotmap, you'll need to format your search database. This can be invoked as follows:
-
-     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb
-
-Once formatted, you do not need to reformat, unless you change search database related options (see below). Also, If you are using a cloud (i.e., --remote), you'll need to conduct a one-time transfer of your search database to the remote server using --stage:
-
-     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb --stage
-
-Example
--------
+Installation: Example
+---------------------
 
 The following commands provide an example of how to run shotmap, using the test data found in shotmap/data. From the root level shotmap directory (i.e., shotmap/):
 
@@ -266,32 +270,42 @@ Note: if mysql server is on foreign machine, DBD::mysql may need to be
 * LAST
 * RAPsearch (v2)
 
-Running Shotmap
----------------
 
-You can run shotmap.pl as follows. 
+Configuration files
+-------------------
 
-    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file>
+If you would like you specifically configure shotmap, you can either append additional command line options at run time, or
+set up a configuration file (see below). If you would like to use a configuration file, then there are some additional 
+installation steps:
 
-Note that the FIRST TIME you run it, you need to build either a search database. Also, if you are using a remote computing cluster, you will have to STAGE 
-(i.e. transfer) the files to the remote cluster with the --stage option. So your first run will look something like this:
+1. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The following script builds a configuration file for you:
 
-    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> --build-searchdb --stage
+   perl scripts/build_conf_file.pl  --conf-file=<path_of_output_conf_file> [options]
 
-On subsequent runs, you can omit "--build-searchdb" and "--stage". 
+Note that this script can receive via the command line any of shotmap's options. The simplest configuration file (running the analysis on a local machine without using a mysql database and using as many defaults as possible) would look like the following:
 
-If desired, you override the configuration file settings at the command line when running shotmap:
+     perl scripts/build_conf_file.pl --conf-file=<path_of_output_conf_file> --nprocs=<number_of_processors> --rawdata=<directory_containing_metagenome> --refdb=<directory_containing_protein_families>
 
-    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> [options]
+Note: if you elect to use a mysql database, this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
 
-If you want to rerun or reprocess part of the workflow (say, with different options), you can jump to a particular step using the --goto option. This 
-also requires setting the --pid (project_id) option so that shotmap knows which data set in the MySQL/flat file databases it should reference. The command would
-subsequently look like the following:
+4. Test your configuration file and installation using the following script:
 
-    perl $SHOTMAP_LOCAL/scripts/shotmap.pl --conf-file=<path_to_configuration_file> --goto=<goto_value> --pid=<project_id>
+   perl scripts/test_conf_file.pl --conf-file=<path_of_configuration_file>
 
-For a full list of the values that the --goto option can accept, see the [options] documentation. To obtain a project identifier, either see previous
-shotmap output, check your flat file data repository, or check your mysql database for the project identifier that corresponds to your data.
+This will validate your shotmap settings and verify that your installation and infrastructure is properly configured. Note that there are many edge cases and this script may not yet adequately check them all. Please contact the author if you find that this script fails to detect problems with your configuration.
+
+5. Run shotmap:
+
+   perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> [options]
+
+Note that you can override configuration file settings by invoking command line options. The first time you run shotmap, you'll need to format your search database. This can be invoked as follows:
+
+     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb
+
+Once formatted, you do not need to reformat, unless you change search database related options (see below). Also, If you are using a cloud (i.e., --remote), you'll need to conduct a one-time transfer of your search database to the remote server using --stage:
+
+     perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --build-searchdb --stage
+
 
 OPTIONS
 -------
@@ -685,13 +699,13 @@ OPTIONS
   * 'T' or 'TRANSLATE'   - Read translation/coding sequence annotation
   * 'O' or 'LOADORFS'    - Load translated reads (orfs) into mysql database
   * 'B' or 'BUILD'       - Build search database
-  * 'R' or 'REMOTE'      - Stage search database on remote cluster
+  * 'R' or 'REMOTE'      - Stage search database on remote cluster (remote users only)
   * 'S' or 'SCRIPT'      - Build script for conducting massively parallel search on remote cluster
   * 'X' or 'SEARCH'      - Search all orfs against all protein families
   * 'P' or 'PARSE'       - Parse the search results and prepare
-  * 'G' or 'GET'         - Transfer the results from the remote cluster
-  * 'L' or 'LOADRESULTS' - Load the results into the mysql database
-  * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families
+  * 'G' or 'GET'         - Transfer the results from the remote cluster (remote users only)
+  * 'Z' or 'AGS'         - Calculate Average Genome Size
+  * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families  
   * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
 
 * **--reload** (Optional) DEFAULT: DISABLED

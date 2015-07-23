@@ -2970,6 +2970,7 @@ sub calculate_abundances_flatfile{
     }
 
     $self->Shotmap::Notify::print( "\tCalculating abundances..."); 
+    $self->Shotmap::Notify::print_verbose( "\t...processing $class_map" );
     open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
     my $count = 0;
     while(<MAP>){
@@ -3105,6 +3106,7 @@ sub build_sample_abundance_map_flatfile{
     #get the classification/abundance statistics, store in memory, 
     #will print in print_sample_abundance_statistics
     my $stats_output = $outdir . "/Abundance_Statistics_Sample_{$sample_id}.tab";
+    print Dumper $abundances;
     my $total       = $abundances->{"total"};
     my $tot_reads   = $statistics->{"total_seqs"};
     my $class_reads = $statistics->{"class_seqs"};
