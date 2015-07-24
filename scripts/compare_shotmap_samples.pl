@@ -62,8 +62,6 @@ my $merge_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/external/merge_abundance_ta
 print "R --slave --args ${tmp} ${metadata} ${abund_dir} ${r_lib} < $merge_script\n";
 system( "R --slave --args ${tmp} ${metadata} ${abund_dir} ${r_lib} < $merge_script" );
 
-die;
-
 #run statistical tests using shotmap.R
 my $stats_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/R/compare_shotmap_results.R";
 my $stats_file;
