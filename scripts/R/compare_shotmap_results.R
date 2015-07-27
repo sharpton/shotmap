@@ -1,6 +1,9 @@
 locallib <- Sys.getenv( "SHOTMAP_LOCAL")
 
-source( paste( locallib, "/lib/R/shotmap.R") )
+source( paste( locallib, "/lib/R/shotmap.R", sep="" ) )
+
+options(error=traceback)
+#options(error=recover)
 
 Args              <- commandArgs()
 abund.map.file    <- Args[4]
@@ -25,10 +28,10 @@ set_categorical_fields( as.vector( cat.fields ) )
 alpha.out  <- paste( outpath, "/Alpha_Diversity/", sep="")
 beta.out   <- paste( outpath, "/Beta_Diversity/", sep="")
 family.out <- paste( outpath, "/Families/", sep="")
-dir.create( outpath )
-dir.create( alpha.out )
-dir.create( beta.out )
-dir.create( family.out )
+dir.create( outpath, showWarnings = FALSE )
+dir.create( alpha.out, showWarnings = FALSE )
+dir.create( beta.out, showWarnings = FALSE )
+dir.create( family.out, showWarnings = FALSE )
 
 # Filter families based on Patrick's recommendations
 abund.map   <- abundance_variance_filtering( abund.map, "full.observation" )

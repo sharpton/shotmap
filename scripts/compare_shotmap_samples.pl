@@ -73,7 +73,7 @@ if( $datatype eq "abundances" ){
     $stats_file = "${abund_dir}/Merged_Counts.tab";
 }
 #integrate cat_fields_file into this command
-print "R --slave --args ${stats_file} ${merged_metadata} ${output} ${r_lib} < $stats_script\n";
+print "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_fields_file} ${r_lib} < $stats_script\n";
 
 ###############
 # SUBROUTINES #

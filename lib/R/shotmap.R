@@ -4,10 +4,10 @@ r.lib    <- paste( locallib, "/ext/R/", sep="")
 
 library(ggplot2)
 library(vegan)
-library(dendextend)
+#library(dendextend)
 library(fpc)
 library(cluster)
-library(dplyr)
+#library(dplyr)
 library(psych)
 library(coin)
 library(multtest)
@@ -150,7 +150,7 @@ categorical_family_analyses <- function( div.map, abund.map, outpath, plot.q.thr
       )            
     }
     names( rawp0 ) <- rownames(test.data)
-    rnd.p  <- correct_p( rawp0, test.data )
+    rnd.p  <- correct_p( rawp0 )
     rnd.p2 <- data.frame( test.type=test.type, rnd.p)
     ##now do something with this output
     tab.file <- paste( outpath, "/", test.type, "-", div.type, ".tab", sep="" )
@@ -158,20 +158,25 @@ categorical_family_analyses <- function( div.map, abund.map, outpath, plot.q.thr
     write.table( rnd.p2, tab.file )
     if( to.plot ){
       plot.tab  <- subset( rnd.p2, rnd.p2$qvalue < plot.q.threshold )
-      plot.data <- subset( test.data, 
-                           rownames( test.data ) %in% rownames( plot.tab ) 
-      )
-      for( i in 1:dim(plot.data)[1]){
-        family <- rownames(plot.data)[i]
-        data   <- plot.data[i,]
-        outfile <- paste( outpath, "/", "Boxplot-Family-" , 
+      if( length( rownames( plot.q.threshold ) ) < 1 ){
+      	  print( "No significant hits were found at your corrected threshold of", plot.q.threshold )
+      } 
+      else {
+          plot.data <- subset( test.data, 
+      	                       rownames( test.data ) %in% rownames( plot.tab ) 
+			       )				 
+	  for( i in 1:dim(plot.data)[1]){
+               family <- rownames(plot.data)[i]
+               data   <- plot.data[i,]
+               outfile <- paste( outpath, "/", "Boxplot-Family-" , 
                           family, "-", div.type, ".pdf", sep="")
-        pdf( file = outfile )
-        boxplot( data~classes, xlab=div.type, ylab="Abundance" )
-        dev.off()
-      }
-    }
-  }
+               pdf( file = outfile )
+               boxplot( data~classes, xlab=div.type, ylab="Abundance" )
+     	       dev.off()
+      	  }
+     }
+   }
+ }
 }
 
 ##################################################
@@ -321,7 +326,7 @@ continuous_diversity_analyses <- function ( div.map, outpath ){
                      "/Scatterplots-", meta.type, "-", div.type, ".pdf", 
                      sep="" )
       ggsave( filename = file, plot = last_plot(), width=7, height=7 )
-      if( is.numeric( div.map[,meta.type] ) ){
+      if( is.numeric( div.map[,meta.type] ) ){     
         corr      <- cor.test( div.map[,meta.type], 
                                div.map[,div.type], 
                                method="spearman" 
@@ -359,28 +364,35 @@ continuous_family_analyses <- function( div.map, abund.map, outpath, plot.q.thre
     names( rawp0 ) <- rownames( cor.data )
     corrected <- correct_p( rawp0 )
     results   <- as.data.frame( cbind( test.type = method, corrected) )
-    tab.file  <- paste( outpath, "/Correlations-Families-by", div.type, "-", test.type, ".tab", sep="" )
+    tab.file  <- paste( outpath, "/Correlations-Families-by", div.type, "-", method, ".tab", sep="" )
     print( paste( "Generating p-value table ", tab.file, sep="") )
-    write.table( rnd.p2, tab.file )
+    write.table( results, tab.file )
     if( to.plot ){
       fams.2.plot <- subset( results, results$BH < plot.q.threshold )
-      for( i in 1:length(fams.2.plot)[1]){
-        family   <- rownames(fams.2.plot)[i]
-        cor.val  <- cor.data[family, "cor"]
-        abunds   <- abund.map[,family]
-        div.data <- div.map[,div.type]
-        plot.data <- as.data.frame( cbind( abunds, div.data ) )
-        ggplot( plot.data, aes_string( x = abunds, y=div.data ) ) +
-          geom_point( ) + #if color: geom_point(aes(fill = COLNAME) )
-          labs( title = paste( "Family", family, " by ", div.type, "; ", 
-                               test.type, " = ", cor.val, sep="" ) ) +
-          xlab( "Abundance" ) +
-          ylab( div.type )
-        file <- paste( outpath, 
-                       "/Scatterplots-Family", family, "-", div.type, "-", test.type, ".pdf", 
+      if( dim( fams.2.plot )[1] < 1 ){
+      	  print( "Did not find any families that passed your corrected p-value threshold of",
+	  	 plot.q.threshold)
+	  next
+      }
+      else{ 
+            for( i in 1:length(fams.2.plot)[1]){
+      	      family   <- rownames(fams.2.plot)[i]
+              cor.val  <- cor.data[family, "cor"]
+  	      abunds   <- abund.map[,family]
+              div.data <- div.map[,div.type]
+	      plot.data <- as.data.frame( cbind( abunds, div.data ) )
+              ggplot( plot.data, aes_string( x = abunds, y=div.data ) ) +
+              	      geom_point( ) + #if color: geom_point(aes(fill = COLNAME) )
+          	      labs( title = paste( "Family", family, " by ", div.type, "; ", 
+                            method, " = ", cor.val, sep="" ) ) +
+          	      xlab( "Abundance" ) +
+          	      ylab( div.type )
+               file <- paste( outpath, 
+                       "/Scatterplots-Family", family, "-", div.type, "-", method, ".pdf", 
                        sep="" )
-        ggsave( filename = file, plot = last_plot(), width=7, height=7 )
-      }      
+               ggsave( filename = file, plot = last_plot(), width=7, height=7 )
+	    }
+      }     
     }
   }
 }
@@ -474,7 +486,7 @@ heatmap_samples <- function(div.map, abund.map, outpath){
 ###############################################
 is_categorical_field <- function( field ){
   value = 0
-  if( field %in% cat.fields   ){
+  if( field %in% cat.fields$V1   ){
     value = 1
   }
   return(value)
@@ -501,7 +513,8 @@ ordinate_samples <- function( div.map, abund.map, outpath ){
   centers = c( TRUE, FALSE )
   scales  = c( TRUE, FALSE )
   choices = c( 1,2,3,4 )
-  methods = c( "pca", "mds", "pcoa" )
+  #come back and get mds and pcoa working!
+  methods = c( "pca"  )
   for( a in 1:length(choices)){
     for( b in 1:length(choices)){
       for( d in 1:length(scales)){
@@ -554,7 +567,7 @@ ordinate_samples <- function( div.map, abund.map, outpath ){
                                    sep="")            
               }   
               pdf( file = plotstem )
-              mds.fig <- ordiplot(mod, 
+	      mds.fig <- ordiplot(mod, 
                                   display="sites", 
                                   type = "none", 
                                   choices=c(choice.1,choice.2)
