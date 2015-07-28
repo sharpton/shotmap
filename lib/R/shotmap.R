@@ -375,7 +375,7 @@ continuous_family_analyses <- function( div.map, abund.map, outpath, plot.q.thre
 	  next
       }
       else{ 
-            for( i in 1:length(fams.2.plot)[1]){
+            for( i in 1:dim(fams.2.plot)[1]){	    
       	      family   <- rownames(fams.2.plot)[i]
               cor.val  <- cor.data[family, "cor"]
   	      abunds   <- abund.map[,family]
