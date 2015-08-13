@@ -21,7 +21,6 @@ $SHOTMAP_LOCAL to your system environment when you log in:
         source ~/.bash_profile
 
 3. Run the installer script, which is located in the top level of the shotmap repository (install.pl).
-
         cd $SHOTMAP_LOCAL
         perl install.pl > install.log 2> install.err
 
@@ -34,7 +33,6 @@ some software by hand.
 (like install.log in the above command) so that you can review the results of the installation process.
 
 4. Set a few extra environmental variables. ShotMAP and its dependences reference these variables.
-
 
         echo 'export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/' >> ~/.bash_profile
         echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/scripts/' >> ~/.bash_profile
