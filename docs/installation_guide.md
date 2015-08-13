@@ -10,7 +10,9 @@ A. Github Installation
 
 1. Clone the github repository
 
+    <pre><code>
     git clone https://github.com/sharpton/shotmap.git
+    </code></pre>
 
 2. Set the SHOTMAP_LOCAL environmental variable. This should point your github-checked-out copy of shotmap. 
 Ideally, you set this variable in your ~/.bash_profile (or ~/.profile) so that you don't have to 
