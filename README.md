@@ -42,8 +42,8 @@ All metagenomes in the directory specified by -i will be processed by shotmap.
 While several metagenomes can be processed simultaneously, each sample should be represented by a single file.
 The data for each project is stored within a sample subdirectory within the shotMAP ffdb:
 ffdb/sample/
-The directory containing the input metagenomes may optionally include a mapping file
-(see the section on ShotMAP Mapping Files for more information).
+The directory containing the input metagenomes may optionally include a metadata file
+(see the section on ShotMAP Metadata Files for more information).
 3. Split each metagenome file into a set of smaller files to improve parallelization.  
 These files are located in the ffdb/sample/raw/ subdirectory.
 4. Predict protein coding sequences in each metagenome. 
@@ -72,7 +72,7 @@ The output of this step can be found in ffdb/output/Abundances/.
 Various diversity-associated summary statistics are calucated and placed in the
 /ffdb/output/Alpha_diversity directory. 
 If multiple samples are included, shotmap conducts statistical comparison of their differences
-in functional diversity. If a mapping file is included, shotMAP will evaluate how diveristy 
+in functional diversity. If a metadata file is included, shotMAP will evaluate how diveristy 
 associates with sample covariates.
 11. Identify families that stratify samples, and cluster samples by their interfamily variation.
 [Note: These analyses are only attempted if multiple samples are included in an analysis, 
