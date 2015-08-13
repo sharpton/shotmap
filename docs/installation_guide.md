@@ -88,9 +88,9 @@ environment (specifically, Ubuntu 14.04.2 LTS) that has ShotMAP preinstalled.
 
 5. Run Shotmap. Go to the following path in your Ubuntu VM to access ShotMAP:
 
-    <pre><code>
-    cd ~/src/shotmap
-    </code></pre>
+
+        cd ~/src/shotmap
+
 
     You can now implement all ShotMAP features as indicated in the documentation.
 
