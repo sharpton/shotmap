@@ -3106,7 +3106,6 @@ sub build_sample_abundance_map_flatfile{
     #get the classification/abundance statistics, store in memory, 
     #will print in print_sample_abundance_statistics
     my $stats_output = $outdir . "/Abundance_Statistics_Sample_{$sample_id}.tab";
-    print Dumper $abundances;
     my $total       = $abundances->{"total"};
     my $tot_reads   = $statistics->{"total_seqs"};
     my $class_reads = $statistics->{"class_seqs"};
