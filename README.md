@@ -34,8 +34,14 @@ Documentation Table of Contents
 
 1. [Workflow Synopsis](docs/workflow_synopsis.md)
 2. [Overview on How to Run ShotMAP](docs/running_shotmap.md)
-
-
+3. [Dependencies](docs/dependencies.md)
+4. [Installation Guide](docs/installation_guide.md)
+5. [Metadata Files](docs/metadata_files.md)
+5. Scripts
+5.1 build_shotmap_database.pl
+5.2 
+6. Advanced Documentation
+6.1. 
 
 
 Building a ShotMAP Search Database
@@ -62,50 +68,6 @@ ShotMAP can accept user defined metadata, which it applies to the statistical te
 2. The first row is a header row that names each metadata field (no spaces please)
 3. The first column is named Sample.Name and contains the file name corresponding to each metagenomic sample
 
-Installation
-------------
-
-1. Set your SHOTMAP_LOCAL environment variable.
-
-    export SHOTMAP_LOCAL=/my/home/directory/shotmap       
-
-Where this is your github-checked-out copy of shotmap. Ideally, you place the above command in your ~/.bash_profile (or ~/.profile) so that you don't have to execute the same command everytime you run shotmap. You might try the following:
-
-      echo "export SHOTMAP_LOCAL=/m/home/directory/shotmap" >> ~/.bash_profile
-
-2. Run the installer script, located in the top level of the shotmap repository (install.pl). This script attempts to auto install all of the requirements and dependencies used by shotmap. It does so by downloading source files via the internet (so you must have an internet connection for this to work!) and building binaries on your server. Note that this is challenging to automate, and you may still have to install some software by hand. Run the script with the following command:
-
-   perl install.pl > install.log 2> install.err
-
-This will take some time to run and will generate a lot of output. I recommend storing the output in a file like install.log so that you can review the results of the installation process.
-
-3. Add the following to your ~/.bash_profile
-
-```
-export SHOTMAP_LOCAL=<path_to_the_shotmap_directory>
-export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg/MicrobeCensus
-export PATH=$PATH:${SHOTMAP_LOCAL}/pkg/MicrobeCensus/scripts/
-export PATH=$PATH:${SHOTMAP_LOCAL}/bin/
-export PATH=$PATH:${SHOTMAP_LOCAL}/lib/
-```
-
-and then source your ~/.bash_profile
-
-source ~/.bash_profile
-
-You should now be be ready to run shotmap
-
-
-Installation: Example
----------------------
-
-The following commands provide an example of how to run shotmap, using the test data found in shotmap/data. From the root level shotmap directory (i.e., shotmap/):
-
-    perl install.pl
-
-    perl scripts/build_shotmap_searchdb.pl -r=data/test_family_database/ -d=data/test_family_smdb/
-
-    perl scripts/shotmap.pl -i ../data/stool_sim_single/ -d ../data/test_family_smdb/ --prerare-samps=10000 --nprocs=4     
 
 
 Cloud (remote) Users (Advanced)
@@ -131,73 +93,6 @@ Some additional configurations must be set up to interface shotmap with a MySQL 
 2. The user has CREATE, INSERT, DROP, SELECT, and FILE privileges. Also, the user must be able to write to /tmp/ so that data can be loaded infile (this results in *massive* speed-ups).
 
 3. DB options: Invoke and properly set the following db opions (see below for details): --db, --dbuser, --dbhost, --dbpass, --dbname
-
-Requirements & Dependencies
----------------------------
-
-Note that install.pl attempts to install *all* of the packages below, and their dependencies, automatically.
-
-###Perl Modules
-
-####All users need these
-* IPC::System::Simple
-* IO::Uncompress::Gunzip
-* IO::Compress::Gzip
-* Carp
-* File::Util
-* File::Cat
-* Unicode::UTF8
-* XML::DOM
-* XML::Tidy
-* Math::Random
-* Parallel::ForkManager
-* File::Basename
-* File::Copy
-* File::Path
-* File::Spec
-* Getopt::Long
-* Capture::Tiny
-
-#####Only needed if using a mysql database (advanced users)
-* DBIx::Class
-* DBIx::BulkLoader::Mysql 
-* DBI
-* DBD::mysql  
-
-Note: if mysql server is on foreign machine, DBD::mysql may need to be 
-      installed by hand. see 
-      http://search.cpan.org/dist/DBD-mysql/lib/DBD/mysql/INSTALL.pod 
-
-###MySQL (Only if using a mysql database - advanced users)
-
-* mysql 5.5 or greater
-
-###R Packages
-
-* vegan
-* ggplot2
-* reshape2
-* plyr
-* fpc 
-* grid
-* coin
-* MASS
-* qvalue (bioconductor)
-* multtest (bioconductor)
-
-###Translation/Gene Annotation Tools
-
-* Metatrans
-* transeq
-* prodigal
-
-###Homology Detection Tools
-
-* HMMER (v3)
-* BLAST+
-* LAST
-* RAPsearch (v2)
-
 
 Configuration files
 -------------------
