@@ -42,7 +42,7 @@ Documentation Table of Contents
 4. [Installation Guide](docs/installation_guide.md)
 5. [Building a ShotMAP Search Database](docs/search_databases.md)
 6. [Metadata Files](docs/metadata_files.md)
-7. Scripts
+7. Script Documentation
     * [install.pl](docs/install.pl.md)
     * [test_shotmap.pl](docs/test_shotmap.pl.md)
     * [build_shotmap_database.pl](docs/build_shotmap_database.pl.md)
