@@ -21,6 +21,7 @@ $SHOTMAP_LOCAL to your system environment when you log in:
         source ~/.bash_profile
 
 3. Run the installer script, which is located in the top level of the shotmap repository (install.pl).
+
         cd $SHOTMAP_LOCAL
         perl install.pl > install.log 2> install.err
 
