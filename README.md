@@ -25,9 +25,13 @@ The fastest way to get shotmap working on your data is to first build a search d
 
     perl $SHOTMAP_LOCAL/scripts/build_shotmap_searchdb.pl -r=</directory/path/to/reference/database> -d=</directory/path/to/search/database>
 
-And then execute shotMAP:
+And then execute ShotMAP:
      
-     perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i=</directory/path/to/metagenomes> -d=</directory/path/to/search/database>
+     perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i=</directory/path/to/metagenomes> -d=</directory/path/to/search/database> -o=</directory/path/to/result/database/>
+
+And then compare the results (if more than one sample):
+   
+    perl $SHOTMAP_LOCAL/scripts/compare_shotmap_results.pl -i=</directory/path/to/result/database/> -m=</path/to/optional/metadata/file> -o=</directory/path/to/new/result/directory/>
 
 Documentation Table of Contents
 -------------------------------
