@@ -10,26 +10,20 @@ A. Github Installation
 
 1. Clone the github repository
 
-    <pre><code>
-    git clone https://github.com/sharpton/shotmap.git
-    </code></pre>
+        git clone https://github.com/sharpton/shotmap.git
 
 2. Set the SHOTMAP_LOCAL environmental variable. This should point your github-checked-out copy of shotmap. 
 Ideally, you set this variable in your ~/.bash_profile (or ~/.profile) so that you don't have to 
 set the variable everytime you run shotmap. You might try the following, which will attempt to set
 $SHOTMAP_LOCAL to your system environment when you log in:
 
-    <pre><code>
-    echo 'export SHOTMAP_LOCAL=<path_to_local_shotmap>' >> ~/.bash_profile
-    source ~/.bash_profile
-    </code></pre>
+        echo 'export SHOTMAP_LOCAL=<path_to_local_shotmap>' >> ~/.bash_profile
+        source ~/.bash_profile
 
 3. Run the installer script, which is located in the top level of the shotmap repository (install.pl).
 
-    <pre><code>
-    cd $SHOTMAP_LOCAL
-    perl install.pl > install.log 2> install.err
-    </code></pre>
+        cd $SHOTMAP_LOCAL
+        perl install.pl > install.log 2> install.err
 
     This script attempts to auto install all of the requirements and dependencies used by shotmap. 
 It does so by downloading source files via the internet (so you must have an internet connection for this to work!) 
@@ -41,22 +35,19 @@ some software by hand.
 
 4. Set a few extra environmental variables. ShotMAP and its dependences reference these variables.
 
-    <pre><code>
-    echo 'export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/' >> ~/.bash_profile
-    echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/scripts/' >> ~/.bash_profile
-    echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile
-    echo 'export PERL5LIB=${PERL5LIB}:${SHOTMAP_LOCAL}/lib:${SHOTMAP_LOCAL}/ext/lib' >> ~/.bash_profile
-    </code></pre>
+
+        echo 'export PYTHONPATH=${PYTHONPATH}:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/' >> ~/.bash_profile
+        echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/pkg//MicrobeCensus/scripts/' >> ~/.bash_profile
+        echo 'export PATH=$PATH:${SHOTMAP_LOCAL}/bin/' >> ~/.bash_profile
+        echo 'export PERL5LIB=${PERL5LIB}:${SHOTMAP_LOCAL}/lib:${SHOTMAP_LOCAL}/ext/lib' >> ~/.bash_profile
 
 5. Notes
 
     The Perl module XML::Parser require the Expat XML Parser C library to be accessible on your system. 
 If you receive errors with XML::Parser, please have your system administrator install the expat
-libraries. This is relatively straight forward via apt:
+libraries. This is relatively straight forward via 
 
-    <pre><code>
-    apt-get install libexpat1-dev
-    </code></pre>
+        apt-get install libexpat1-dev
 
 B. ShotMAP Virtual Machine
 --------------------------
