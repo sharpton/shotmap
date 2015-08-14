@@ -60,8 +60,7 @@ to this script, but for most users, you will only need to provide the following:
 
         <ffdb>/output/Classification_Maps/
 
-    * Use Microbe Census to calculate the average genome size of each metagenome. The results are stored in:
-    
+    * Use Microbe Census to calculate the average genome size of each metagenome. The results are stored in:    
         <ffdb>/<sample>/ags
 
     * Calculate the abundance of each protein family in each sample. 
