@@ -44,7 +44,8 @@ All metagenomes in the directory specified by -i will be processed by shotmap. E
 
     * Split each metagenome file into a set of smaller files to improve parallelization. These split files are located in following subdirectory: 
 
-    <ffdb>/<sample>/raw/
+
+                <ffdb>/<sample>/raw/
 
     * Predict protein coding sequences (orfs) in each sample. ShotMAP can currently run one of three different gene prediction methods: 
         * six-frame translation via transeq (6FT); 
