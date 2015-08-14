@@ -12,6 +12,7 @@ shotmap.pl output:
 the results corresponding to the best hit - the hit that resulted in the classification - are shown.
 
 *Location*:
+
     <ffdb>/output/Classification_Maps/Classification_Map_<Sample.Name>.tab
 
 *Format*: These are comma separated tables, with the following header fields:
