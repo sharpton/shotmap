@@ -16,3 +16,5 @@ Each protein family should have a distinct file. ShotMAP collects the data in th
 
 Note that by default, ShotMAP assumes you will use RAPsearch2; if you plan to use a different algorithm
 (e.g., HMMER), then you will need to invoke the --search-method option when running build_shotmap_search_db.pl.
+
+For more information, please see the documentation for [build_shotmap_search_db.pl](build_shotmap_search_db.pl).
