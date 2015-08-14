@@ -1,5 +1,5 @@
 Detailed Workflow Synopsis
-__________________________
+==========================
 
 ShotMAP is a computional workflow that annotates (meta)genomic or (meta)transcritomic sequences based on protein family 
 classification. To run the workflow, users must:
@@ -14,8 +14,7 @@ ShotMAP is agnostic to the specific database used, and we leave it up to users t
     Whatever database is used in the analysis, users must first index the database so that ShotMAP can communicate with it. This
 is handled by the script [build_shotmap_search_database.pl](docs/build_shotmap_search_database.pl.md). 
 Briefly, users point this script to a reference database with the following requirements:
-    * the database must consist of either protein sequences in fasta format, with filenames ending in .fa,
- or HMMs in HMMER3 format, with filenames ending in .hmm
+    * the database must consist of either protein sequences in fasta format, with filenames ending in .fa, or HMMs in HMMER3 format, with filenames ending in .hmm
     * each family must exist as an independent file
     * all reference family files must be in the same directory
 
