@@ -38,11 +38,15 @@ Only those families identified in the processed samples will be represented in t
 
 ###Alpha-diversity Metadata Table
 
-####Description:
+####Description: These files contain alpha diversity and other statistics calculated by ShotMAP for each sample, including
+protein family richness, shannon entropy, and classification rate. These data are appended to the metadata provided by the user.
+If no metadata is provided, then ShotMAP initializes a metadata file, which includes just these statistics.
 
 ####Location:
 
-####Format:
+    <ffdb>/output/Metadata/Metadata-Diversity.tab
+
+####Format: These are tab delimited files that follow the metadata table file format outlined [here](metadata_files.md).
 
 
 compare_shotmap_results.pl output:
