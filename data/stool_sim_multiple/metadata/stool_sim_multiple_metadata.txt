@@ -1,0 +1,11 @@
+Sample.Name	Richness	Shannon.Entropy	Study	Sample.Category
+159268001-stool1_grinder-reads_100k	631	2.110012598	HMP	1
+160319967-stool1_grinder-reads_100k	545	2.270258622	HMP	1
+706846339-stool1_grinder-reads_100k	642	2.946128937	HMP	1
+763982056-stool2_grinder-reads_100k	561	2.158991447	HMP	2
+764487809-stool2_grinder-reads_100k	648	2.496098863	HMP	2
+765094712-stool2_grinder-reads_100k	675	2.067461216	HMP	2
+MH0033_grinder-reads_100k	702	2.813257061	MetaHIT	2
+MH0044_grinder-reads_100k	691	2.738438578	MetaHIT	3
+V1.CD1-0_grinder-reads_100k	660	2.266681086	MetaHIT	3
+V1.UC9-0_grinder-reads_100k	705	3.52531019	MetaHIT	3
