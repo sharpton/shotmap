@@ -56,12 +56,13 @@ to this script, but for most users, you will only need to provide the following:
 
     * Classify metagenomic sequences into protein families. By default, ShotMAP assigns metagenomic reads to the family that contains the read's best hit.
 
-    This produces a classification map that provides classification statistics for each read, including the family it was classified into. It can be found here:
+        This produces a classification map that provides classification statistics for each read, including the family it was classified into. It can be found here:
 
-        <ffdb>/output/Classification_Maps/
+            <ffdb>/output/Classification_Maps/
 
     * Use Microbe Census to calculate the average genome size of each metagenome. The results are stored in:    
-        <ffdb>/<sample>/ags
+ 
+       <ffdb>/<sample>/ags
 
     * Calculate the abundance of each protein family in each sample. 
 
