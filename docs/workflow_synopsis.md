@@ -39,14 +39,18 @@ to this script, but for most users, you will only need to provide the following:
    only process this single sample. However, if the user supplies a directory, shotmap.pl will process all samples in the folder.
    All metagenomes in the directory specified by -i will be processed by shotmap. Each input file (sample) will have a subdirectory created in the ffdb.
 
-   * Split each metagenome file into a set of smaller files to improve parallelization. These split files are located in the <ffdb>/<sample>/raw/ subdirectory.
+   * Split each metagenome file into a set of smaller files to improve parallelization. These split files are located in following subdirectory: 
+
+        <ffdb>/<sample>/raw/
 
    * Predict protein coding sequences (orfs) in each sample. ShotMAP can currently run one of three different gene prediction methods: 
        * six-frame translation via transeq (6FT); 
        * 6FT, but splitting on stop codons (6FT_split), and 
        * prodigal.
 
-       The results are stored in the <ffdb>/<sample>/orfs/.
+       The results are stored in the 
+
+            <ffdb>/<sample>/orfs/.
 
     * Search all predicted peptides against each target in a ShotMAP formatted search database. Search results are stored within <ffdb>/<sample>/search_results/.
 
@@ -54,11 +58,11 @@ to this script, but for most users, you will only need to provide the following:
 
     This produces a classification map that provides classification statistics for each read, including the family it was classified into. It can be found here:
 
-    <ffdb>/output/Classification_Maps/
+        <ffdb>/output/Classification_Maps/
 
     * Use Microbe Census to calculate the average genome size of each metagenome. The results are stored in:
 
-    <ffdb>/<sample>/ags
+        <ffdb>/<sample>/ags
 
     * Calculate the abundance of each protein family in each sample. 
 
@@ -66,11 +70,11 @@ to this script, but for most users, you will only need to provide the following:
 each family, as well as the number of times a read is classified into a family (i.e., the family's count). ShotMAP will output various files that represent these
 data in the following directory:
 
-     <ffdb>/output/Abundances
+         <ffdb>/output/Abundances
 
      * Calculate the functional alpha-diversity of each sample (e.g., richness, shannon entropy). Various diversity-associated summary statistics are calucated and placed in
 
-     <ffdb>/output/Metadata/Metadata-Diversity.tab
+         <ffdb>/output/Metadata/Metadata-Diversity.tab
 
 4. Compare results across samples. 
 
