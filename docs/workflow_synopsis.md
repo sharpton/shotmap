@@ -44,7 +44,6 @@ All metagenomes in the directory specified by -i will be processed by shotmap. E
 
     * Split each metagenome file into a set of smaller files to improve parallelization. These split files are located in following subdirectory: 
 
-
             <ffdb>/<sample>/raw/
 
     * Predict protein coding sequences (orfs) in each sample. ShotMAP can currently run one of three different gene prediction methods: 
@@ -54,9 +53,11 @@ All metagenomes in the directory specified by -i will be processed by shotmap. E
 
         The results are stored in the 
 
-             <ffdb>/<sample>/orfs/.
+            <ffdb>/<sample>/orfs/
 
-    * Search all predicted peptides against each target in a ShotMAP formatted search database. Search results are stored within <ffdb>/<sample>/search_results/.
+    * Search all predicted peptides against each target in a ShotMAP formatted search database. Search results are stored within 
+
+            <ffdb>/<sample>/search_results/
 
     * Classify metagenomic sequences into protein families. By default, ShotMAP assigns metagenomic reads to the family that contains the read's best hit.
 
