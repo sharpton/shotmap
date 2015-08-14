@@ -42,14 +42,15 @@ Documentation Table of Contents
 4. [Installation Guide](docs/installation_guide.md)
 5. [Building a ShotMAP Search Database](docs/search_databases.md)
 6. [Metadata Files](docs/metadata_files.md)
-7. Script Documentation
+7. [Workflow Output](docs/output.md)
+8. Script Documentation
     * [install.pl](docs/install.pl.md)
     * [test_shotmap.pl](docs/test_shotmap.pl.md)
     * [build_shotmap_database.pl](docs/build_shotmap_database.pl.md)
     * [shotmap.pl](docs/shotmap.pl.md)
     * [compare_shotmap_results.pl](docs/compare_shotmap_results.pl.md)
     * [test_config_file.pl](docs/test_config_file.pl.md)
-8. Advanced Documentation
+9. Advanced Documentation
     * [configuration files](docs/config_files.md)
     * [remote (cloud) users](docs/remote_users.md)
     * [relational database users](docs/relational_database_users.md)
