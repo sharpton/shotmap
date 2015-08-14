@@ -38,19 +38,75 @@ Only those families identified in the processed samples will be represented in t
 
 ###Alpha-diversity Metadata Table
 
-####Description: These files contain alpha diversity and other statistics calculated by ShotMAP for each sample, including
+*Description*: These files contain alpha diversity and other statistics calculated by ShotMAP for each sample, including
 protein family richness, shannon entropy, and classification rate. These data are appended to the metadata provided by the user.
 If no metadata is provided, then ShotMAP initializes a metadata file, which includes just these statistics.
 
-####Location:
+*Location*:
 
     <ffdb>/output/Metadata/Metadata-Diversity.tab
 
-####Format: These are tab delimited files that follow the metadata table file format outlined [here](metadata_files.md).
+*Format*: These are tab delimited files that follow the metadata table file format outlined [here](metadata_files.md).
 
 
 compare_shotmap_results.pl output:
 ----------------------------------
 
+###Merged ShotMAP output files
 
+The first thing [compare_shotmap_results.pl](compare_shotmap_results.pl.md) does is merge abundance maps and metadata tables produced by shotmap.pl (see above)
+into single files. These may be useful for subsequent, project specific analyses. You can find them in the output directory
+specified when running compare_shotmap_results.pl
 
+    <output_directory>/Abundances/Merged_<Abundance.Type>.tab
+    <output_directory>/Merged_Metadata.tab
+
+Note that if you specify an additional metadata table when invoking compare_shotmap_results.pl, then the merged metadata table
+will contain this additional metadata. Also, it will only process those samples specified in the metadata file.
+
+###Statistical Comparisons
+
+The script then uses R to conduct various statistical comparisons:
+
+####Alpha-diversity analyses
+
+*Description*: Various alpha-diversity (and other) statistics are evaluated across samples and metadata fields. For example, richness, shannon entropy,
+and classification rates are subject to robust statistical tests to identify associations between metadata fields and these sample statistics. For
+continuous metadata fields, tests of correlation are used. For categorical fields, wilcoxon tests are used. The resulting p-values are subject to 
+multiple test correction (qvalue). Both plots and table files are created to represent these results.
+
+*Location*: 
+
+    <output_directory>/Alpha_Diversity/
+
+*Format*: The pdf files contain plots (regression or boxplots, depending on data type) and the file names indicate which diversity statistics and
+which metadata fields are represented in the plot. The tab-deliminted table files (.tab) provide the underlying data with the following format:
+
+    Metadata.Field Diversity.Field p.value q.value
+
+####Beta-diversity
+
+*Description*: Intersample distances are calculated based on protein family abundances. Currently, PCA is used to represent the protein family
+beta-diversity based on the intersample co-variation in protein family abundance profiles. Ordination plots are produced and colored based on 
+sample metadata.
+
+*Location*:
+
+    <output_directory>/Beta_Diversity/
+
+*Format*: The pdf files contain the aforemtioned PCA plots. The file names indicate which metadata field is being used to color samples and which
+PC axes are represented in the plot.
+
+####Families
+
+*Description*: The association between family abundance and sample metadata field is quantified using robust statistical tests, such as wilcoxon tests
+for categorical fields or kendall's tau for continuous fields. 
+
+*Location*:
+
+    <output_directory>/Families/
+
+*Format*: The pdf files contain either boxplots or regression plots for families that significantly associate with sample metadata properties. 
+The tab-delimited table files (.tab) contain the underlying data, with the following header fields:
+
+    Test.Type Family.Identifier Diversity.Field p.value q.value
