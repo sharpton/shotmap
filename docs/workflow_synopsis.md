@@ -33,12 +33,12 @@ to this script, but for most users, you will only need to provide the following:
     ShotMAP operates by conducting the following steps:
     * Initialize a flatfile database (ffdb) that stores the results of the analysis. 
 
-    By default, this is located in the directory that contains the metagenomic samples and is named shotmap_ffdb, 
+        By default, this is located in the directory that contains the metagenomic samples and is named shotmap_ffdb, 
 but users can specify a specific output directory (recommended!) using the -o option.
 
     * Obtain the input metagenomes (fasta formatted, can be gzipped). 
 
-    If users input a path to a file (recommended!), shotmap.pl will
+        If users input a path to a file (recommended!), shotmap.pl will
 only process this single sample. However, if the user supplies a directory, shotmap.pl will process all samples in the folder.
 All metagenomes in the directory specified by -i will be processed by shotmap. Each input file (sample) will have a subdirectory created in the ffdb.
 
