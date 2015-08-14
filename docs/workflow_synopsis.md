@@ -67,7 +67,7 @@ All metagenomes in the directory specified by -i will be processed by shotmap. E
 
     * Use Microbe Census to calculate the average genome size of each metagenome. The results are stored in:    
  
-       <ffdb>/<sample>/ags
+            <ffdb>/<sample>/ags
 
     * Calculate the abundance of each protein family in each sample. 
 
@@ -75,11 +75,11 @@ All metagenomes in the directory specified by -i will be processed by shotmap. E
 each family, as well as the number of times a read is classified into a family (i.e., the family's count). ShotMAP will output various files that represent these
 data in the following directory:
 
-         <ffdb>/output/Abundances
+            <ffdb>/output/Abundances
 
      * Calculate the functional alpha-diversity of each sample (e.g., richness, shannon entropy). Various diversity-associated summary statistics are calucated and placed in
 
-         <ffdb>/output/Metadata/Metadata-Diversity.tab
+            <ffdb>/output/Metadata/Metadata-Diversity.tab
 
 4. Compare results across samples. 
 
