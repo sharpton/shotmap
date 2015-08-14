@@ -22,12 +22,19 @@ the results corresponding to the best hit - the hit that resulted in the classif
 
 ###Abundance Maps
 
-####Description:
+*Description*: These files provide the abundance of each protein family in each sample. There are three different types:
 
-####Location: 
+* Abundance: the abundance of the family, which by default is based on average genome size normalized coverage of the family
+* Relative abundance: the fraction of the total abundance across families in a sample that the family occupies
+* Counts: the number of reads classified into the family 
 
-####Format:
+*Location*: 
 
+    <ffdb>/output/Abundances/<Abundance.Type>_Map_<Sample.Name>.tab
+
+*Format*: These are tab delimited table files. Columns represent families and rows represent samples. These files include
+column names, so the first line is a list of families, as well as row names, so the first column is a list of sample names.
+Only those families identified in the processed samples will be represented in these files.
 
 ###Alpha-diversity Metadata Table
 
