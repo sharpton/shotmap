@@ -1,5 +1,5 @@
 Running Shotmap
----------------
+===============
 
 At its simplest level, you can run shotmap.pl as follows. The following command invokes all default values in shotmap. 
 
