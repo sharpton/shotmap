@@ -23,12 +23,12 @@ Briefly, users point this script to a reference database with the following requ
 database only needs to be indexed one time and can be used for any number of subsequent ShotMAP runs. At its simplest,
 you can invoke this script in the following manner:
 
-    	perl build_shotmap_search_database.pl -r </dir/path/to/reference/database/> -d </dir/path/to/output/search/database/>
+        perl build_shotmap_search_database.pl -r=</dir/path/to/reference/database/> -d=</dir/path/to/output/search/database/>
 
 3. Run the primary annotation script, [shotmap.pl](docs/shotmap.pl.md). There are a variety of options that can be supplied
 to this script, but for most users, you will only need to provide the following:
 
-   	perl shotmap.pl -i </path/to/input/file/> -d </path/to/search/database/file> -o </path/to/output/dir/> --nprocs <number processors to use>
+   	perl shotmap.pl -i=</path/to/input/file/> -d=</path/to/search/database/file> -o=</path/to/output/dir/> --nprocs=<number processors to use>
 
     ShotMAP operates by conducting the following steps:
    * Initialize a flatfile database (ffdb) that stores the results of the analysis. 
@@ -81,7 +81,7 @@ with a metadata file that provides additional statistics for each sample (e.g., 
 changes in protein family diversity vary in accordance with sample properties, identify protein families that stratify samples based on their properties, and assess how
 samples relate to one another based on their shared protein family diversity. This script can be invoked in the following manner:
 
-        perl compare_shotmap_results.pl -i </file/list/of/ffdbs/to/compare> -m </metadata/table/file> -o </directory/path/to/comparison/results/>
+        perl compare_shotmap_results.pl -i=</file/list/of/ffdbs/to/compare> -m=</metadata/table/file> -o=</directory/path/to/comparison/results/>
 
     This script attempts to automate comparisons, but many analyses will require data-appropriate, customized consideration. We provide a variety of potentially useful analytical
 functions via the shotmap.R library which may help users with one-off analyses (see $SHOTMAP_LOCAL/lib/R/shotmap.R). We plan to add functions to these libraries based on 
