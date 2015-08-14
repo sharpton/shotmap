@@ -8,12 +8,12 @@ shotmap.pl output:
 
 ###Classification Maps
 
-Description: These files provide the classification statistics for each read that was classified into a family. Only 
+*Description*: These files provide the classification statistics for each read that was classified into a family. Only 
 the results corresponding to the best hit - the hit that resulted in the classification - are shown.
 
-*Location*: <code><ffdb>/<output>/Classification_Maps/<Classification_Map_<Sample.Name>.tab
+*Location*: <code><ffdb>/output/Classification_Maps/Classification_Map_<Sample.Name>.tab</code>
 
-Format: These are comma separated tables, with the following header fields:
+*Format*: These are comma separated tables, with the following header fields:
 
     orf_identifier read_identifier sample_id target_sequence family score evalue coverage alignment_length
 
