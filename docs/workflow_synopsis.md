@@ -14,9 +14,10 @@ ShotMAP is agnostic to the specific database used, and we leave it up to users t
     Whatever database is used in the analysis, users must first index the database so that ShotMAP can communicate with it. This
 is handled by the script [build_shotmap_search_database.pl](docs/build_shotmap_search_database.pl.md). 
 Briefly, users point this script to a reference database with the following requirements:
-    * the database must consist of either protein sequences in fasta format, with filenames ending in .fa, or HMMs in HMMER3 format, with filenames ending in .hmm
-    * each family must exist as an independent file
-    * all reference family files must be in the same directory
+
+	     * the database must consist of either protein sequences in fasta format, with filenames ending in .fa, or HMMs in HMMER3 format, with filenames ending in .hmm
+    	     * each family must exist as an independent file
+    	     * all reference family files must be in the same directory
 
     The script grabs all reference family files and builds an indexed search database based on user input parameters. A search
 database only needs to be indexed one time and can be used for any number of subsequent ShotMAP runs. At its simplest,
