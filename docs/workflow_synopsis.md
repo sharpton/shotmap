@@ -12,7 +12,7 @@ each sample to be processed should be in the same directory. Files should end in
 ShotMAP is agnostic to the specific database used, and we leave it up to users to select a database of their preference. 
 
     Whatever database is used in the analysis, users must first index the database so that ShotMAP can communicate with it. This
-is handled by the script [build_shotmap_search_database.pl](docs/build_shotmap_search_database.pl.md). 
+is handled by the script [build_shotmap_search_database.pl](build_shotmap_search_database.pl.md). 
 Briefly, users point this script to a reference database with the following requirements:
 
     * the database must consist of either protein sequences in fasta format, with filenames ending in .fa, or HMMs in HMMER3 format, with filenames ending in .hmm
@@ -25,7 +25,7 @@ you can invoke this script in the following manner:
 
         perl build_shotmap_search_database.pl -r=</dir/path/to/reference/database/> -d=</dir/path/to/output/search/database/>
 
-3. Run the primary annotation script, [shotmap.pl](docs/shotmap.pl.md). There are a variety of options that can be supplied
+3. Run the primary annotation script, [shotmap.pl](shotmap.pl.md). There are a variety of options that can be supplied
 to this script, but for most users, you will only need to provide the following:
 
         perl shotmap.pl -i=</path/to/input/file/> -d=</path/to/search/database/file> -o=</path/to/output/dir/> --nprocs=<number processors to use>
@@ -84,7 +84,7 @@ data in the following directory:
 4. Compare results across samples. 
 
     In addition to annotating samples, ShotMAP can conduct statistical comparative assessments across samples. Here, the script
-[compare_shotmap_results.pl](docs/compare_shotmap_results.pl.md) is used to quantify how protein alpha-diversity varies across samples and measure protein 
+[compare_shotmap_results.pl](compare_shotmap_results.pl.md) is used to quantify how protein alpha-diversity varies across samples and measure protein 
 family beta-diversity. Users can point this script to multiple ShotMAP flat file directories - so the data being compared need not be processed at the same time - along
 with a metadata file that provides additional statistics for each sample (e.g., environmental conditions). The script then executes a variety of functions that evaluate how
 changes in protein family diversity vary in accordance with sample properties, identify protein families that stratify samples based on their properties, and assess how

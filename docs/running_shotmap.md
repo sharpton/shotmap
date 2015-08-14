@@ -6,7 +6,7 @@ At its simplest level, you can run shotmap.pl as follows. The following command 
     perl $SHOTMAP_LOCAL/scripts/shotmap.pl -i <path_to_input_data> -d <path_to_search_database>
 
 Note that -d points to the path of the ShotMAP formatted search database, not the reference database. For more information,
-please see section [Building a ShotMAP Search Database].
+please see section [Building a ShotMAP Search Database](search_databases.md).
 
 As there are many ways to tune shotmap through the variety of options it provides, it may be simplest to specify your parameters 
 through the use of a configuration file, which is simply a text file that contains a list of the command line parameters you want
