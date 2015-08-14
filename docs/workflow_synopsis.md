@@ -28,7 +28,7 @@ you can invoke this script in the following manner:
 3. Run the primary annotation script, [shotmap.pl](docs/shotmap.pl.md). There are a variety of options that can be supplied
 to this script, but for most users, you will only need to provide the following:
 
-   	perl shotmap.pl -i=</path/to/input/file/> -d=</path/to/search/database/file> -o=</path/to/output/dir/> --nprocs=<number processors to use>
+        perl shotmap.pl -i=</path/to/input/file/> -d=</path/to/search/database/file> -o=</path/to/output/dir/> --nprocs=<number processors to use>
 
     ShotMAP operates by conducting the following steps:
    * Initialize a flatfile database (ffdb) that stores the results of the analysis. 
