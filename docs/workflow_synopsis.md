@@ -19,7 +19,7 @@ Briefly, users point this script to a reference database with the following requ
     * each family must exist as an independent file
     * all reference family files must be in the same directory
 
-The script grabs all reference family files and builds an indexed search database based on user input parameters. A search
+    The script grabs all reference family files and builds an indexed search database based on user input parameters. A search
 database only needs to be indexed one time and can be used for any number of subsequent ShotMAP runs. At its simplest,
 you can invoke this script in the following manner:
 
