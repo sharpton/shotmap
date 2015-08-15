@@ -2,8 +2,13 @@ Configuration files
 -------------------
 
 If you would like you specifically configure shotmap, you can either append additional command line options at run time, or
-set up a configuration file (see below). If you would like to use a configuration file, then there are some additional 
-installation steps:
+set up a configuration file (see below). A configuration file is simply a text file that contains command line options you want 
+shotmap to invoke, one option per line. Configuration files simplify the command you use to run shotmap and make repeated processing with 
+custom parameters trivial. Most users won't need to bother with setting up a configuration file.
+
+An example configuration file can be found [here](../data/config/sample_config_file.txt).
+
+To build a configuration file, follow these steps:
 
 1. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The script [build_conf_file.pl](build_conf_file.pl.md) builds a configuration file for you:
 
@@ -13,7 +18,7 @@ installation steps:
 
         perl scripts/build_conf_file.pl --conf-file=<path_of_output_conf_file> --nprocs=<number_of_processors> --rawdata=<directory_containing_metagenome> --refdb=<directory_containing_protein_families>
 
-    Note: if you elect to use a mysql database, this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
+    Note: if you elect to use a mysql database (Advanced users only!), this script will prompt you to store your password in the file and will lock the file down with user-only read permissions
 
 2. Test your configuration file and installation using the following script:
 
@@ -25,7 +30,7 @@ installation steps:
 
         perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> [options]
 
-    Note that you can override configuration file settings by invoking command line options thusly: 
+    Note that you can override configuration file settings by invoking command line options. In the following example, we override the --trans-method value in our configuration file with the command line option so that shotmap.pl invokes the 6FT value for the --trans-method parameter.
 
         perl scripts/shotmap.pl --conf-file=<path_of_configuration_file> --trans-method=6FT
 
