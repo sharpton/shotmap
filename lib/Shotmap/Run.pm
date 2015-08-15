@@ -3049,7 +3049,6 @@ sub calculate_abundances_flatfile{
 	}
     }
     $self->Shotmap::Notify::print( "\t...abundances calculated\n" );
-
 #off for troubleshooting
     if( 0 ){
 	if( $self->database() ){   
@@ -3689,12 +3688,10 @@ sub cat_data_frame_files{
 		$little_count = 1;
 		next;
 	    }
-	    if( $big_count == 0 ){
-		$big_count = 1;
-	    }
 	    print TMP $_;
 	}
 	close MAP;
+	$big_count = 1;
     }
     close TMP;
     return $catted_file;
