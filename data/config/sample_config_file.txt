@@ -1,0 +1,9 @@
+--orf-filter-len=14
+--seq-split-size=100000
+--class-score=31
+--trans-method=6FT_split
+--searchdb-name=Test_families
+--refdb=../data/test_family_database/
+--rawdata=../data/testdata/
+--db=none
+--nproc=2
