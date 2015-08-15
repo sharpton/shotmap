@@ -5,9 +5,9 @@ If you would like you specifically configure shotmap, you can either append addi
 set up a configuration file (see below). If you would like to use a configuration file, then there are some additional 
 installation steps:
 
-1. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The following script builds a configuration file for you:
+1. Now we need a configuration file that tells shotmap where to find the data you want to process it and how you want it to be analyzed. The script [build_conf_file.pl](build_conf_file.pl.md) builds a configuration file for you:
 
-   perl scripts/build_conf_file.pl  --conf-file=<path_of_output_conf_file> [options]
+    perl scripts/build_conf_file.pl  --conf-file=<path_of_output_conf_file> [options]
 
 Note that this script can receive via the command line any of shotmap's options. The simplest configuration file (running the analysis on a local machine without using a mysql database and using as many defaults as possible) would look like the following:
 
