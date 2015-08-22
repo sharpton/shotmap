@@ -112,3 +112,25 @@ foreach my $alg( sort( keys( %$algs ) ) ){
 	_pr( "testing $alg installation", "PASS" );
     }
 }
+
+if( $has_fails ){
+    die "Found errors when testing the configuration file. Please see the above output for more\n";
+}
+
+sub _chk_mod{
+    my $mod_str   = shift;
+    my $has_fails = shift;
+    if( eval( "use ${mod_str}; 1" )){
+	_pr( "testing $mod_str installation", "PASS" );
+    } else {
+	_pr( "testing $mod_str installation", "FAIL" );
+	$has_fails = 1;
+    }    
+    return $has_fails;
+}
+
+sub _pr{
+    my $string = shift;
+    my $value  = shift;
+    print join( "\t", $string, $value, "\n" );
+}
