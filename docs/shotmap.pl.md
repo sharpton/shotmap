@@ -129,7 +129,7 @@ OPTIONS
    last      - lastal
    blast     - blastall
    hmmsearch - HMMER v 3
-   hmmscan   - HMMER v 2
+   hmmscan   - HMMER v 3
 
    Note that different tools may require that different search database indexing procedures are implemented. As a result, you may need to 
    invoke --stage (if --remote) the first time you use an algorithm to compare sequences against your search database.
@@ -429,7 +429,7 @@ OPTIONS
     Determines how many rows should be simultaneously inserted into the MySQL database when using LOAD DATA INFILE.
     Only used if --bulk is invoked. Most users will never need to worry about this option. Note that it is irrevelent if --db=none.
 
-###REFERENCE SEARCH DATABASE ARGUMENTS:
+###BUILD SEARCH DATABASE ARGUMENTS:
 
 While you can use shotmap.pl to build your search database, we recommend you instead use [build_shotmap_searchdb.pl](build_shotmap_searchdb.pl.pm).
 
