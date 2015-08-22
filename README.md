@@ -46,7 +46,7 @@ Documentation Table of Contents
 8. Script Documentation
     * [install.pl](docs/install.pl.md)
     * [test_shotmap.pl](docs/test_shotmap.pl.md)
-    * [build_shotmap_database.pl](docs/build_shotmap_database.pl.md)
+    * [build_shotmap_searchdb.pl](docs/build_shotmap_searchdb.pl.md)
     * [shotmap.pl](docs/shotmap.pl.md)
     * [compare_shotmap_results.pl](docs/compare_shotmap_results.pl.md)
     * [test_config_file.pl](docs/test_config_file.pl.md)
