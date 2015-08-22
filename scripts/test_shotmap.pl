@@ -12,11 +12,7 @@ use Shotmap;
 use Shotmap::Load;
 use Shotmap::Run;
 
-my $pipe = Shotmap->new();
-$pipe->is_test(1); #has effect on next statements
-$pipe->Shotmap::Load::get_options( @ARGV );
-$pipe->Shotmap::Load::check_vars();
-$pipe->Shotmap::Load::set_params();
+my $use_db = 0; #we should ultimately make this an option
 
 my $has_fails = 0;
 
@@ -66,7 +62,7 @@ my @mods = (
     "Capture::Tiny",
     );
 
-if( $pipe->use_db ){
+if( $use_db ){
     my @db_mods = (
 	"DBIx::Class",
 	"DBIx::BulkLoader::Mysql",
