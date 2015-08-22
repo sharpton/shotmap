@@ -1,22 +1,52 @@
+shotmap.pl
+==========
+
+Usage:
+------
+    
+    perl shotmap.pl -i </path/to/input/file.fa> -d </path/to/search_database/dir> -o </path/to/output/dir> [options]
+     
+Description: 
+------------
+
+This script is the workhorse routine for the ShotMAP workflow, and is responsible for identifying coding sequences in metagenomic data,
+comparing them to a search database of families (either protein sequences or HMMs), classifying sequences into these families, and producing estimates of each family's
+abundance along with the total family diversity in the metagenomic sample.
+
+At minimum, it takes an input of (-i) either a fasta formatted metagenome file or a directory containing several metagenome files (one per sample), 
+(-d) a shotmap formatted search database, and (-o) a directory for where the output should be located. But, shotmap.pl
+is highly customizable. For example, you can run it on a multi-core computer or a SGE/PBS configured high-performance compute cluster. You can adjust the thresholds used 
+to determine if a sequence is a homologous member of a family. You can reprocess a sample with different parameters at an internal step in the workflow. See the options
+below for a better sense of how you can customize this tool for your needs.
+
+By default, shotmap.pl will adopt gene prediction, homology search, and classification parameters that our statistical simulations have found to maximize throughput while
+maintaining high protein family abundance estimation accuracy. See [this paper](http://biorxiv.org/content/early/2015/07/10/022335) for more.
+
+Examples:
+---------
+
+To run shotmap.pl on a multi-core server:
+
+    perl shotmap.pl -i </path/to/input/file.fa> -d </path/to/search_database/dir> -o </path/to/output/dir> --nprocs <number_processors_to_use>
+
+If you want to customize shotmap.pl, (e.g., it on a remote SGE/PBS server), we recommend you set up a configuration file as described [here](config_files.md). 
+It might look like the following:
+
+   perl shotmap.pl --conf-file </path/to/configuration/file>
+
+Note that configuration files can be overriden by adding command line options, ala:
+
+   perl shotmap.pl --conf-file </path/to/configuration/file> --parse-score 20
+
+If you are going to run on an SGE/PBS server, then additionally follow the 
+[remote user instructions](remote_users.md).
+
 OPTIONS
 -------
 
-###CONFIGURATION FILE:
-
-* **--conf-file=/PATH/TO/CONFIGURATION_FILE** (optional, but RECOMMENDED) NO DEFAULT VALUE
-
-  Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
-  a list of shotmap options, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
-  You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
-
-  When building a configuation file, you will be asked to enter your MySQL password if you are using a relational database to manage your results. 
-  You are not required to put your password in this file, though it is
-  recommended as passing that argument to shotmap.pl at run time will place your password in your history. The configuation file is secured with user-only,
-  read-only permissions. Note that this is NOT a failsafe security method!
-
 ###METAGENOME DATA ARGUMENTS:
 
-* **--rawdata=/PATH/TO/PROJECT/DIR** (REQUIRED argument) NO DEFAULT VALUE
+* **-i, --rawdata=/PATH/TO/PROJECT/DIR** (REQUIRED argument) NO DEFAULT VALUE
 
   Location of the metagenomic sequences to be processed. Each metagenomic sample should be in a single
   and seperate file with a unique file prefix (e.g., O2.UC-1_090112) and have .fa, .fna, or .fa.gz or .fna.gz (if a gzipped compressed file) as the file suffix.
@@ -39,123 +69,21 @@ OPTIONS
 
   Note that once this value has been set, it cannot be amended in subsequent reanalyses of a sample (i.e., when using --goto).			     
 
+###SEARCH DATABASE ARGUMENTS:
+
+* **-d, --searchdb-dir=/PATH/TO/SEARCHDB/DIRECTORY** (REQUIRED argument) DEFAULT: NONE
+
+  This is the location of the shotmap formatted search database that will be used to assign metagenomic sequences to families. This
+  database is produced by running build_shotmap_searchdb.pl. Point this parameter to the directory containing the database files.
+
 ###SHOTMAP DATA REPOSITORY ARGUMENTS:
 
-* **--ffdb=/PATH/TO/FLATFILES** (REQUIRED argument) DEFAULT: --ffdb=<path_to_raw_data>/shotmap_ffdb/
+* **-o, --ffdb=/PATH/TO/FLATFILES** (REQUIRED argument) DEFAULT: --ffdb=<path_to_raw_data>/shotmap_ffdb/
   
     Location of the flat file shotmap data repository. Shotmap creates this location and stores both
     the search database and the reads, orfs, search results, and statistical output. Multiple projects
     can be stored in the same data repository. See details for more information about the structure of
     this directory.
-
-
-###REFERENCE SEARCH DATABASE ARGUMENTS:
-
-* **--refdb=/PATH/TO/REFERENCE/FLATFILES**  (REQUIRED argument) NO DEFAULT VALUE
-
-    Location of the protein family reference data.  Each family must have a HMM (if running HMMER tools) 
-    or a set of protein sequences sequences, in fasta format, that are members of the family (if running blast-like tools).
-
-    Files in this directory should correspond to an individual family, with the prefix of the file being 
-    the family identifier (e.g., IPR020405) and the suffix should either be .hmm (for HMMs) or .fa
-    (for protein sequences). These files can be placed in any subdirectory stucture within this upper 
-    level directory; shotmap will recurse through all subdirectories and append all appropriate .hmm or .fa files to the list
-    of families that will be incorporated into the search database.
-
-* **--build-searchdb** (REQUIRED IF SEARCH DATABASE HAS NOT BEEN CONSTRUCTED) DEFAULT: DISABLED
-
-    Tell shotmap to build a search database using the reference sequences identified by --refdb.
-
-    This option must be run at least one time for each search database you elect to use with shotmap. 
-
-* **--searchdb-name=STRING** (REQUIRED argument) NO DEFAULT VALUE
-
-    The name of the search database(s) (sequence and HMM) that shotmap will build. 
-    The use of additional arguments (see below) may result in additional strings being concattenated to this prefix. For example,
-    if --searchdb-name=KEGG and --nr is invoked, the search database name will be KEGG_nr
-
-* **--searchdb-split-size=INTEGER** (OPTIONAL argument) NO DEFAULT VALUE
-
-    Split the search database into subsets with INTEGER number of hmms/sequences in each subset. This can improve parallelization and optimization
-    of the remote compute cluster (i.e., smaller search database files are transferred to /scratch on slave nodes).
-
-    Most users will not set this option, which results in a single, large search database, and will instead only change --seq-split-size.
-
-* **--nr** (Optional argument) DEFAULT: ENABLED
-
-    Build a non-redundant protein sequence search database.  	  
-
-    When building a protein sequence (blast-like) search database, collapses identical sequences found within
-    the same family. This option has no affect on hmm-based searches.
-
-* **--db-suffix=STRING** (OPTIONAL argument) DEFAULT: --db_suffix=rsdb
-
-    When building a protein sequence (blast-like) database, appends this string to the end of binary formatted
-    database files.
-
-    Currently only invoked when --search-method=rapsearch. Most users will never need to worry about this option.
-
-* **--force-searchdb** (OPTIONAL argument) DEFAULT: DISABLED
-
-    Force a search database to be built. Overwrites a previously built search database with the same name and settings!
-
-* **--family-subset=PATH/TO/SUBSET_FILE** (OPTIONAL argument) NO DEFAULT
-
-    Tell shotmap to build a search database for only a subset of the families found in --refdb. The value of this option
-    must point to a file that contains family identifiers, one per line, to include in the search database.
-
-###MYSQL DATABASE ARGUMENTS:
-
-* **--db=none|full|slim** (REQIRED argument) DEFAULT: --db=none
-
-  Sets whether a mysql database should be used in this analysis and, if so, whether all data (--db=full) or
-  only essential data (--db=slim) should be stored. 
-
-  To turn off the use of mysql, set --db=none. Note that we observe large improvements in analytical throughput
-  when a database is not invoked, though there are data organizational and management benefits in using a database.
-
-  Also, if --db=full, we highly recommend setting --bulk.
-
-* **--dbhost=YOUR.DATABASE.SERVER.COM** (REQUIRED IF --db=slim or --db=full) DEFAULT: --db=none
-
-  The ip address or hostname of machine that hosts the remote MySQL database. For most users, this parameter will
-  not be set (i.e., --db=none) or --dbhost=localhost
-
-  Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
-  to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
-
-* **--dbuser=MYSQL_USERNAME** (REQUIRED IF --db=slim or --db=full) DEFAULT: --dbuser=<your_current_unix_username>
-
-  MySQL username for logging into mysql on the database server. Default assumes your current username is also your
-  database username, which it obtains via the LOGNAME bash environmental variable.
-
-* **--dbpass=MYSQL_PASSWORD** (REQUIRED IF --db=slim or --db=full) DEFAULT: NONE
-
-  The MySQL password for <dbuser>, on the remote database server.
-  It is best to store this in a secure configuration file as calling this option on the command line will
-  store your password in your terminal history.
-  
-* **--dbname=DATABASENAME** (REQUIRED IF --db=slim or --db=full) NO DEFAULT VALUE
-
-    The name of the MySQL database that will store the project data and all results.
-
-* **--dbschema=SCHEMANAME**  (REQUIRED IF --db=slim or --db=full) DEFAULT: --dbschma=Shotmap
-  
-    The DBIx schema name Shotmap should use. If modifications to the database schema are made and saved under a different DBIx library,
-    then change this name. Most users will never need to worry about this option.
-
-* **--bulk** (Optional) DEFAULT: --bulk ENABLED
-
-    When set, data is loaded into the MySQL using a LOAD DATA INFILE statement. This results in massive improvements
-    when inserting a massive number of rows into a table. This requires having MySQL configured such that it can 
-    read data from /tmp/ (this is a typical setting).
-
-    This option is set by default and most users will never need to worry about it. Note that it is irrevelent if --db=none.
-
-* **--bulk-count=INTEGER** (Optional) DEFAULT: --bulk-count=10000
-
-    Determines how many rows should be simultaneously inserted into the MySQL database when using LOAD DATA INFILE.
-    Only used if --bulk is invoked. Most users will never need to worry about this option. Note that it is irrevelent if --db=none.
 
 ###LOCAL COMPUTE ARGUMENTS:
 
@@ -165,88 +93,18 @@ OPTIONS
 
    Cannot use both --nproc and --remote.
 
-###REMOTE COMPUTATIONAL CLUSTER ARGUMENTS:
+###CONFIGURATION FILE:
 
-* **--remote** (REQUIRED if using a remote compute cluster) DEFAULT: DISABLED
+* **--conf-file=/PATH/TO/CONFIGURATION_FILE** (optional, but RECOMMENDED) NO DEFAULT VALUE
 
-   Sets whether a remote compute cluster should be used by shotmap for parallelizable analytical tasks (e.g., gene prediction,
-   similarity search, classification).
+  Location of the configuration file that shotmap should use. This file can be built using "${SHOTMAP_LOCAL}/scripts/build_conf_file.pl" and contains
+  a list of shotmap options, one per row. Configuration file options can be overridden when calling shotmap with run-time arguments. 
+  You may also copy and edit a configuration file, to streamline additional anlayses that vary in only a small number of settings.
 
-* **--rhost=SOME.CLUSTER.HEAD.NODE.COM** (REQUIRED IF --remote) DEFAULT: DISABLED
-
-    The ip address or hostname of machine that manages the remote computational cluster. 
-    Usually this is a cluster head node. 
-
-    Note that this machine must currently run SGE (i.e., qsub).
-
-* **--ruser=USERNAME** (REQUIRED IF --remote) DEFAULT: --ruser=<your_current_username>
-
-    Your username for logging into the remote computational cluster / machine.
-    Note that you have to set up passphrase-less SSH for this to work. 
-
-    Default assumes you are using the same username on the remote machine as your current login, which it identifies
-    using the LOGNAME variable.
-
-* **--rdir=/PATH/ON/REMOTE/SERVER** (REQUIRED IF --remote)
-
-    The directory path on the remote cluster where we will store a temporary copy of the shotmap flatfile database
-
-* **--rpath=COLON_DELIMITED_STRING**  (Optional argument) NO DEFAULT
-
-    Example: --rpath=/remote/exe/path/bin:/somewhere/else/bin:/another/place/bin
-    The PATH on the remote computational server, where we find various executables like 'rapsearch'.
-    COLONS delimit separate path locations, just like in the normal UNIX path variable.
-
-    If this variable is not defined, shotmap will assume that the executables will just be in your $PATH on the remote cluster. Most users
-    will not need to worry about this option.
-
-* **--stage** (Optional argument) DEFAULT: DISABLED
-
-    Causes the search database to be copied to the remote cluster. You should not have to do this except when you build a 
-    new search database.
-
-* **--wait=SECONDS** (Optional argument) DEFAULT: --wait=30
-
-    How long, in seconds, should we wait before checking the status of activity on the remote cluster? Most users won't need to worry about
-    this option.   
-
-* **--scratch** (Optional) DEFAULT: ENABLED
-
-    Forces slave nodes to use local scratch space (i.e., /scratch) when running processes on the compute cluster. When disabled, all distributed shotmap tasks
-    will read/write using --rdir, which may create I/O bottlenecks on the cluster. Talk to your system administrator before disabling!
-    
-* **--scratch-path** (Optional) DEFAULT: /scratch
-
-  --scratch-path=/data/
-
-  Not all remote clusters use the same path structure to indicate the location of the machine's scratch space. Use this variable
-  to specify the location of the scratch space on your remote machine.
-
-* **--use-array** (Optional) DEFAULT: ENABLED
-
-  Should shotmap use array jobs when invoking SGE? The answer is probably yes, but you might check with your system admin.
-
-  Disable by invoking --nouse-array.
-
-* **--cluster-config=/PATH/TO/LOCAL/CLUSTER/HEADER/FILE** (Optional argument) NO DEFAULT
-
-  Example: --cluster-config=data/cluster_config.txt 
-
-  Your SGE distributed compute cluster may require that specific job-level variables be properly set for successful execution. 
-  These variables can be made available through the header section of the queue submission script (denoted by #$ -option value).
-  You can point to a file that includes such a header, which shotmap will prepend to the submission scripts that it creates.
-
-  Note that this may be unnecessary for your cluster. Also, options that you normally invoke at the commandline when executing
-  qsub can be included here using the aforementioned format)
-
-* **--remote-bash-source=/PATH/TO/REMOTE/SOURCE/FILE** (Optional argument) NO DEFAULT
-
-  Example: --remote-bash-source=/remote/home/user/.bashrc
-  
-  The location of a file on the remote machine that includes the bash settings needed to operate the remote environment.
-  During our troubleshooting, we noticed that while some remote machines will load the bash variables when commands are called
-  via ssh, others will not. So, when shotmap executes a command on the remote machine via ssh, it first sources the file
-  that this option points to so that the bash environmental variables are properly configured for successful execution.
+  When building a configuation file, you will be asked to enter your MySQL password if you are using a relational database to manage your results. 
+  You are not required to put your password in this file, though it is
+  recommended as passing that argument to shotmap.pl at run time will place your password in your history. The configuation file is secured with user-only,
+  read-only permissions. Note that this is NOT a failsafe security method!
 
 ###TRANSLATION/GENE CALLING METHODS:
 
@@ -433,3 +291,197 @@ OPTIONS
   cleans up some data in the ffdb throughout the run and compresses data where possible.
 
   Disable with --nolightweight	
+
+###REMOTE COMPUTATIONAL CLUSTER ARGUMENTS:
+
+* **--remote** (REQUIRED if using a remote compute cluster) DEFAULT: DISABLED
+
+   Sets whether a remote compute cluster should be used by shotmap for parallelizable analytical tasks (e.g., gene prediction,
+   similarity search, classification).
+
+* **--rhost=SOME.CLUSTER.HEAD.NODE.COM** (REQUIRED IF --remote) DEFAULT: DISABLED
+
+    The ip address or hostname of machine that manages the remote computational cluster. 
+    Usually this is a cluster head node. 
+
+    Note that this machine must currently run SGE (i.e., qsub).
+
+* **--ruser=USERNAME** (REQUIRED IF --remote) DEFAULT: --ruser=<your_current_username>
+
+    Your username for logging into the remote computational cluster / machine.
+    Note that you have to set up passphrase-less SSH for this to work. 
+
+    Default assumes you are using the same username on the remote machine as your current login, which it identifies
+    using the LOGNAME variable.
+
+* **--rdir=/PATH/ON/REMOTE/SERVER** (REQUIRED IF --remote)
+
+    The directory path on the remote cluster where we will store a temporary copy of the shotmap flatfile database
+
+* **--rpath=COLON_DELIMITED_STRING**  (Optional argument) NO DEFAULT
+
+    Example: --rpath=/remote/exe/path/bin:/somewhere/else/bin:/another/place/bin
+    The PATH on the remote computational server, where we find various executables like 'rapsearch'.
+    COLONS delimit separate path locations, just like in the normal UNIX path variable.
+
+    If this variable is not defined, shotmap will assume that the executables will just be in your $PATH on the remote cluster. Most users
+    will not need to worry about this option.
+
+* **--stage** (Optional argument) DEFAULT: DISABLED
+
+    Causes the search database to be copied to the remote cluster. You should not have to do this except when you build a 
+    new search database.
+
+* **--wait=SECONDS** (Optional argument) DEFAULT: --wait=30
+
+    How long, in seconds, should we wait before checking the status of activity on the remote cluster? Most users won't need to worry about
+    this option.   
+
+* **--scratch** (Optional) DEFAULT: ENABLED
+
+    Forces slave nodes to use local scratch space (i.e., /scratch) when running processes on the compute cluster. When disabled, all distributed shotmap tasks
+    will read/write using --rdir, which may create I/O bottlenecks on the cluster. Talk to your system administrator before disabling!
+    
+* **--scratch-path** (Optional) DEFAULT: /scratch
+
+  --scratch-path=/data/
+
+  Not all remote clusters use the same path structure to indicate the location of the machine's scratch space. Use this variable
+  to specify the location of the scratch space on your remote machine.
+
+* **--use-array** (Optional) DEFAULT: ENABLED
+
+  Should shotmap use array jobs when invoking SGE? The answer is probably yes, but you might check with your system admin.
+
+  Disable by invoking --nouse-array.
+
+* **--cluster-config=/PATH/TO/LOCAL/CLUSTER/HEADER/FILE** (Optional argument) NO DEFAULT
+
+  Example: --cluster-config=data/cluster_config.txt 
+
+  Your SGE distributed compute cluster may require that specific job-level variables be properly set for successful execution. 
+  These variables can be made available through the header section of the queue submission script (denoted by #$ -option value).
+  You can point to a file that includes such a header, which shotmap will prepend to the submission scripts that it creates.
+
+  Note that this may be unnecessary for your cluster. Also, options that you normally invoke at the commandline when executing
+  qsub can be included here using the aforementioned format)
+
+* **--remote-bash-source=/PATH/TO/REMOTE/SOURCE/FILE** (Optional argument) NO DEFAULT
+
+  Example: --remote-bash-source=/remote/home/user/.bashrc
+  
+  The location of a file on the remote machine that includes the bash settings needed to operate the remote environment.
+  During our troubleshooting, we noticed that while some remote machines will load the bash variables when commands are called
+  via ssh, others will not. So, when shotmap executes a command on the remote machine via ssh, it first sources the file
+  that this option points to so that the bash environmental variables are properly configured for successful execution.
+
+
+###MYSQL DATABASE ARGUMENTS:
+
+* **--db=none|full|slim** (REQIRED argument) DEFAULT: --db=none
+
+  Sets whether a mysql database should be used in this analysis and, if so, whether all data (--db=full) or
+  only essential data (--db=slim) should be stored. 
+
+  To turn off the use of mysql, set --db=none. Note that we observe large improvements in analytical throughput
+  when a database is not invoked, though there are data organizational and management benefits in using a database.
+
+  Also, if --db=full, we highly recommend setting --bulk.
+
+* **--dbhost=YOUR.DATABASE.SERVER.COM** (REQUIRED IF --db=slim or --db=full) DEFAULT: --db=none
+
+  The ip address or hostname of machine that hosts the remote MySQL database. For most users, this parameter will
+  not be set (i.e., --db=none) or --dbhost=localhost
+
+  Note that you must have select, insert, and delete permissions in MySQL. Also, you must be able 
+  to READ DATA INFILE from /tmp/ (typical default setting in MySQL).
+
+* **--dbuser=MYSQL_USERNAME** (REQUIRED IF --db=slim or --db=full) DEFAULT: --dbuser=<your_current_unix_username>
+
+  MySQL username for logging into mysql on the database server. Default assumes your current username is also your
+  database username, which it obtains via the LOGNAME bash environmental variable.
+
+* **--dbpass=MYSQL_PASSWORD** (REQUIRED IF --db=slim or --db=full) DEFAULT: NONE
+
+  The MySQL password for <dbuser>, on the remote database server.
+  It is best to store this in a secure configuration file as calling this option on the command line will
+  store your password in your terminal history.
+  
+* **--dbname=DATABASENAME** (REQUIRED IF --db=slim or --db=full) NO DEFAULT VALUE
+
+    The name of the MySQL database that will store the project data and all results.
+
+* **--dbschema=SCHEMANAME**  (REQUIRED IF --db=slim or --db=full) DEFAULT: --dbschma=Shotmap
+  
+    The DBIx schema name Shotmap should use. If modifications to the database schema are made and saved under a different DBIx library,
+    then change this name. Most users will never need to worry about this option.
+
+* **--bulk** (Optional) DEFAULT: --bulk ENABLED
+
+    When set, data is loaded into the MySQL using a LOAD DATA INFILE statement. This results in massive improvements
+    when inserting a massive number of rows into a table. This requires having MySQL configured such that it can 
+    read data from /tmp/ (this is a typical setting).
+
+    This option is set by default and most users will never need to worry about it. Note that it is irrevelent if --db=none.
+
+* **--bulk-count=INTEGER** (Optional) DEFAULT: --bulk-count=10000
+
+    Determines how many rows should be simultaneously inserted into the MySQL database when using LOAD DATA INFILE.
+    Only used if --bulk is invoked. Most users will never need to worry about this option. Note that it is irrevelent if --db=none.
+
+###REFERENCE SEARCH DATABASE ARGUMENTS:
+
+While you can use shotmap.pl to build your search database, we recommend you instead use [build_shotmap_searchdb.pl](build_shotmap_searchdb.pl.pm).
+
+* **-r, --refdb=/PATH/TO/REFERENCE/FLATFILES**  (REQUIRED argument) NO DEFAULT VALUE
+
+    Location of the protein family reference data.  Each family must have a HMM (if running HMMER tools) 
+    or a set of protein sequences sequences, in fasta format, that are members of the family (if running blast-like tools).
+
+    Files in this directory should correspond to an individual family, with the prefix of the file being 
+    the family identifier (e.g., IPR020405) and the suffix should either be .hmm (for HMMs) or .fa
+    (for protein sequences). These files can be placed in any subdirectory stucture within this upper 
+    level directory; shotmap will recurse through all subdirectories and append all appropriate .hmm or .fa files to the list
+    of families that will be incorporated into the search database.
+
+* **--build-searchdb** (REQUIRED IF SEARCH DATABASE HAS NOT BEEN CONSTRUCTED) DEFAULT: DISABLED
+
+    Tell shotmap to build a search database using the reference sequences identified by --refdb.
+
+    This option must be run at least one time for each search database you elect to use with shotmap. 
+
+* **--searchdb-name=STRING** (REQUIRED argument) NO DEFAULT VALUE
+
+    The name of the search database(s) (sequence and HMM) that shotmap will build. 
+    The use of additional arguments (see below) may result in additional strings being concattenated to this prefix. For example,
+    if --searchdb-name=KEGG and --nr is invoked, the search database name will be KEGG_nr
+
+* **--searchdb-split-size=INTEGER** (OPTIONAL argument) NO DEFAULT VALUE
+
+    Split the search database into subsets with INTEGER number of hmms/sequences in each subset. This can improve parallelization and optimization
+    of the remote compute cluster (i.e., smaller search database files are transferred to /scratch on slave nodes).
+
+    Most users will not set this option, which results in a single, large search database, and will instead only change --seq-split-size.
+
+* **--nr** (Optional argument) DEFAULT: ENABLED
+
+    Build a non-redundant protein sequence search database.  	  
+
+    When building a protein sequence (blast-like) search database, collapses identical sequences found within
+    the same family. This option has no affect on hmm-based searches.
+
+* **--db-suffix=STRING** (OPTIONAL argument) DEFAULT: --db_suffix=rsdb
+
+    When building a protein sequence (blast-like) database, appends this string to the end of binary formatted
+    database files.
+
+    Currently only invoked when --search-method=rapsearch. Most users will never need to worry about this option.
+
+* **--force-searchdb** (OPTIONAL argument) DEFAULT: DISABLED
+
+    Force a search database to be built. Overwrites a previously built search database with the same name and settings!
+
+* **--family-subset=PATH/TO/SUBSET_FILE** (OPTIONAL argument) NO DEFAULT
+
+    Tell shotmap to build a search database for only a subset of the families found in --refdb. The value of this option
+    must point to a file that contains family identifiers, one per line, to include in the search database.
