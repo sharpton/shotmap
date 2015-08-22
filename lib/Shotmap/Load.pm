@@ -435,7 +435,7 @@ sub get_options{
 	"ffdb"           => \$local_ffdb
 	, "refdb"        => \$local_reference_ffdb
 	, "input"        => \$raw_data
-	, "metadata-file" => \$metadata_file
+	, "metadata-file|m" => \$metadata_file
 	# Database-server related variables
 	, "db"         => \$db_type 
 	, "dbuser"     => \$db_username

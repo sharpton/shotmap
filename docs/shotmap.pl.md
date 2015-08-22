@@ -106,6 +106,12 @@ OPTIONS
   recommended as passing that argument to shotmap.pl at run time will place your password in your history. The configuation file is secured with user-only,
   read-only permissions. Note that this is NOT a failsafe security method!
 
+###METADATA FILE OPTIONS:
+
+* **-m, --metadata-file=STRING** (OPTIONAL) DEFAULT: NO DEFAULT
+
+    Location of the metadata file associated with the samples being processed. Instructions for how to set up a metadata file can be found [here](metadata_files.md).
+
 ###TRANSLATION/GENE CALLING METHODS:
 
 * **--trans-method=STRING** (REQUIRED) DEFAULT: --trans-method=prodigal
