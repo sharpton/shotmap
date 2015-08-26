@@ -74,6 +74,7 @@ if( $datatype eq "abundances" ){
 }
 #integrate cat_fields_file into this command
 print "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_fields_file} ${r_lib} < $stats_script\n";
+system( "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_fields_file} ${r_lib} < $stats_script" );
 
 ###############
 # SUBROUTINES #
