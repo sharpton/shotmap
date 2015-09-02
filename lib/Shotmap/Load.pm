@@ -429,6 +429,7 @@ sub get_options{
 	$extraBrutalClobberingOfDirectories,
 	$dryRun,
 	$reload,
+	$filter_hits,
 	);
 
     my %options = (	
@@ -527,6 +528,7 @@ sub get_options{
 	,    "clobber"     => \$extraBrutalClobberingOfDirectories
 	,    "dryrun"      => \$dryRun
 	,    "reload"      => \$reload
+	,    "filter-hits" => \$filter_hits #should we use a hit-filtered classification map?
 	);
     my @opt_type_array = ( "input|i=s"      
 			  , "metadata-file|m=s"
@@ -624,6 +626,7 @@ sub get_options{
 			  , "clobber"   
 			  , "dryrun|dry!"
 			  , "reload!"   		
+			  , "filter-hits!"
 	);
     #grab command line options
 
@@ -714,7 +717,7 @@ sub set_params{
 	$self->iterate_output( $self->opts->{"iterate-output"} );
     }
     $self->clobber( $self->opts->{"clobber"} );
-    
+    $self->filter_hits( $self->opts->{"filter-hits"} );
     # Set remote - do here because it f/x many downstream vars
     # more on remote variables below.
     $self->remote( $self->opts->{"remote"} );

@@ -3100,7 +3100,11 @@ sub build_sample_abundance_map_flatfile{
     if( $self->use_db || $self->iterate_output ){
 	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
     }
-    $outdir = File::Spec->catdir( $outdir, "Abundances" );
+    if( $self->filter_hits ){
+	$outdir = File::Spec->catdir( $outdir, "Abundances_Filtered" );
+    } else {
+	$outdir = File::Spec->catdir( $outdir, "Abundances" );
+    }
     File::Path::make_path($outdir);
     #get the classification/abundance statistics, store in memory, 
     #will print in print_sample_abundance_statistics
@@ -3155,6 +3159,9 @@ sub print_sample_abundance_statistics{
 	$self->project_dir, "output" );
     if( $self->use_db || $self->iterate_output ){
 	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}" );
+    }
+    if( $self->filter_hits ){
+	$outdir = File::Spec->catdir( $outdir, "Abundances_Filtered" );
     }
     $outdir = File::Spec->catdir( $outdir, "Abundances" );
     File::Path::make_path($outdir);
@@ -3603,14 +3610,26 @@ sub calculate_diversity{
 	$outdir         = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}");
     }    
     File::Path::make_path($outdir);
-    File::Path::make_path($outdir . "/Metadata/");
+    my $metadata_dir;
+    if( $self->filter_hits ){
+	$metadata_dir = "Metadata_Filtered";
+	File::Path::make_path($outdir . "/" . $metadata_dir );
+    } else {
+	$metadata_dir = "Metadata" ;
+	File::Path::make_path($outdir . "/" . $metadata_dir );
+    }
     my $scripts_dir     = $self->local_scripts_dir();
     #build a sample metadata table that maps sample_id to metadata properties. dump to file
-    my $metadata_table = File::Spec->catfile( $outdir, "Metadata", "sample_metadata_tmp.tab" );
+    my $metadata_table = File::Spec->catfile( $outdir, $metadata_dir, "sample_metadata_tmp.tab" );
     $self->Shotmap::Run::get_project_metadata( $metadata_table );    
-
+    
     #prep the output
-    my $abund_dir     = File::Spec->catdir( $outdir, "Abundances" );
+    my $abund_dir;
+    if( $self->filter_hits ){
+	$abund_dir = File::Spec->catdir( $outdir, "Abundances_Filtered" );
+    } else {
+	$abund_dir = File::Spec->catdir( $outdir, "Abundances" );
+    }
     #my $diversity_dir = File::Spec->catdir( $outdir, "Alpha_diversity" );
     #my $families_dir  = File::Spec->catdir( $outdir, "Families" );
     #my $beta_dir      = File::Spec->catdir( $outdir, "Beta_diversity" );
@@ -3625,12 +3644,18 @@ sub calculate_diversity{
     my $tmp_file = $abund_dir . "/tmp_abundance_dfs.tab";
     $self->Shotmap::Run::cat_data_frame_files( \@abund_maps, $tmp_file );
 
+    #are we working with filtered classification maps?
+    my $filter = 0;
+    if( $self->filter_hits ) {
+	$filter = 1;
+    }
+
     #CALCULATE DIVERSITY AND PRODUCE UPDATED METADATA TABLE
     #open output directory that contains per sample diversity data
     #run an R script that groups samples by metadata parameters and identifies differences in diversity distributions
     #produce pltos and output tables
     my $script            = File::Spec->catdir( $scripts_dir, "R", "calculate_diversity.R" );
-    my $cmd               = "R --slave --args ${tmp_file} ${outdir} ${metadata_table} $verbose $r_lib < ${script}";
+    my $cmd               = "R --slave --args ${tmp_file} ${outdir} ${metadata_table} $filter $verbose $r_lib < ${script}";
     $self->Shotmap::Notify::notify( "Going to execute the following command:\n${cmd}" );
     Shotmap::Notify::exec_and_die_on_nonzero( $cmd );
 #    unlink( $metadata_table ); #this was a tmp file

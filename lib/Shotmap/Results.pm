@@ -152,11 +152,21 @@ sub calculate_abundances{
 		    $sample_alt_id, $self->rarefaction_type, 1 
 		) );
 	}
-	my $outdir  = File::Spec->catdir( $self->project_dir . "/output/Classification_Maps/" );
-	if( $self->use_db || $self->iterate_output ){
-	    $outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+	my( $outdir, $class_map );
+	if( $self->filter_hits ){
+	    #circle back and make this more generic
+	    $outdir  = File::Spec->catdir( $self->project_dir . "/output/Classification_Maps_Filtered_Mammal/" );
+	    if( $self->use_db || $self->iterate_output ){
+		$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+	    }
+	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.filtered.mammals.tab";
+	} else {
+	    $outdir  = File::Spec->catdir( $self->project_dir . "/output/Classification_Maps/" );
+	    if( $self->use_db || $self->iterate_output ){
+		$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+	    }
+	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.tab";
 	}
-	my $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.tab";
 	if( ! -e $class_map ){
 	    die( "I can't find a classification map at the targeted location. " . 
 		 "Cannot continue calculating abundances." );

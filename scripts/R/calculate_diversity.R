@@ -7,8 +7,9 @@ Args              <- commandArgs()
 samp.abund.map    <- Args[4]
 outpath           <- Args[5]
 metadata.tab      <- Args[6]
-verbose           <- Args[7]
-r.lib             <- Args[8]
+filter            <- Args[7]
+verbose           <- Args[8]
+r.lib             <- Args[9]
 
 #samp.abund.map <- "/nfs1/Sharpton_Lab/projects/sharptot/shotmap-runs/shotmap_ms/IBD_cohort/resubmission/MetaHIT/organized_results/stats_all//no_ags//metahit_all-abundance-tables.tab"
 #outpath        <- "/nfs1/Sharpton_Lab/projects/sharptot/shotmap-runs/shotmap_ms/IBD_cohort/resubmission/MetaHIT/organized_results/stats_all//no_ags/"
@@ -55,14 +56,25 @@ if( verbose ) {
     msg.trap <- capture.output( suppressMessages( library( reshape2 ) ) )
 }
 
+if( filter == 1 ){
+    filter <- TRUE
+} else {
+  filter <- FALSE
+}
+
 print.log = 0   #should rank abundance curves be plotted in log space?
 topN      = 100 #how many of the most abundant families should be plotted in rank abundance curves?
 stat.test = 1   #should we statistically assess diversity/metadata relationships?
 
 #create output directories
 dir.create( outpath, showWarnings = FALSE )
-dir.create( paste( outpath, "/Abundances", sep="" ), showWarnings = FALSE )
-dir.create( paste( outpath, "/Metadata", sep=""   ), showWarnings = FALSE)
+if( filter ){
+    dir.create( paste( outpath, "/Abundances_Filtered", sep="" ), showWarnings = FALSE )
+    dir.create( paste( outpath, "/Metadata_Filtered", sep=""   ), showWarnings = FALSE)
+} else {
+  dir.create( paste( outpath, "/Abundances", sep="" ), showWarnings = FALSE )
+  dir.create( paste( outpath, "/Metadata", sep=""   ), showWarnings = FALSE)
+}
 
 ###################################
 #### Good's coverage
@@ -90,15 +102,27 @@ ra.map     <- acast(abund.df, Sample.Name~Family.ID, value.var="Relative.Abundan
 
 ### write the sample-by-data matrices
 # abundance table
-samp.abund.file = paste( outpath, "/Abundances/Abundances.tab", sep="" )
+if( filter ){
+    samp.abund.file = paste( outpath, "/Abundances_Filtered/Abundances.tab", sep="" )
+} else {
+  samp.abund.file = paste( outpath, "/Abundances/Abundances.tab", sep="" )
+}
 print( paste( "Producing samples-by-abundance table here: ", samp.abund.file, sep="") )
 write.table( abund.map, file = samp.abund.file, quote=FALSE )
 # counts table
-samp.count.file = paste( outpath, "/Abundances/Counts.tab", sep="" )
+if( filter ){
+    samp.count.file = paste( outpath, "/Abundances_Filtered/Counts.tab", sep="" )
+} else {
+  samp.count.file = paste( outpath, "/Abundances/Counts.tab", sep="" )
+}
 print( paste( "Producing samples-by-counts table here: ", samp.count.file, sep="") )
 write.table( count.map, file = samp.count.file, quote=FALSE )
 # relative abundance table
-samp.ra.file    = paste( outpath, "/Abundances/Relative_abundances.tab", sep="" )
+if( filter ){
+    samp.ra.file    = paste( outpath, "/Abundances_Filtered/Relative_abundances.tab", sep="" )
+} else {
+  samp.ra.file    = paste( outpath, "/Abundances/Relative_abundances.tab", sep="" )
+}
 print( paste( "Producing samples-by-relative abundance table here: ", samp.ra.file, sep="") )
 write.table( ra.map, file = samp.ra.file, quote=FALSE )
 
@@ -136,7 +160,12 @@ class.rate <- class.map / seq.map
 
 div.map    <- cbind( meta, shannon, richness, goods, class.rate )
 
-div.file   <- paste( outpath, "/Metadata/Metadata-Diversity.tab", sep="" )
+if( filter ){
+    div.file   <- paste( outpath, "/Metadata_Filtered/Metadata-Diversity.tab", sep="" )
+} else {
+  div.file   <- paste( outpath, "/Metadata/Metadata-Diversity.tab", sep="" )
+}
+
 print( paste( "Producing diversity map file here: ", div.file, sep="") )
 write.table( div.map, file = div.file, quote=FALSE )
 

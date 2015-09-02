@@ -84,6 +84,7 @@ sub new{
     $self->{"adapt"}              = 0;
     $self->{"adaptive_classification"} = 0;
     $self->{"read_length_filter"}      = 0;
+    $self->{"filter_hits"}             = 0;
     bless($self);
     return $self;
 }
@@ -1198,6 +1199,12 @@ sub readlen_map{
     return $map;
 }
 
+sub filter_hits{
+    my( $self, $value ) = @_;
+    my $key = "filter_hits";
+    $self->set_value( $key, $value);
+    return $self->{ $key };    
+}
 
 1;
 
