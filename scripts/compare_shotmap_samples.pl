@@ -22,13 +22,14 @@ my $r_lib = File::Spec->catdir( $ENV{'SHOTMAP_LOCAL'}, "ext", "R" );
 
 print STDERR ">> ARGUMENTS TO compare_shotmap_samples.pl: perl compare_shotmap_samples.pl @ARGV\n";
 
-my( $input, $datatype, $metadata, $output, $cat_fields_file );
+my( $input, $datatype, $metadata, $output, $cat_fields_file, $filtered_hits );
 GetOptions(
     "input|i=s"           => \$input,
     "datatype|d=s"        => \$datatype,
     "metadata|m:s"        => \$metadata, #optional, include more categories, restrict samples
     "output|o=s"          => \$output,
     "cat-fields-file|c:s" => \$cat_fields_file, #a list of categorical metadata fields
+    "filtered-hits!"      => \$filtered_hits,
     );
 
 #validate input variables
@@ -36,7 +37,8 @@ my $vals = _validate_inputs( "input"      => $input,
 			     "datatype"   => $datatype,
 			     "metadata"   => $metadata, 
 			     "output"     => $output,
-			     "cat-fields" => $cat_fields_file,
+			     "cat-fields-file" => $cat_fields_file,
+			     "filtered-hits"   => $filtered_hits,
     );
 
 #create output and tmp directories
@@ -48,7 +50,7 @@ mkdir( $abund_dir );
 
 #put symlinked output files in tmp
 print( "Obtaining ShotMAP $datatype and metadata result files...\n" );
-_link_input_files( $vals->{"input"}, $vals->{"in_type"}, $tmp );
+_link_input_files( $vals->{"input"}, $vals->{"in_type"}, $vals->{"filtered-hits"}, $tmp );
 
 #do we need to get metadata table?
 print( "Producing merged metadata file...\n" );
@@ -59,8 +61,10 @@ print( "Created merged metadata file here: $merged_metadata\n" );
 
 #build merged data tables
 my $merge_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/external/merge_abundance_tables_across_projects.R";
-print "R --slave --args ${tmp} ${metadata} ${abund_dir} ${r_lib} < $merge_script\n";
-system( "R --slave --args ${tmp} ${metadata} ${abund_dir} ${r_lib} < $merge_script" );
+print "R --slave --args ${tmp} ${merged_metadata} ${abund_dir} ${r_lib} < $merge_script\n";
+system( "R --slave --args ${tmp} ${merged_metadata} ${abund_dir} ${r_lib} < $merge_script" );
+
+exit(0);
 
 #run statistical tests using shotmap.R
 my $stats_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/R/compare_shotmap_results.R";
@@ -81,19 +85,19 @@ system( "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_field
 ###############
 
 sub _link_input_files{
-    my( $input, $in_type, $tmp ) = @_;
+    my( $input, $in_type, $filtered, $tmp ) = @_;
     if( $in_type eq "dir" ){
 	#get all of the sample abundance files in the dir
-	_link_from_ffdb( $input, $tmp, "Abundances" );
-	_link_from_ffdb( $input, $tmp, "Metadata" );
+	_link_from_ffdb( $input, $tmp, $filtered, "Abundances" );
+	_link_from_ffdb( $input, $tmp, $filtered, "Metadata" );
     } elsif( $in_type eq "file" ){
 	#get all of the sample abundance files in all of the dirs
 	open( FILE, $input ) || die "Can't open $input for read: $!\n";
 	while( <FILE> ){
 	    chomp $_;
 	    my $path = $_;
-	    _link_from_ffdb( $path, $tmp, "Abundances" );
-	    _link_from_ffdb( $path, $tmp, "Metadata" );
+	    _link_from_ffdb( $path, $tmp, $filtered, "Abundances" );
+	    _link_from_ffdb( $path, $tmp, $filtered, "Metadata" );
 	}
     }
     return;
@@ -107,8 +111,17 @@ sub _get_proj_name_from_path{
 
 #type = Abundances, Metadata, Classification_Maps
 sub _link_from_ffdb{
-    my( $path, $tmp, $type ) = @_;
-    my $output_path   = $path . "/output/${type}/";
+    my( $path, $tmp, $filtered, $type ) = @_;
+    my $output_path;
+    if( $filtered ){
+	if( $type eq "Classification_Maps" ){
+	    $output_path   = $path . "/output/${type}_Filtered_Mammal/";
+	} else {
+	    $output_path   = $path . "/output/${type}_Filtered/";
+	}
+    } else {
+	$output_path   = $path . "/output/${type}/";
+    }
     if( ! -d $output_path ){
 	die( "Can't locate $output_path. Are you certain that you are pointing --input ". 
 	     "to the top level of the shotmap flat file database? Are you certain that " .
@@ -154,8 +167,9 @@ sub _validate_inputs{
     my $input      = _validate_var( "input",    $vals{"input"}    );
     my $datatype   = _validate_var( "datatype", $vals{"datatype"} );
     my $metadata   = _validate_var( "metadata", $vals{"metadata"} );
-    my $cat_fields = _validate_var( "cat_fields", $vals{"cat_fields"} );
     my $output     = _validate_var( "output",   $vals{"output"}   );   
+    my $cat_fields    = _validate_var( "cat-fields-file", $vals{"cat_fields"} );
+    my $filtered_hits = _validate_var( "filtered-hits", $vals{"filtered_hits"} );
     my $in_type    = _check_input( $input );
     $vals{"in_type"} = $in_type;
     return \%vals;
@@ -165,7 +179,10 @@ sub _validate_var{
     my $type = shift;
     my $var  = shift;
     #these are optional command line inputs:
-    unless( $type eq "metadata" || $type eq "cat_fields" ){
+    unless( $type eq "metadata" || 
+	    $type eq "cat-fields-file" ||
+	    $type eq "filtered-hits"
+	){
 	if( !defined( $var ) ){
 	    die( "You did not specify a value for --${type}. Exiting." );
 	}
@@ -191,14 +208,27 @@ sub _validate_var{
 		);
 	} 
     }
-    if( $type eq "metadata" ){
-	if( ! -e $var ){
+    if( $type eq "metadata" && defined( $var) ){
+	if(  ! -e $var ){
 	    die( "The specified metadata file does not exist. You specified:\n" .
 		 "${var}\n" .
 		 "Exiting." 
 		);
 	}
 	_check_metadata( $var, "xls" );
+    }
+    if( $type eq "cat-fileds-file" ){
+	if( ! -e $var ){
+	    die( "The specified cat-fields-file does not exist. You specified:\n" .
+		 "${var}\n" .
+		 "Exiting." 
+		);
+	}
+    }
+    if( $type eq "filtered" ){
+	if( $var ){
+	    print "Grabbing filtered hits results since --filtered-hits is set\n";
+	}
     }
     return $var;
 }
@@ -343,7 +373,13 @@ sub _print_metadata{
     my $count = 0;
     my @fields = keys( %{ $data->{"fields"} } );
     #print join ( "\n", @fields, "\n" );
-    foreach my $sample( keys( %{ $data->{"external"} } ) ) {
+    my @samples = ();
+    if( defined( $data->{"external"} ) ){
+	@samples = keys( %{ $data->{"external"} } );
+    } else {
+	@samples = keys( %{ $data->{"raw"} } );
+    }
+    foreach my $sample( @samples ) {
 	if( $count == 0 ){
 	    print OUT join( "\t", "Sample.Name", @fields) . "\n";
 	}
