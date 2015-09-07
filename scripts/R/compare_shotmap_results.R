@@ -1,7 +1,5 @@
 locallib <- Sys.getenv( "SHOTMAP_LOCAL")
 
-source( paste( locallib, "/lib/R/shotmap.R", sep="" ) )
-
 options(error=traceback)
 #options(error=recover)
 
@@ -10,6 +8,13 @@ abund.map.file    <- Args[4]
 metadata.file     <- Args[5]
 outpath           <- Args[6]
 cat.fields.file   <- Args[7]
+r.lib             <- Args[8]
+
+if( !is.na( r.lib ) ){
+    .libPaths( r.lib )  
+}
+
+source( paste( locallib, "/lib/R/shotmap.R", sep="" ) )
 
 #####################
 #### INPUT VARIABLES
@@ -21,8 +26,12 @@ abund.map <- read.table( file = abund.map.file,
                          row.names = 1,
                          check.names = F
 )
-cat.fields <- read.table( file = cat.fields.file )
-set_categorical_fields( as.vector( cat.fields ) )
+if( !( is.null( cat.fields.file ) ) ){
+  set_categorical_fields( NULL )
+} else {
+    cat.field.list <- read.table( file = cat.fields.file )
+    set_categorical_fields( as.vector( cat.field.list ) )
+}
 
 # Set up the output infrastructure
 alpha.out  <- paste( outpath, "/Alpha_Diversity/", sep="")

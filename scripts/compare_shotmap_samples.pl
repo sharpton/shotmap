@@ -64,8 +64,6 @@ my $merge_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/external/merge_abundance_ta
 print "R --slave --args ${tmp} ${merged_metadata} ${abund_dir} ${r_lib} < $merge_script\n";
 system( "R --slave --args ${tmp} ${merged_metadata} ${abund_dir} ${r_lib} < $merge_script" );
 
-exit(0);
-
 #run statistical tests using shotmap.R
 my $stats_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/R/compare_shotmap_results.R";
 my $stats_file;
@@ -77,6 +75,9 @@ if( $datatype eq "abundances" ){
     $stats_file = "${abund_dir}/Merged_Counts.tab";
 }
 #integrate cat_fields_file into this command
+if( ! defined( $cat_fields_file ) ){
+    $cat_fields_file = "NULL";
+}
 print "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_fields_file} ${r_lib} < $stats_script\n";
 system( "R --slave --args ${stats_file} ${merged_metadata} ${output} ${cat_fields_file} ${r_lib} < $stats_script" );
 
@@ -159,7 +160,8 @@ sub _cp_file{
 
 sub _link_file{
     my( $file, $dir ) = @_;
-    system( "ln -s $file $dir" );
+    my $pwd = $ENV{'PWD'}; 
+    system( "ln -s ${pwd}/${file} $dir" );
 }
 
 sub _validate_inputs{

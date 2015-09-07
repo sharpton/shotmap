@@ -359,6 +359,10 @@ continuous_family_analyses <- function( div.map, abund.map, outpath, plot.q.thre
           is_categorical_field( div.type )  ){
       next
     }
+    #need at least 3 samples to correlate, or corr.test throws errors
+    if( dim(abund.map)[1] < 4 ){	
+    	next
+    }   
     cor.data <- correlate_families_by_category( div.map, abund.map, div.type, method )
     rawp0 <- cor.data$p 
     names( rawp0 ) <- rownames( cor.data )
