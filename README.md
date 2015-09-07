@@ -48,7 +48,7 @@ Documentation Table of Contents
     * [test_shotmap.pl](docs/test_shotmap.pl.md)
     * [build_shotmap_searchdb.pl](docs/build_shotmap_searchdb.pl.md)
     * [shotmap.pl](docs/shotmap.pl.md)
-    * [compare_shotmap_results.pl](docs/compare_shotmap_results.pl.md)
+    * [compare_shotmap_samples.pl](docs/compare_shotmap_samples.pl.md)
     * [test_config_file.pl](docs/test_config_file.pl.md)
 9. Advanced Documentation
     * [configuration files](docs/config_files.md)
