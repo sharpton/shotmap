@@ -3220,7 +3220,16 @@ sub get_post_rarefied_reads_flatfile{
 	$path = $self->get_sample_path($sample_id) . "/orfs/";
     } elsif( $rare_type eq "class_read" ){	
 	$self->Shotmap::Notify::print( "\t...rarefying classified reads for sample $sample_id at depth of $size\n" );	
-	$path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";
+	if( $self->filter_hits() ){
+	    my $outdir = File::Spec->catdir( $self->project_dir, "output/" );
+	    if( $self->use_db || $self->iterate_output ){
+		die( "This doesn't yet work for iterate_output!" );
+		#$outdir         = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}");
+	    }    
+	    $path = $outdir . "/Classification_Maps_Filtered_Mammal/ClassificationMap_Sample_${sample_id}.cleanded.filtered.mammals.tab";
+	} else {
+	    $path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";
+	}
     } elsif( $rare_type eq "class_orf" ){
 	$self->Shotmap::Notify::print( "\t...rarefying classified orfs for sample $sample_id at depth of $size\n" );
 	$path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";

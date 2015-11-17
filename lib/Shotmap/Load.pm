@@ -996,7 +996,7 @@ sub load_defaults{
 	    ,      "seq-split-size" => 100000
 	    ,    "rarefaction-type" => "read"
 	    ,    "auto"             => 1
-	    ,    "adapt"            => 1
+	    ,    "adapt"            => 0
 	    ,    "lightweight"      => 1
 	    ,    "iterate-output"   => 0
 	    ,    "nprocs"           => 1
