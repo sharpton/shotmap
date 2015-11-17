@@ -98,6 +98,7 @@ my $algs = {
     "metatrans.py"      => "python ${bin}/metatrans.py",
     "ags_functions.py"  => "python ${bin}/ags_functions.py",
     "microbe_census.py" => "python ${bin}/microbe_census.py",
+    "gzip"              => "gzip -h",
 };
 
 foreach my $alg( sort( keys( %$algs ) ) ){
