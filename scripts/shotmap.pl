@@ -77,7 +77,7 @@ if( $pipe->remote ){
  AGS: $pipe->Shotmap::Results::estimate_ags();
 # Calculate family abundances
  ABUNDANCE: $pipe->Shotmap::Results::calculate_abundances();
-if( $pipe->lightweight ){
+if( $pipe->lightweight && !($pipe->iterate_output) ){
     $pipe->Shotmap::DB::delete_sample_subpath( "/raw/" );
     $pipe->Shotmap::DB::delete_sample_subpath( "/orfs/" );
 }

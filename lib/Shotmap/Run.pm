@@ -30,7 +30,7 @@ use Data::Dumper;
 use File::Basename;
 use File::Cat;
 use File::Copy qw( move copy );
-use File::Path;
+use File::Path qw( make_path);
 use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
@@ -704,7 +704,7 @@ sub cp_search_db_properties{
     my $raw_db_path    = $self->search_db_path( $search_type ); 
     my $symlinks       = 0; #set to zero as cp gives us a single, contained directory
     my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
-    my $ffdb_famlen_cp = $self->params_dir . "/family_lengths.tab";
+    my $ffdb_famlen_cp = $self->params_dir . "/" . $self->search_db_name . "_family_lengths.tab";
     if( -e $famlen_tab && ! -e $ffdb_famlen_cp ){
 	if( ! -e $famlen_tab ){
 	    die "Can't find family length table. Expected it here: $famlen_tab\n";
@@ -727,7 +727,7 @@ sub cp_search_db_properties{
 	}
     }
     my $seqlen_tab     = $self->search_db_path( $search_type ) . "/sequence_lengths.tab";
-    my $ffdb_seqlen_cp = $self->params_dir . "/sequence_lengths.tab";
+    my $ffdb_seqlen_cp = $self->params_dir . "/" . $self->search_db_name . "_sequence_lengths.tab";
     if( $search_type eq "blast" && -e $seqlen_tab && ! -e $ffdb_seqlen_cp ){
 	if( ! -e $seqlen_tab ){
 	    die "Can't find a sequence length table. Expected it here: $seqlen_tab";
@@ -1232,6 +1232,11 @@ sub classify_mysqld_results_from_dir{
 	    #Here, we have to look across all db-split-result-files for an orf-split
 	    foreach my $recurse_file( @recurse_files ){
 		next if ( $recurse_file !~ m/\.mysqld/ );
+		my $db_name = $self->search_db_name;
+		if ( $recurse_file !~ m/$db_name/ ){ #probably only for --iterate-output runs; make sure we only parse this run's results
+		    #print "passing $recurse_file\n";
+		    next;
+		} 
 		$self->Shotmap::Notify::print_verbose( "processing: $recurse_file\n" );
 		if( $top_type eq "best_in_fam" ){
 		    if( $class_level eq "orf" ){
@@ -1526,8 +1531,8 @@ sub build_search_db{
     my $seq   = '';	   
     my $redunts;
     #build a map of family lengths    
-    my $family_length_file = "${raw_db_path}/family_lengths.tab"; 
-    my $seq_length_file    = "${raw_db_path}/sequence_lengths.tab";
+    my $family_length_file = "${raw_db_path}/" . $self->search_db_name . "_family_lengths.tab"; 
+    my $seq_length_file    = "${raw_db_path}/" . $self->search_db_name . "_sequence_lengths.tab";
     $self->Shotmap::Notify::print_verbose( "Initializing family length file here: $family_length_file" );
     open( FAMLENS, ">$family_length_file" ) || die "Can't open $family_length_file for write: $!\n";
     #build a map of family member sequence lengths, not relevant for type = hmm
@@ -2725,11 +2730,11 @@ sub classify_reads_flatfile{
     $self->Shotmap::Notify::notify( "Classifying reads from flatfile for sample ID ${sample_id}\n" );
     my $search_results = File::Spec->catfile($self->get_sample_path($sample_id), "search_results", $algo);
     #my $output_file    = $search_results . "/classmap_cid_" . $class_id . ".tab";
-    my $outdir         = File::Spec->catdir($self->project_dir . "/output/Classification_Maps/" );
+    my $outdir         = File::Spec->catdir($self->project_dir, "/output/Classification_Maps/" );
     if( $self->use_db || $self->iterate_output ){
-	$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+	$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}" );
     }
-    mkdir( $outdir );
+    make_path( $outdir );
     my $output_file    = $outdir . "/ClassificationMap_Sample_${sample_id}.tab";
     my $top_type    = $self->top_hit_type; #best_hit or best_in_fam
     my $class_level = $self->class_level;  #read or orf

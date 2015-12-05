@@ -306,6 +306,14 @@ sub reps{
 
 sub search_db_name{
     my( $self, $type, $value ) = @_;
+    if( !( defined( $type ) ) ){
+	#try to see if type is set in $self->search_type
+	if( defined( $self->search_type ) ){
+	    $type = $self->search_type;
+	} else {
+	    die "The variable <type> was not defined\n";
+	}
+    }
     if( $type eq "rapsearch" || $type eq "last" || $type eq "blast" ){
 	$type = "blast";
     } elsif( $type eq "hmmsearch" || $type eq "hmmscan" ){

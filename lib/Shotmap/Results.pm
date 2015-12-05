@@ -138,11 +138,11 @@ sub calculate_abundances{
     $self->Shotmap::Notify::notify( "Obtaining search database lengths" );	
     if( $norm_type eq 'family_length' ){
 	$length_hash = $self->Shotmap::Run::parse_file_cols_into_hash( 
-	    $self->params_dir . "/family_lengths.tab", 0, 1 
+	    $self->params_dir . "/" . $self->search_db_name . "_family_lengths.tab", 0, 1 
 	    );
     } elsif( $norm_type eq 'target_length' ){
 	$length_hash = $self->Shotmap::Run::parse_file_cols_into_hash( 
-	    $self->params_dir . "/sequence_lengths.tab", 1, 2 
+	    $self->params_dir . "/" . $self->search_db_name . "_sequence_lengths.tab", 1, 2 
 	    );
     }
     foreach my $sample_alt_id( @{ $self->get_sample_alt_ids() } ){
@@ -157,15 +157,16 @@ sub calculate_abundances{
 	    #circle back and make this more generic
 	    $outdir  = File::Spec->catdir( $self->project_dir . "/output/Classification_Maps_Filtered_Mammal/" );
 	    if( $self->use_db || $self->iterate_output ){
-		$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+		$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}" );
 	    }
 	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.cleanded.filtered.mammals.tab";
 	} else {
-	    $outdir  = File::Spec->catdir( $self->project_dir . "/output/Classification_Maps/" );
+	    $outdir  = File::Spec->catdir( $self->project_dir, "/output/Classification_Maps/" );
 	    if( $self->use_db || $self->iterate_output ){
-		$outdir = File::Spec->catdir( $outdir . "class_id_${class_id}" );
+		$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}/" );
 	    }
 	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.tab";
+	    print "class map is $class_map\n";
 	}
 	if( ! -e $class_map ){
 	    die( "I can't find a classification map at the targeted location, which is: " . 
