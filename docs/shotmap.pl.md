@@ -244,7 +244,7 @@ OPTIONS
 
 * **--pid=INTEGER** (Optional) NO DEFAULT
 
-    The MySQL/flat file project identifier corresponding to data that you want to reprocess. Not used when analyzing data for the first time!
+    Only used when invoking --db. The MySQL/flat file project identifier corresponding to data that you want to reprocess. Not used when analyzing data for the first time!
 
 * **--goto=STRING** (Optional) NO DEFAULT
 
@@ -297,6 +297,16 @@ OPTIONS
   cleans up some data in the ffdb throughout the run and compresses data where possible.
 
   Disable with --nolightweight	
+
+* **--iterate-output** (Optional) DEFAULT: DISABLED
+
+  Setting this tells shotmap that you want to eventually reprocess the data with differnt settings. It has the effect
+  of creating a shotmap output directory (<output_ffdb>/output/) that contains subdirectories for different reprocessing runs of the data. 
+  These are encoded through classification identifiers (class_id) and abundance identifiers (abund_id) which describe
+  the unique analytical settings used during sequence classification into a protein family database (e.g., changes in
+  the database type, changes to classification thresholds) and abundance calculation (e.g., changes in rarefaction depth),
+  respectively. The <output_ffdb>/output/params/params.xml file contains the specific parameters associated with both
+  of these identifiers.
 
 ###REMOTE COMPUTATIONAL CLUSTER ARGUMENTS:
 
