@@ -3231,7 +3231,7 @@ sub get_post_rarefied_reads_flatfile{
 		die( "This doesn't yet work for iterate_output!" );
 		#$outdir         = File::Spec->catdir( $outdir, "class_id_${class_id}", "abund_id_${abund_param_id}");
 	    }    
-	    $path = $outdir . "/Classification_Maps_Filtered_Mammal/ClassificationMap_Sample_${sample_id}.cleanded.filtered.mammals.tab";
+	    $path = $outdir . "/Classification_Maps_Filtered_Mammal/ClassificationMap_Sample_${sample_id}.filtered.mammals.tab";
 	} else {
 	    $path = $self->search_results($sample_id) . "/classmap_cid_" . $self->classification_id . ".tab";
 	}

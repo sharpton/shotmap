@@ -159,7 +159,7 @@ sub calculate_abundances{
 	    if( $self->use_db || $self->iterate_output ){
 		$outdir = File::Spec->catdir( $outdir, "class_id_${class_id}" );
 	    }
-	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.cleanded.filtered.mammals.tab";
+	    $class_map    = $outdir . "/ClassificationMap_Sample_${sample_alt_id}.filtered.mammals.tab";
 	} else {
 	    $outdir  = File::Spec->catdir( $self->project_dir, "/output/Classification_Maps/" );
 	    if( $self->use_db || $self->iterate_output ){
