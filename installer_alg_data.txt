@@ -35,11 +35,11 @@ srccmds:NA
 installed:bin/metatrans.py
 
 name:microbecensus
-download:git
-x86:https://github.com/snayfach/MicrobeCensus.git
-src:https://github.com/snayfach/MicrobeCensus.git
-x86stem:MicrobeCensus
-srcstem:MicrobeCensus
+download:wget
+x86:https://github.com/snayfach/MicrobeCensus/archive/v1.0.5.tar.gz
+src:https://github.com/snayfach/MicrobeCensus/archive/v1.0.5.tar.gz
+x86stem:MicrobeCensus-1.0.5
+srcstem:MicrobeCensus-1.0.5
 x86bins:/scripts/run_microbe_census.py
 srcbins:/scripts/run_microbe_census.py
 testcmds:python setup.py install

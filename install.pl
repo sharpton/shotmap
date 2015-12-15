@@ -24,6 +24,10 @@ my $test      = $options->{"test"};
 my $db        = $options->{"db"};
 my $source    = $options->{"source"};
 my $all       = $options->{"all"};
+my $iso_alg;
+if( defined( $options->{"iso-alg"} ) ){
+    $iso_alg = $options->{"iso-alg"};
+}
 
 #see if env var is defined. If not, try to add it.
 if( !defined( $ENV{'SHOTMAP_LOCAL'} ) ){
@@ -131,6 +135,9 @@ if( $rpackages ){
 if( $algs ){
     my $alg_data = parse_alg_data( $root . "/installer_alg_data.txt", $source, $test);
     foreach my $alg( keys( %$alg_data ) ){
+	if( defined( $iso_alg ) ){
+	    next if( $alg ne $iso_alg );
+	}
 	my $src   = $alg_data->{$alg}->{"src"};
 	my $stem  = $alg_data->{$alg}->{"stem"};
 	my $links = $alg_data->{$alg}->{"links"};
@@ -230,7 +237,7 @@ sub decompress_src{
     if( $stem =~ m/\.tar\.gz/ ){
 	system( "tar xzf $stem" );
     }
-    if( $stem =~ m/\.zip/ ){
+    elsif( $stem =~ m/\.zip/ ){
 	system( "unzip $stem" );
     }
     else{
@@ -310,7 +317,8 @@ sub get_options{
     my $db        = 0; #should we install myql libraries? 
     my $all       = 1; 
     my $source    = 0; #should we build from source instead of x86 libraries
-    
+    my $iso_alg;       #let's only build one specific algoritm.
+
     my %ops = (
 	"use-db"   => \$db, #try to build the libraries needed for mysql communication
 	"source"   => \$source,
@@ -321,7 +329,8 @@ sub get_options{
 	"algs"     => \$algs,
 	"rpacks"   => \$rpackages,
 	"perlmods" => \$perlmods,
-	"all"      => \$all
+	"all"      => \$all,
+	"iso-alg"  => \$iso_alg,
 	);
     
     my @opt_type_array = (
@@ -333,7 +342,8 @@ sub get_options{
 	"get!",
 	"algs!",
 	"rpacks!",
-	"perlmods!"
+	"perlmods!",
+	"iso-alg:s"
 	);
     
     print "Note that this installer attempts to install precompiled x86 binaries when possible. If ".

@@ -3,7 +3,7 @@ ShotMAP
 
 A Shotgun Metagenome Annotation Pipeline
 
-Version: Beta
+Version: v1.0
 
 Overview
 --------

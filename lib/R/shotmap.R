@@ -115,7 +115,7 @@ categorical_family_analyses <- function( div.map, abund.map, outpath, plot.q.thr
       type.y    <- div.groups[2]
       x.samps   <- subset( div.map, div.map[,div.type] == type.x )$Sample.Name
       y.samps   <- subset( div.map, div.map[,div.type] == type.y )$Sample.Name      
-      if( length(x.samps) <= 3 | length(y.samps) <= 3 ){
+      if( length(x.samps) < 3 | length(y.samps) < 3 ){
         print( paste( "You have fewer than three samples for one of the fields in <", 
                       div.type, 
                       ">, so we don't have ",
@@ -385,7 +385,8 @@ continuous_family_analyses <- function( div.map, abund.map, outpath, plot.q.thre
   	      abunds   <- abund.map[,family]
               div.data <- div.map[,div.type]
 	      plot.data <- as.data.frame( cbind( abunds, div.data ) )
-              ggplot( plot.data, aes_string( x = abunds, y=div.data ) ) +
+              #ggplot( plot.data, aes_string( x = abunds, y=div.data ) ) +
+	      ggplot( plot.data, aes( x = abunds, y=div.data ) ) +	     
               	      geom_point( ) + #if color: geom_point(aes(fill = COLNAME) )
           	      labs( title = paste( "Family", family, " by ", div.type, "; ", 
                             method, " = ", cor.val, sep="" ) ) +
