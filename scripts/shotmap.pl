@@ -48,9 +48,9 @@ $pipe->Shotmap::Reads::load_project();
  TRANSLATE: $pipe->Shotmap::Orfs::translate_reads();
  LOADORFS: $pipe->Shotmap::Orfs::load_orfs();
 # Build search database and load into DB
-unless( $pipe->iso_db_build ){
- BUILDSEARCHDB: $pipe->Shotmap::Search::build_search_db();
-}
+#unless( $pipe->iso_db_build ){
+  BUILDSEARCHDB: $pipe->Shotmap::Search::build_search_db();
+#}
 # Stage search database on remote server
 if( $pipe->remote ){ 
  REMOTESTAGE: $pipe->Shotmap::Search::stage_search_db(); 

@@ -848,7 +848,6 @@ sub build_project_ffdb {
     $self->params_dir( $params_dir );
     $self->params_file( $params_dir . "/parameters.xml" );
     $self->Shotmap::DB::initialize_parameters_file( $self->params_file );
-
     #or die "Can't create new directory <$proj_dir> in build_project_ffdb: $! ";
 }
 
@@ -1522,7 +1521,7 @@ sub _get_xml_value{
 sub initialize_parameters_file{
     my( $self, $param_file ) = @_;
     if( ! -e $param_file ){ #don't reinitialize a file that has already been created!
-	$self->Shotmap::Notify::notify( "Initialize a parameters xml file here: $param_file\n" );
+	$self->Shotmap::Notify::notify( "Initialized a parameters xml file here: $param_file\n" );
 	open( OUT, ">$param_file" ) || die "Can't open $param_file for write: $!\n";
 	print OUT 
 	    "<xml>\n" 

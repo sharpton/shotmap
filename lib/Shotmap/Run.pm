@@ -703,12 +703,12 @@ sub cp_search_db_properties{
     my $search_type    = $self->search_type;
     my $raw_db_path    = $self->search_db_path( $search_type ); 
     my $symlinks       = 0; #set to zero as cp gives us a single, contained directory
-    my $famlen_tab     = "${raw_db_path}/family_lengths.tab";
+    my $famlen_tab     = "${raw_db_path}/" . $self->search_db_name .  "_family_lengths.tab";
     my $ffdb_famlen_cp = $self->params_dir . "/" . $self->search_db_name . "_family_lengths.tab";
+    if( ! -e $famlen_tab ){
+	die "Can't find family length table. Expected it here: $famlen_tab\n";
+    }
     if( -e $famlen_tab && ! -e $ffdb_famlen_cp ){
-	if( ! -e $famlen_tab ){
-	    die "Can't find family length table. Expected it here: $famlen_tab\n";
-	}
 	if( $symlinks ){
 	    my $symlink_exists = eval { symlink( $famlen_tab, $ffdb_famlen_cp ); 1 };
 	    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
@@ -726,12 +726,12 @@ sub cp_search_db_properties{
 	    }
 	}
     }
-    my $seqlen_tab     = $self->search_db_path( $search_type ) . "/sequence_lengths.tab";
+    my $seqlen_tab     = $self->search_db_path( $search_type ) . "/" . $self->search_db_name . "_sequence_lengths.tab";
     my $ffdb_seqlen_cp = $self->params_dir . "/" . $self->search_db_name . "_sequence_lengths.tab";
+    if( ! -e $seqlen_tab && $search_type eq "blast" ){
+	die "Can't find a sequence length table. Expected it here: $seqlen_tab";
+    }
     if( $search_type eq "blast" && -e $seqlen_tab && ! -e $ffdb_seqlen_cp ){
-	if( ! -e $seqlen_tab ){
-	    die "Can't find a sequence length table. Expected it here: $seqlen_tab";
-	}
 	if( $symlinks ){
 	    my $symlink_exists    = eval { symlink( $seqlen_tab, $ffdb_seqlen_cp); 1 };
 	    if( ! $symlink_exists ) { #maybe symlink doesn't work on system, so let's try a cp
@@ -752,7 +752,12 @@ sub cp_search_db_properties{
 		    "Trying to place it here:\n  $ffdb_seqlen_cp\n";
 	    }	    
 	}
-    }   
+    } else {
+	if( !$search_type eq "hmm" && ! -e $ffdb_seqlen_cp ){
+	    die "I couldn't find either a sequence length table. Expected ". 
+		" it here:\n$seqlen_tab\n";
+	}   
+    }
 }
 
 #this might need extra work to get the "path" element correct foreach sample
@@ -1709,6 +1714,9 @@ sub build_search_db{
 		unlink( $family_db_file );
 	    }
 	    #calculate the family's length
+	    if( $fam_nseqs == 0 ){
+		die "Couldn't find any sequences for $family\n";
+	    }
 	    $family_length = ( $length - $fam_init_len ) / $fam_nseqs; #average length of total sequence found in family
 	    if( defined( $family_length ) ){
 		print FAMLENS join( "\t", $family, $family_length, $fam_nseqs, "\n" );
