@@ -213,6 +213,12 @@ sub check_vars{
 	    }
 	}
      }     
+     if( ! -d $self->opts->{"tmp"} ||
+	 ! -w $self->opts->{"tmp"} ){
+	 $self->Shotmap::Notify::dieWithUsageError(
+	     "The tmp location " . $self->tmp_dir . " either does not exist or is not writable. Please point --tmp to a writable directory."
+	     );
+     }
      if( $self->opts->{"bulk"} && $self->opts->{"multi"} ){
 	 $self->Shotmap::Notify::dieWithUsageError( 
 	     "You are invoking BOTH --bulk and --multi, but can you only proceed with one or the other! I recommend --bulk."
@@ -423,7 +429,7 @@ sub get_options{
 	$normalization_type,   $abundance_type,       $ags_method,
 	#vars being tested
 	$nprocs, $auto, $python, $perl, $cluster_config_file, $use_array, $scratch_path, 
-	$lightweight, $iterate_output,  $read_filter_length, $adapt,
+	$lightweight, $iterate_output,  $read_filter_length, $adapt, $tmp,
 	#non conf-file vars	
 	$verbose,
 	$extraBrutalClobberingOfDirectories,
@@ -517,6 +523,7 @@ sub get_options{
 	, "perl"              => \$perl
 	, "lightweight"       => \$lightweight #tries to keep the ffdb as small as possible
 	, "iterate-output"    => \$iterate_output #saves all old output generated using different classification/abundance thresholds
+	, "tmp"               => \$tmp #where should tmp data be written. Is a directory
 	#forcing statements
 	,    "stage"          => \$stage # should we "stage" the database onto the remote machine?
 	,    "build-searchdb" => \$build_search_db
@@ -615,6 +622,7 @@ sub get_options{
 			  , "perl=s"
 			  , "lightweight!"
 			  , "iterate-output!"
+			  , "tmp=s"
 			  #forcing statements
 			  , "stage!"
 			  , "build-searchdb!"
@@ -686,7 +694,7 @@ sub set_params{
 	    "I see --auto is on, so I will automate as " .
 	    "much as possible. You can turn me off with --noauto" );
     }
-
+    $self->tmp_dir( $self->opts->{"tmp"} );
     #set adaptor
     #if any class-score is set, turn off adapt by default
     if( defined( $self->opts->{"class-score"} ) ){
@@ -1003,7 +1011,8 @@ sub load_defaults{
 	    ,    "lightweight"      => 1
 	    ,    "iterate-output"   => 0
 	    ,    "nprocs"           => 1
-	    # translation options
+	    ,    "tmp"              => "/tmp/"
+            # translation options
 	    ,      "trans-method"    => 'prodigal'
 	    ,      "orf-filter-len"  => 15
 	    ,      "read-filter-len" => 50

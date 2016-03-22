@@ -1214,6 +1214,13 @@ sub filter_hits{
     return $self->{ $key };    
 }
 
+sub tmp_dir{
+    my( $self, $value ) = @_;
+    my $key = "tmp";
+    $self->set_value( $key, $value);
+    return $self->{ $key };    
+}
+
 1;
 
 

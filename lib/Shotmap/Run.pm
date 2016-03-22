@@ -1574,7 +1574,7 @@ sub build_search_db{
 		if( ( defined( $split_size ) && $count >= $split_size ) || $family eq $families[-1]) {
 		    $n_proc++; 	    #build the DB
 		    my $split_db_path;
-		    $split_db_path = Shotmap::Run::cat_db_split(
+		    $split_db_path = $self->Shotmap::Run::cat_db_split(
 			$db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0
 			); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
 		    gzip_file($split_db_path); # We want DBs to be gzipped.
@@ -1587,7 +1587,7 @@ sub build_search_db{
 		if( $family eq $families[-1] ) {
                     $n_proc++;      
 		    my $split_db_path;
-		    $split_db_path = Shotmap::Run::cat_db_split(
+		    $split_db_path = $self->Shotmap::Run::cat_db_split(
 			$db_path_with_name, $n_proc, $ffdb, ".hmm", \@split, $type, 0
 			); # note: the $nr_db parameter for hmm is ALWAYS zero --- it makes no sense to build a NR HMM DB
                     gzip_file($split_db_path); 
@@ -1626,7 +1626,7 @@ sub build_search_db{
 	    }	   
 	    if( $nr_db ){
 		$self->Shotmap::Notify::print_verbose( "...making nonredundant" );
-		    my $nr_tmp      = _build_nr_seq_db( $family_db_file, $suffix, $compressed, $redunts );
+		my $nr_tmp      = $self->Shotmap::Run::build_nr_seq_db( $family_db_file, $suffix, $self->tmp_dir, $compressed, $redunts );
 		$family_db_file = $nr_tmp;
 	    }
 	    $self->Shotmap::Notify::print_verbose( "...in file" );	    
@@ -1711,6 +1711,7 @@ sub build_search_db{
 	    close FILE;
 	    if( $nr_db ){
 		#we don't want to keep the copy of the tmp nr file that we created, which was pushed into $family_db_file above
+		$self->Shotmap::Notify::print("removing file $family_db_file\n");
 		unlink( $family_db_file );
 	    }
 	    #calculate the family's length
@@ -1892,7 +1893,7 @@ sub get_family_path_from_dir{
 }
 
 sub cat_db_split{
-    my ($db_path, $n_proc, $ffdb, $suffix, $ra_families_array_ptr, $type, $nr_db) = @_;
+    my ($self, $db_path, $n_proc, $ffdb, $suffix, $ra_families_array_ptr, $type, $nr_db) = @_;
     my @families     = @{$ra_families_array_ptr}; # ra_families is a POINTER TO AN ARRAY
     my $split_db_path = "${db_path}_${n_proc}${suffix}";
     my $fh;
@@ -1906,7 +1907,7 @@ sub cat_db_split{
 	if( $type eq "blast" && defined($nr_db) && $nr_db ){
 	    #make a temp file for the nr 
 	    #append famids to seqids within this routine
-	    my $tmp = _build_nr_seq_db( $family, $suffix, $compressed ); #make a tmp file for the nr
+	    my $tmp = $self->Shotmap::Run::build_nr_seq_db( $family, $suffix, $self->tmp_dir(), $compressed ); #make a tmp file for the nr
 	    File::Cat::cat( $tmp, $fh ); 
 	    unlink( $tmp ); #delete the tmp file
 	}
@@ -1990,12 +1991,16 @@ sub _parse_seq_id{
 #Note heuristic here: builiding an NR version of each family_db rather than across the complete DB. 
 #Assumes identical sequences are in same family, decreases RAM requirement. First copy of seq is retained
 #can speed this up by getting out of bioperl if necessary....
-sub _build_nr_seq_db{
-    my $family    = shift;
-    my $suffix    = shift;
-    my $compressed = shift;
+sub build_nr_seq_db{
+    my $self           = shift;
+    my $family         = shift;
+    my $suffix         = shift;
+    my $tmp_dir        = shift;
+    my $compressed     = shift;
     my $dups_list_file = shift;
-    my $family_nr  = $family . "_nr_tmp";
+    
+    my( $family_file, $path ) = fileparse( $family );
+    my $family_nr             = File::Spec->catfile( $tmp_dir, $family_file . "_nr_tmp" );
     my $fh;
     if( $compressed ){
 	open( SEQS, "zcat $family|" ) || die "Can't open $family for read: $!\n";
@@ -2033,8 +2038,7 @@ sub _build_nr_seq_db{
 	    }
 	    $header = $_;
 	    $sequence = ();
-	} else {
-	    $sequence .= $_;
+	} else {	    $sequence .= $_;
 	}		
     }
     #deal with the last line
