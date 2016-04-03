@@ -2487,27 +2487,27 @@ sub parse_results {
 	my $incompressed = $infile . ".gz";
 	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "orfs", $orfbasename . $i . ".fa" );
 	my $cmd  = "perl $script_file "
-	    . "--results-tab=$incompressed "
-	    . "--orfs-file=$query_orfs_file "
-	    . "--sample-alt-id=$sample_alt_id "
-	    . "--algo=$type "
-	    . "--parse-type=best_hit "
-	    . "--trans-method=$trans_meth "
+	    . "--results-tab $incompressed "
+	    . "--orfs-file $query_orfs_file "
+	    . "--sample-alt-id $sample_alt_id "
+	    . "--algo $type "
+	    . "--parse-type best_hit "
+	    . "--trans-method $trans_meth "
 	    ;	
 	if( defined( $t_score ) ){
-	    $cmd .= " --score=$t_score ";
+	    $cmd .= " --score $t_score ";
 	} else {
-	    $cmd .= " --score=NULL ";
+	    $cmd .= " --score NULL ";
 	}
 	if( defined( $t_evalue ) ){
-	    $cmd .= " --evalue=$t_evalue ";
+	    $cmd .= " --evalue $t_evalue ";
 	} else { 
-	    $cmd .= " --evalue=NULL ";
+	    $cmd .= " --evalue NULL ";
 	}
 	if( defined( $t_coverage ) ){
-	    $cmd .= " --coverage=$t_coverage ";
+	    $cmd .= " --coverage $t_coverage ";
 	} else {
-	    $cmd .= " --coverage=NULL ";
+	    $cmd .= " --coverage NULL ";
 	}
 	#if( $type eq "rapsearch" ){	
 	    $cmd .= " &> $log_file"; 
@@ -3256,6 +3256,7 @@ sub get_post_rarefied_reads_flatfile{
     if( !defined( $path) ){
 	die "You didn't provide a properly formatted path in get_post_rarefied_reads_flatfile\n";
     }
+    #my $max = $self->Shotmap::Run::count_objects_in_files( $path, $rare_type );
     my $max = $self->Shotmap::Run::count_objects_in_files( $path, $rare_type );
     if( $check == 1 ){
 	my $bit = 1;
@@ -3294,7 +3295,8 @@ sub generate_random_samples{
 sub count_objects_in_files{
     my( $self, $input, $type ) = @_;
     my $count = 0;
-    if( $type eq "read" || $type eq "orf" ){
+    if( $type eq "read" ||
+	$type eq "orf" ){
 	if( -d $input ){
 	    opendir( DIR, $input ) || die "Can't opendir on $input: $!\n";
 	    my @files = sort( readdir( DIR ) ); #sorting is important for consistent drawing
