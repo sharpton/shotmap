@@ -2395,12 +2395,16 @@ sub run_search{
         if( $type eq "rapsearch" ){
             my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
-            $cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+            #$cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+	    #set -v while we only do best hit. Future class methods will need this off.
+            $cmd = "rapsearch -b 0 -v 1 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
         }
 	elsif( $type eq "rapsearch_accelerated" ){
 	    my $suffix = $self->search_db_name_suffix;
 	    my $parse_score = $self->parse_score;
-            $cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+            #$cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+	    #set -v while we only do best hit. Future class methods will need this off.
+            $cmd = "rapsearch -b 0 -v 1 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
 	}       
         #ADD ADDITIONAL METHODS HERE    
         elsif( $type eq "blast" ){
