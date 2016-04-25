@@ -26,7 +26,7 @@ abund.map <- read.table( file = abund.map.file,
                          row.names = 1,
                          check.names = F
 )
-if( is.null( cat.fields.file ) ){
+if(  cat.fields.file == "NULL" ){
   set_categorical_fields( NULL )
 } else {
     cat.field.list <- read.table( file = cat.fields.file )
