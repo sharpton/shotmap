@@ -22,7 +22,10 @@ my $r_lib = File::Spec->catdir( $ENV{'SHOTMAP_LOCAL'}, "ext", "R" );
 
 print STDERR ">> ARGUMENTS TO compare_shotmap_samples.pl: perl compare_shotmap_samples.pl @ARGV\n";
 
-my( $input, $datatype, $metadata, $output, $cat_fields_file, $filtered_hits );
+my( $input, $datatype, $metadata, $output, $cat_fields_file, $filtered_hits, $no_merge );
+
+$datatype = "abundances"; #default setting
+
 GetOptions(
     "input|i=s"           => \$input,
     "datatype|d=s"        => \$datatype,
@@ -30,6 +33,7 @@ GetOptions(
     "output|o=s"          => \$output,
     "cat-fields-file|c:s" => \$cat_fields_file, #a list of categorical metadata fields
     "filtered-hits!"      => \$filtered_hits,
+    "no-merge!"           => \$no_merge,
     );
 
 #validate input variables
@@ -53,11 +57,17 @@ print( "Obtaining ShotMAP $datatype and metadata result files...\n" );
 _link_input_files( $vals->{"input"}, $vals->{"in_type"}, $vals->{"filtered-hits"}, $tmp );
 
 #do we need to get metadata table?
-print( "Producing merged metadata file...\n" );
-my $merged_metadata = File::Spec->catfile( $output, "Merged_Metadata.tab" );
-_merge_metadata( $merged_metadata, $tmp, $metadata );
-_check_metadata( $merged_metadata, "xls" );
-print( "Created merged metadata file here: $merged_metadata\n" );
+my $merged_metadata;
+if( $no_merge){
+    $merged_metadata = $metadata;
+}
+else{
+    print( "Producing merged metadata file...\n" );
+    $merged_metadata = File::Spec->catfile( $output, "Merged_Metadata.tab" );
+    _merge_metadata( $merged_metadata, $tmp, $metadata );
+    _check_metadata( $merged_metadata, "xls" );
+    print( "Created merged metadata file here: $merged_metadata\n" );
+}
 
 #build merged data tables
 my $merge_script = $ENV{'SHOTMAP_LOCAL'} . "/scripts/external/merge_abundance_tables_across_projects.R";
@@ -160,8 +170,12 @@ sub _cp_file{
 
 sub _link_file{
     my( $file, $dir ) = @_;
-    my $pwd = $ENV{'PWD'}; 
-    system( "ln -s ${pwd}/${file} $dir" );
+    my $abs_path = $file;
+    if( $file !~ m/^\// ){ #if not an absolute path, won't start with /
+	my $pwd = $ENV{'PWD'};
+	$abs_path = "${pwd}/${file}";
+    } 
+    system( "ln -s $abs_path $dir" );
 }
 
 sub _validate_inputs{
