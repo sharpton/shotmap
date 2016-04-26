@@ -436,8 +436,19 @@ correct_p <- function( rawp0 ){
   rownames(rnd.p) <- names( rawp0 )
   rnd.p <- as.data.frame( rnd.p )
   if( "qvalue" %in% procs.full ){            
-    qvals        <- qvalue( rnd.p[,1] )$qvalues
-    rnd.p$qvalue <- qvals
+    qvals <- NULL
+    qvals        <- tryCatch(
+    		 {   
+		    	qvalue( rnd.p[,1] )$qvalues
+     	      	 },
+			 error=function(cond){
+			 #message(cond)
+			 return(NULL)
+		       }
+		 )		       
+    if( !( is.null( qvals ) ) ){
+        rnd.p$qvalue <- qvals
+    }	
   }
   return(rnd.p)
 }

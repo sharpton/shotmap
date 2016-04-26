@@ -3,7 +3,7 @@ ShotMAP
 
 A Shotgun Metagenome Annotation Pipeline
 
-Version: v1.0
+Version: v1.1
 
 Overview
 --------
@@ -54,3 +54,14 @@ Documentation Table of Contents
     * [configuration files](docs/config_files.md)
     * [remote (cloud) users](docs/remote_users.md)
     * [relational database users](docs/relational_database_users.md)
+
+Change Log
+----------
+
+v1.1 - 2016.04.26
+* update to indexed database file names
+* changes to shotmap.R to handle variation in R version
+* error handline in shotmap.R for qvalue calculation
+* bug fixes in installer script to work on more general systems
+* addition of scripts/run_tests.pl
+* change in rapsearch options to reduce disc footpring

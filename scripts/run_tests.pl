@@ -37,7 +37,7 @@ print $cmd3 . "\n";
 #test shotmap on a directory of samples, w/in sample ffdb
 my $dir_stem = "testdata";
 my $samp_dir = File::Spec->catdir( $output, $dir_stem );
-`cp $t_data $samp_dir`;
+`cp -R $t_data $samp_dir`;
 my $cmd4 = "perl ${master}/scripts/shotmap.pl -i $samp_dir -d $t_fam_db --ags-method=none --clobber --verbose --nprocs $nprocs";
 print $cmd4 . "\n";
 `$cmd4`;
