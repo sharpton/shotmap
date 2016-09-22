@@ -2961,7 +2961,8 @@ sub calculate_abundances_flatfile{
 	    if( defined( $self->prerarefy_samples() ) ){
 		$read_count = $self->prerarefy_samples();
 	    } else {
-		$read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
+		#$read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/raw/", "read" );
+		$read_count = $self->Shotmap::Run::count_objects_in_files( $self->raw_data, "read" );
 	    }
 	} elsif( $self->class_level eq "orf" ){
 	    $read_count = $self->Shotmap::Run::count_objects_in_files( $self->get_sample_path($sample_id) . "/orfs/", "read" );
@@ -2994,6 +2995,8 @@ sub calculate_abundances_flatfile{
     $self->Shotmap::Notify::print_verbose( "\t...processing $class_map" );
     open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
     my $count = 0;
+    #$statistics->{"class_seqs"} = 0;
+    #$abundances->{"total"}      = 0;
     while(<MAP>){
 	$count++;
 	chomp $_;
@@ -3003,7 +3006,15 @@ sub calculate_abundances_flatfile{
 	    ) = split( "\,", $_ );
 	if( defined( $self->postrarefy_samples ) ){
 	    if( $rare_type =~ "read" ){ #read or class_read
-		next unless defined( $rare_ids->{$read_alt_id} );
+		my $trun_alt_id; #going to get rid of -rl\d+$ for compressed postrare
+		if( $read_alt_id =~ m/(.*)\-rl\d+$/ ){
+		    $trun_alt_id = $1;
+		} else {
+		    die "Can't parse read length string for $read_alt_id\n";
+		}
+		next unless(
+		    defined( $rare_ids->{$read_alt_id} ) ||
+		    defined( $rare_ids->{$trun_alt_id} ) );
 	    }
 	    if( $rare_type =~ "orf" ){ #orf or class orf
 		next unless defined( $rare_ids->{$orf_alt_id} );
@@ -3133,10 +3144,16 @@ sub build_sample_abundance_map_flatfile{
     my $total       = $abundances->{"total"};
     my $tot_reads   = $statistics->{"total_seqs"};
     my $class_reads = $statistics->{"class_seqs"};
+    print "total is $total, total reads is $tot_reads, and class_reads is $class_reads\n";
     #save some classification statistics for updated metadata output
     $self->sample_stats( $sample_id, "total_abundance", $total );
     $self->sample_stats( $sample_id, "total_reads", $tot_reads );
     $self->sample_stats( $sample_id, "class_reads", $class_reads );
+    #test some output
+    print $self->sample_stats( $sample_id, "total_abundance" ) . "\n";
+    print $self->sample_stats( $sample_id, "total_reads" ) . "\n";
+    print $self->sample_stats( $sample_id, "class_reads" ) . "\n";
+
     #print the abundance data frame
     my $output = $outdir . "/Abundance_Data_Frame_sample_${sample_id}.tab";
     open( ABUND, ">$output"  ) || die "Can't open $output for write: $!\n";
@@ -3235,7 +3252,8 @@ sub get_post_rarefied_reads_flatfile{
     my $path;
     if( $rare_type eq "read" ){
 	$self->Shotmap::Notify::print_verbose( "\t...rarefying reads for sample $sample_id at depth of $size\n" );
-	$path = $self->get_sample_path($sample_id) . "/raw/";
+	#$path = $self->get_sample_path($sample_id) . "/raw/";
+	$path = $self->raw_data();
     } elsif( $rare_type eq "orf" ){
 	$self->Shotmap::Notify::print( "\t...rarefying orfs for sample $sample_id at depth of $size\n" );
 	$path = $self->get_sample_path($sample_id) . "/orfs/";
@@ -3319,7 +3337,21 @@ sub count_objects_in_files{
 		    }
 		}
 		close( $fh );
+	    }	    
+	} elsif( -e $input ){ #is just a single input file
+	    next unless( $input =~ m/\.fa/ );
+	    my $fh;
+	    if( $input =~ m/\.gz$/ ){
+		open( $fh, "zmore ${input} |" ) || die "Can't open ${input} for read in count_objects_in_file: $!\n";
+	    } else {
+		open( $fh, "${input}" ) || die "Can't open ${input} for read in count_objects_in_file: $!\n";
 	    }
+	    while(<$fh>){
+		if( $_ =~ m/^>/ ){
+		    $count++;
+		}
+	    }
+	    close( $fh );	    
 	} else {
 	    die "In count_objects_in_file: $input doesn't exist!\n";
 	}
@@ -3377,6 +3409,24 @@ sub sample_objects_in_files{
 		}
 		close( FILE );
 	    }
+	} elsif( -e $input ){ #is just a single file input
+	    my $fh;
+	    if( $input =~ m/\.gz$/ ){
+		open( $fh, "zmore ${input} |" ) || die "Can't open ${input} for read in count_objects_in_file: $!\n";
+	    } else {
+		open( $fh, "${input}" ) || die "Can't open ${input} for read in count_objects_in_file: $!\n";
+	    }
+	    while(<$fh>){
+		if( $_ =~ m/^>/ ){
+		    if( defined( $draws->{$count} ) ){
+			my $id = _get_header_part_before_whitespace( $_ );
+			$id =~ s/\>//;
+			$id_hash->{$id}++;
+		    }
+		    $count++;
+		}
+	    }
+	    close( $fh );
 	} else {
 	    die "In sample_objects_in_file: $input doesn't exist!\n";
 	}
@@ -3998,6 +4048,12 @@ sub run_microbecensus{
     #no need to set up a fork, as microbecensus can't run in parallel yet
     my $threads = 8; 
     my $cmd = "run_microbe_census.py -t $threads $infile $outfile > $logfile 2>&1";
+    if( defined ($self->mc_nreads) ){
+	my $mc_nreads = $self->mc_nreads;
+	$cmd = "run_microbe_census.py -n $mc_nreads -t $threads $infile $outfile > $logfile 2>&1";
+    }
+    print $cmd . "\n";
+    die;
     $self->Shotmap::Notify::print( "Waiting for microbecensus to finish..." );
     $self->Shotmap::Notify::print_verbose( "$cmd\n" );
     my $results = IPC::System::Simple::capture("$cmd");                                                                                                                                                                                

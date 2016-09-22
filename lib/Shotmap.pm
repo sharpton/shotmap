@@ -85,6 +85,7 @@ sub new{
     $self->{"adaptive_classification"} = 0;
     $self->{"read_length_filter"}      = 0;
     $self->{"filter_hits"}             = 0;
+    $self->{"mc_reads"}                = undef;
     bless($self);
     return $self;
 }
@@ -1145,6 +1146,13 @@ sub input_type{
     $self->set_value( $key, $value );
     return $self->{ $key };
 
+}
+
+sub mc_nreads{
+    my( $self, $value ) = @_;
+    my $key = "mc_nreads";
+    $self->set_value( $key, $value );
+    return $self->{ $key };
 }
 
 sub set_value{

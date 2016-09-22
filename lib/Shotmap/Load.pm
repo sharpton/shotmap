@@ -436,6 +436,7 @@ sub get_options{
 	$dryRun,
 	$reload,
 	$filter_hits,
+	$mc_nreads, #number of reads to use in microbecensus
 	);
 
     my %options = (	
@@ -513,6 +514,7 @@ sub get_options{
 	,    "abundance-type"     => \$abundance_type
 	,    "normalization-type" => \$normalization_type
 	,    "ags-method"         => \$ags_method
+	,    "mc-nreads"          => \$mc_nreads
 	#usually set at run time
 	, "conf-file"         => \$conf_file
 	, "pid"               => \$input_pid          
@@ -612,7 +614,8 @@ sub get_options{
 			  , "abundance-type:s"
 			  , "normalization-type:s"			  			  
 			  , "ags-method:s"
-			  #general settings
+			  , "mc-nreads:i" 
+			   #general settings
 			  , "conf-file|c=s" 
 			  , "pid=i"
 			  , "goto|g=s"			  
@@ -950,7 +953,9 @@ sub set_params{
     $self->abundance_type(     $self->opts->{"abundance-type"}     );
     $self->normalization_type( $self->opts->{"normalization-type"} );
     $self->ags_method(           $self->opts->{"ags-method"}           ); #currently "none" or "microbecensus"
-
+    if( defined $self->opts->{"mc-nreads"} ){
+	$self->mc_nreads( $self->opts->{"mc-nreads"} );
+    }
     # Set rarefication parameters
     if( defined( $self->opts->{"prerare-samps"} ) ){ 
 	$self->Shotmap::Notify::warn( "You are running with --prerare-samps, so I will only process " . 

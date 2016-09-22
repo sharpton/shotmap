@@ -87,11 +87,11 @@ OPTIONS
 
 ###LOCAL COMPUTE ARGUMENTS:
 
-* **--nproc=INTEGER** (REQUIRED if not using --remote) NO DEFAULT
+* **--nprocs=INTEGER** (REQUIRED if not using --remote) NO DEFAULT
 
    Sets the number of processors that should be used by shotmap when running on a multiprocessor or multicore machine.
 
-   Cannot use both --nproc and --remote.
+   Cannot use both --nprocs and --remote.
 
 ###CONFIGURATION FILE:
 
@@ -261,7 +261,8 @@ OPTIONS
   * 'G' or 'GET'         - Transfer the results from the remote cluster (remote users only)
   * 'Z' or 'AGS'         - Calculate Average Genome Size
   * 'C' or 'CLASSIFY'    - Classify reads/orfs into protein families  
-  * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity and family abundances
+  * 'A' or 'ABUNDANCE'   - Calculate family abundances (potentially using --postrare-samps number of reads)
+  * 'D' or 'DIVERSITY'   - Calculate intra- and inter-sample diversity
 
 * **--reload** (Optional) DEFAULT: DISABLED
 

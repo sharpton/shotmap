@@ -145,6 +145,7 @@ sub calculate_abundances{
 	    $self->params_dir . "/" . $self->search_db_name . "_sequence_lengths.tab", 1, 2 
 	    );
     }
+    
     foreach my $sample_alt_id( @{ $self->get_sample_alt_ids() } ){
 	if( defined( $self->postrarefy_samples ) ){
 	    next unless( 
