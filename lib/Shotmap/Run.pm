@@ -4047,13 +4047,8 @@ sub run_microbecensus{
     my( $self, $infile, $outfile, $logfile ) = @_;
     #no need to set up a fork, as microbecensus can't run in parallel yet
     my $threads = 8; 
-    my $cmd = "run_microbe_census.py -t $threads $infile $outfile > $logfile 2>&1";
-    if( defined ($self->mc_nreads) ){
-	my $mc_nreads = $self->mc_nreads;
-	$cmd = "run_microbe_census.py -n $mc_nreads -t $threads $infile $outfile > $logfile 2>&1";
-    }
-    print $cmd . "\n";
-    die;
+    my $mc_nreads = $self->mc_nreads;
+    my $cmd = "run_microbe_census.py -n $mc_nreads -t $threads $infile $outfile > $logfile 2>&1";
     $self->Shotmap::Notify::print( "Waiting for microbecensus to finish..." );
     $self->Shotmap::Notify::print_verbose( "$cmd\n" );
     my $results = IPC::System::Simple::capture("$cmd");                                                                                                                                                                                

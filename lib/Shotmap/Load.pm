@@ -1031,6 +1031,7 @@ sub load_defaults{
 	    ,      "abundance-type"     => 'coverage'
 	    ,      "normalization-type" => 'target_length'
 	    ,      "ags-method"         => 'microbecensus'
+	    ,      "mc-nreads"          => '2000000'
     };
     if( defined( $options->{"input"} ) ){
 	my $input = $options->{"input"};
