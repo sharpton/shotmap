@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-#MRC.pm - The MRC workflow manager
+#Shotmap::Search.pm 
 #Copyright (C) 2011  Thomas J. Sharpton 
 #author contact: thomas.sharpton@gladstone.ucsf.edu
 #This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
@@ -17,6 +17,7 @@ use lib ($ENV{'SHOTMAP_LOCAL'} . "/ext/lib/perl5");
 use Shotmap;
 use File::Basename;
 use File::Copy;
+use Data::Dumper;
 
 sub build_search_db{
     my( $self ) = @_;
@@ -25,6 +26,7 @@ sub build_search_db{
     my $full_pipe     = $self->full_pipe; #is this a full pipeline run, or just a db build?
     #NOTE: These warning should NEVER be needed given the precautions we take in Load.pm 
     #(search method defines type of database to build!)
+    
     #hmm
     if ($self->build_search_db("hmm")){
 	if ( $search_method ne "hmmsearch" && $search_method ne "hmmscan" && $full_pipe ){
@@ -59,7 +61,7 @@ sub build_search_db{
 	    $self->force_build_search_db, 
 	    $search_type, 
 	    $self->reps, 
-	    $self->nr 
+	    $self->nr, 
 	    );
     }
     
@@ -162,6 +164,10 @@ sub run_search{
     my $verbose        = $self->verbose;
     my $force_search   = $self->force_search;
 
+    #make sure that n_splits setting matches number splits in our databse.
+    my $n_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
+    $self->search_db_n_splits( $search_type, $n_splits );
+
     if ($is_remote){
 	$self->Shotmap::Notify::printBanner("RUNNING REMOTE SEARCH");
 	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
@@ -234,28 +240,46 @@ sub stage_search_db{
 sub format_search_db{
     my( $self ) = @_;
     my $search_method = $self->search_method;
-    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $search_method ) . "_1.fa"; #only ever 1 for local search
-    #rapsearch reqs dbs to have a separate suffix from $db_file
-    if( $search_method eq "rapsearch" ){
-	#First see if we need to do this
-	my $fmt_db  = "${db_file}." . $self->search_db_name_suffix;
-	unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do	    
-	    $self->Shotmap::Notify::printBanner("FORMATTING SEQUENCE DATABASE");
-	    $self->Shotmap::Notify::print( "Formatting searchdb for $search_method" );
-	    $self->Shotmap::Run::format_search_db( $search_method );
-	    $self->Shotmap::Notify::print( "Formatting complete" );
+    my $search_type   = $self->search_type;
+
+    $self->Shotmap::Notify::printBanner("FORMATTING SEQUENCE DATABASE");
+    $self->Shotmap::Notify::print( "Formatting searchdb for $search_method" );
+    for( my $i=1; $i < $self->search_db_n_splits($search_method) + 1; $i++ ){ 
+	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $search_method ) . "_${i}.fa"; #only ever 1 for local search
+	$self->Shotmap::Notify::print_verbose( "Formatting $db_file" );
+	#rapsearch reqs dbs to have a separate suffix from $db_file
+	if( $search_method eq "rapsearch" ){
+	    #First see if we need to do this
+	    my $fmt_db  = "${db_file}." . $self->search_db_name_suffix;
+	    unless( -e $fmt_db && !($self->force_build_search_db ) ){ #ok, we do	    
+		$self->Shotmap::Run::format_search_db( $db_file, $search_method );
+	    }
+	} elsif( $search_method eq "blast" || $search_method eq "last" ){
+	    #First see if we need to do this
+	    unless( -e "${db_file}" && !($self->force_build_search_db ) ){ 
+		$self->Shotmap::Run::format_search_db( $db_file, $search_method );
+	    }
+	} else {
+	    #nothing...
 	}
-    } elsif( $search_method eq "blast" || $search_method eq "last" ){
-	#First see if we need to do this
-	unless( -e "${db_file}" && !($self->force_build_search_db ) ){ 
-	    $self->Shotmap::Notify::printBanner("FORMATTING SEQUENCE DATABASE");
-	    $self->Shotmap::Notify::print( "Formatting searchdb for $search_method" );
-	    $self->Shotmap::Run::format_search_db( $search_method );
-	    $self->Shotmap::Notify::print( "Formatting complete" );       
-	}
-    } else {
-	
     }
+    $self->Shotmap::Notify::print( "Formatting complete" );       
+}
+
+sub set_search_db_n_splits{
+    my( $self ) = @_;
+    my $search_method = $self->search_method;
+    my $search_type   = $self->search_type;
+    my $n_splits;
+    my $db_name = $self->search_db_name( $search_method );
+    my $db_path = $self->search_db_path( $search_method );
+    opendir( DIR, $db_path ) || die "Can't open $db_path for read: $!\n";
+    my @files = grep( /\.fa/, readdir(DIR) );
+    closedir( DIR );
+    $n_splits = scalar( @files );
+    $self->Shotmap::Notify::print_verbose( "Identified $n_splits sequence files in the search database\n" );
+    $self->search_db_n_splits( $search_method, $n_splits );
+    return $self;
 }
 
 1;

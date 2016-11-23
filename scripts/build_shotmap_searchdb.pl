@@ -44,4 +44,5 @@ my $path_to_family_annotations;
 $pipe->build_search_db( $pipe->search_type, 1 );
 # Build search database and load into DB
 $pipe->Shotmap::Search::build_search_db();
+$pipe->Shotmap::Search::set_search_db_n_splits();
 $pipe->Shotmap::Search::format_search_db();

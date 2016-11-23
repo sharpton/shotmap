@@ -44,6 +44,7 @@ goto_step( $pipe );
 
 # Load the project
 $pipe->Shotmap::Reads::load_project();
+
 # Find orfs
  TRANSLATE: $pipe->Shotmap::Orfs::translate_reads();
  LOADORFS: $pipe->Shotmap::Orfs::load_orfs();
@@ -59,6 +60,7 @@ if( $pipe->remote ){
       LOCALSTAGE: $pipe->Shotmap::Search::format_search_db();
     }
 }
+
 # Build search script
  #BUILDSEARCHSCRIPT: $pipe->Shotmap::Search::build_search_script();
 # Execute search

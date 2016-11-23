@@ -256,6 +256,10 @@ sub parse_results{
     my $search_method = $self->search_method;
     my $search_type   = $self->search_type;
 
+    #make sure that n_splits setting matches number splits in our databse.
+    my $n_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );
+    $self->search_db_n_splits( $search_type, $n_splits );
+
     if( $self->remote ){
 	$self->Shotmap::Notify::printBanner("PARSING REMOTE SEARCH RESULTS");
 	my $db_splits = $self->Shotmap::DB::get_number_db_splits( $search_type );

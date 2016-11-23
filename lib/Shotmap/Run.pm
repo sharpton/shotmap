@@ -30,7 +30,7 @@ use Data::Dumper;
 use File::Basename;
 use File::Cat;
 use File::Copy qw( move copy );
-use File::Path qw( make_path);
+use File::Path qw( make_path rmtree );
 use IPC::System::Simple qw(capture system run $EXITVAL);
 use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 use IO::Compress::Gzip qw(gzip $GzipError);
@@ -1415,6 +1415,7 @@ sub check_passing_hit{
 	    if( $evalue > $self->class_evalue ){
 		$pass = 0;
 	    }
+	    #print join( "\t", $evalue, $self->class_evalue, $pass, "\n" );
 	}
 	if( defined( $self->class_coverage ) ){
 	    if( $coverage < $self->class_coverage ){
@@ -1475,20 +1476,20 @@ sub build_search_db{
     my $length      = 0;
     if ($type eq "hmm") { 
 	$raw_db_path = $self->search_db_path("hmm"); 
-	if( $self->remote && defined( $self->search_db_split_size("hmm") ) ){	    
+	if( defined( $self->search_db_split_size("hmm") ) ){	    
 	    $split_size = $self->search_db_split_size("hmm");
 	}
     }
     if ($type eq "blast") { 
 	$raw_db_path = $self->search_db_path("blast"); 
-	if( $self->remote && defined( $self->search_db_split_size("blast") ) ){
+	if( defined( $self->search_db_split_size("blast") ) ){
 	    $split_size = $self->search_db_split_size("blast");
 	}
     }
-    if( $self->remote ){
+    if( defined( $self->search_db_split_size($type) ) ){
 	$self->Shotmap::Notify::notify_verbose( "Building $type DB $db_name, placing $split_size per split\n" );
     } else {
-	$self->Shotmap::Notify::notify_verbose( "Bulding $type DB $db_name, since this a local process, this will be a single file\n" );
+	$self->Shotmap::Notify::notify_verbose( "Bulding $type DB $db_name, this will be a single file\n" );
     }
     #if( $self->is_iso_db ){
 	#$raw_db_path = File::Spec->catdir($raw_db_path, $self->search_db_name( $type ) );
@@ -1497,6 +1498,9 @@ sub build_search_db{
     #Have you built this DB already?[
     if( -d $raw_db_path && !($force) ){
 	die "You've already built a <$type> database with the name <$db_name> at <$raw_db_path>. Please delete or overwrite by using the --force-searchdb option.\n";
+    } elsif( -d $raw_db_path && $force ){
+	rmtree( $raw_db_path );
+	mkdir( $raw_db_path );
     } else {
 	mkdir( $raw_db_path );
     }
@@ -1570,7 +1574,7 @@ sub build_search_db{
 	    push( @split, $family_db_file );
 	    $count++;
 	    #if we've hit our split size, process the split
-	    if( $self->remote ){
+	    if( defined( $self->search_db_split_size("hmm") ) ){
 		if( ( defined( $split_size ) && $count >= $split_size ) || $family eq $families[-1]) {
 		    $n_proc++; 	    #build the DB
 		    my $split_db_path;
@@ -1672,7 +1676,7 @@ sub build_search_db{
 		    $seq = '';
 		    $seq_len = 0;		
 		}
-		if( $self->remote ){
+		if( defined( $self->search_db_split_size( "blast" ) ) ){
 		    #we've hit our desired size (or at the end). Process the split		    
 		    if( ( defined( $split_size) && ( scalar( keys( %$seqs ) ) >= $split_size ) ) || ( $family eq $families[-1] && eof )) {
 			foreach my $id( keys( %$seqs ) ){
@@ -1692,7 +1696,7 @@ sub build_search_db{
 			}
 		    }
 		} else {
-		    #is a local process and we want a single, large db
+		    #we want a single, large db
 		    if( $family eq $families[-1] && eof ) {
 			foreach my $id( keys( %$seqs ) ){
 			    print $tmp $id;
@@ -1702,8 +1706,8 @@ sub build_search_db{
 			$n_proc++; 	    #build the db split number
 			my $split_db_path = "${db_path_with_name}_${n_proc}.fa";
 			move( $tmp_path, $split_db_path );		    
-			#gzip_file($split_db_path); # We want DBs to be gzipped.
-			#unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
+			gzip_file($split_db_path); # We want DBs to be gzipped.
+			unlink($split_db_path); # So we save the gzipped copy, and DELETE the uncompressed copy
 			$seqs = {};
 		    }
 		}
@@ -1711,7 +1715,7 @@ sub build_search_db{
 	    close FILE;
 	    if( $nr_db ){
 		#we don't want to keep the copy of the tmp nr file that we created, which was pushed into $family_db_file above
-		$self->Shotmap::Notify::print("removing file $family_db_file\n");
+		$self->Shotmap::Notify::print_verbose("removing file $family_db_file\n");
 		unlink( $family_db_file );
 	    }
 	    #calculate the family's length
@@ -1724,7 +1728,7 @@ sub build_search_db{
 	    } else {
 		die "Cannot calculate a family length for $family\n";
 	    }       	    
-	}
+	    }
 	else { 
 	    die "invalid type: <$type>"; 
 	}
@@ -1743,8 +1747,8 @@ sub build_search_db{
 }
 
 sub format_search_db{ #local process only
-    my( $self, $type ) = @_;
-    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "_1.fa"; #only ever 1 for local search
+    my( $self, $db_file, $type ) = @_;
+    #my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "_1.fa"; #only ever 1 for local search
     my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
     unless( -e $db_file ){ #if uncompressed version exists, go with it
 	if( -e "${db_file}.gz" ){
@@ -1775,6 +1779,10 @@ sub format_search_db{ #local process only
     $self->Shotmap::Notify::print_verbose( $cmd );
     my $results = IPC::System::Simple::capture( $cmd );    
     (0 == $EXITVAL) or die("Error executing $cmd: $results\n");
+    if( $compressed ){
+	#get rid of the gunzipped copy created above
+	unlink( $db_file );
+    }
     return $results
 }
 
@@ -2339,6 +2347,7 @@ sub run_search_remote {
 sub run_search{
     my( $self, $sample_id, $type, $waittime, $verbose ) = @_;
     my $nprocs   = $self->nprocs();
+    my $n_db_splits = $self->search_db_n_splits( $self->search_type );
     #GET IN/OUT VARS
     my $orfs_dir        = File::Spec->catdir(  $self->get_sample_path($sample_id), "orfs");
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "${type}", "${type}_${sample_id}"); #file stem that we add to below
@@ -2349,20 +2358,24 @@ sub run_search{
     if( !defined( $inbasename ) ){
 	die( "Couldn't obtain a raw file input basename to input from $orfs_dir!");
     }
-    #GET DB VARS
-    my $suffix = "_1.fa";
-    if( $self->search_type eq "hmm" ){
-	$suffix = "_1.hmm.gz";
-    }
-    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "${suffix}"; #only ever 1 for local search
+    # DECOMPRESS DATABASE FILES IF NEED BE
     my $compressed = 0; #auto detect if ref-ffdb family files are compressed or not
-    unless( -e $db_file ){ #if uncompressed version exists, go with it
-	if( -e "${db_file}.gz" ){
-	    $compressed = 1;
+    for( my $j=1; $j<=$n_db_splits; $j++ ){
+	# GET DB VARS
+	my $suffix = "_${j}.fa";
+	if( $self->search_type eq "hmm" ){
+	    #$suffix = "_${j}.hmm.gz";
+	    $suffix = "_${j}.hmm";
 	}
-    }
-    if( $compressed ){
-	gunzip "${db_file}.gz" => $db_file or die "gunzip failed: $GunzipError\n";
+	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "${suffix}";       
+	unless( -e $db_file ){ #if uncompressed version exists, go with it
+	    if( -e "${db_file}.gz" ){
+		$compressed = 1;
+	    }
+	}
+	if( $compressed ){
+	    gunzip "${db_file}.gz" => $db_file or die "gunzip failed: $GunzipError\n";
+	}	    	 
     }
     #RUN THE SEARCH
     my $pm = Parallel::ForkManager->new($nprocs);
@@ -2386,65 +2399,86 @@ sub run_search{
 		);
 	    $pm->finish;
 	}
-	#create output directory
-	my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
-	File::Path::make_path($outdir);
-	my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
-	my $outfile     = File::Spec->catfile( $outdir, $outbasename );
-	my $cmd;
-        if( $type eq "rapsearch" ){
-            my $suffix = $self->search_db_name_suffix;
-	    my $parse_score = $self->parse_score;
-            #$cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-	    #set -v while we only do best hit. Future class methods will need this off.
-            $cmd = "rapsearch -b 0 -v 1 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-        }
-	elsif( $type eq "rapsearch_accelerated" ){
-	    my $suffix = $self->search_db_name_suffix;
-	    my $parse_score = $self->parse_score;
-            #$cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-	    #set -v while we only do best hit. Future class methods will need this off.
-            $cmd = "rapsearch -b 0 -v 1 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
-	}       
-        #ADD ADDITIONAL METHODS HERE    
-        elsif( $type eq "blast" ){
-	    $cmd = "blastp -query $infile -db $db_file -out $outfile -outfmt 6 > $log_file 2>&1";
-	} 
-	elsif( $type eq "last" ){
-	    my $min_aln_score    = $self->parse_score;
-	    my $max_multiplicity = 10;
-	    $cmd = "lastal -e $min_aln_score -f 0 -m $max_multiplicity $db_file $infile -o $outfile > $log_file 2>&1";
-	}
-	elsif( $type eq "hmmsearch" ){
-	    $cmd = "hmmsearch --noali --domtblout $outfile  $db_file $infile > $log_file 2>&1";
-	}
-	elsif( $type eq "hmmscan" ){
-	    $cmd = "hmmscan -Z --noali --domtblout $outfile $db_file $infile > $log_file 2>&1";
-	}
-	else {
-	    die( "I don't know how to process $type in Shotmap::Run::run_search" );
-	}
-	#execute
-	( defined( $cmd ) ) || die( "Couldn't figure out which command to run. $type was input\n" );
-	$self->Shotmap::Notify::print_verbose( "$cmd\n" );
-#	my $results = IPC::System::Simple::capture("$cmd");
-#        (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
-	system( $cmd );
-	#compress results
-	if( $type eq "rapsearch" ){
-	    gzip_file( "${outfile}.m8" );    
-	    unlink( "$outfile.m8" );
-	} else{
-	    gzip_file( $outfile );
-	    unlink( $outfile );
+	#loop over database splits for each input file
+	for( my $j=1; $j<=$n_db_splits; $j++ ){	    
+	    # GET DB VARS
+	    my $suffix = "_${j}.fa";
+	    if( $self->search_type eq "hmm" ){
+		#$suffix = "_${j}.hmm.gz";
+		$suffix = "_${j}.hmm";
+	    }
+	    my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "${suffix}";
+	    # OUTPUT DIR AND FILES
+	    my $outdir  = File::Spec->catdir( $master_out_dir, $inbasename . $i .  ".fa" ); #this is a directory
+	    File::Path::make_path($outdir);
+	    my $outbasename = "${inbasename}${i}.fa-" . $self->search_db_name($type) . "_${j}.tab"; 
+	    my $outfile     = File::Spec->catfile( $outdir, $outbasename );
+	    # BUILD THE COMMAND
+	    my $cmd;
+	    if( $type eq "rapsearch" ){
+		my $suffix = $self->search_db_name_suffix;
+		my $parse_score = $self->parse_score;
+		#$cmd = "rapsearch -b 0 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+		#set -v while we only do best hit. Future class methods will need this off.
+		$cmd = "rapsearch -b 0 -v 1 -i $parse_score -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+	    }
+	    elsif( $type eq "rapsearch_accelerated" ){
+		my $suffix = $self->search_db_name_suffix;
+		my $parse_score = $self->parse_score;
+		#$cmd = "rapsearch -b 0 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+		#set -v while we only do best hit. Future class methods will need this off.
+		$cmd = "rapsearch -b 0 -v 1 -i $parse_score -a T -q $infile -d ${db_file}.${suffix} -o $outfile > $log_file 2>&1";
+	    }       
+	    #ADD ADDITIONAL METHODS HERE    
+	    elsif( $type eq "blast" ){
+		$cmd = "blastp -query $infile -db $db_file -out $outfile -outfmt 6 > $log_file 2>&1";
+	    } 
+	    elsif( $type eq "last" ){
+		my $min_aln_score    = $self->parse_score;
+		my $max_multiplicity = 10;
+		$cmd = "lastal -e $min_aln_score -f 0 -m $max_multiplicity $db_file $infile -o $outfile > $log_file 2>&1";
+	    }
+	    elsif( $type eq "hmmsearch" ){
+		$cmd = "hmmsearch --noali --domtblout $outfile  $db_file $infile > $log_file 2>&1";
+	    }
+	    elsif( $type eq "hmmscan" ){
+		$cmd = "hmmscan -Z --noali --domtblout $outfile $db_file $infile > $log_file 2>&1";
+	    }
+	    else {
+		die( "I don't know how to process $type in Shotmap::Run::run_search" );
+	    }
+	    #execute
+	    ( defined( $cmd ) ) || die( "Couldn't figure out which command to run. $type was input\n" );
+	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
+            #my $results = IPC::System::Simple::capture("$cmd");
+            #(0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
+	    system( $cmd );
+	    #compress results
+	    if( $type eq "rapsearch" ){
+		gzip_file( "${outfile}.m8" );    
+		unlink( "$outfile.m8" );
+	    } else{
+		gzip_file( $outfile );
+		unlink( $outfile );
+	    }
 	}
         $pm->finish; 
     }
     $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish...\n" );
     $pm->wait_all_children;
     $self->Shotmap::Notify::print( "\t...$type finished. Proceeding\n" );
-    if( $compressed ){
-	gzip_file( $db_file );    
+    # COMPRESS DATABASE FILES IF NEED BE
+    for( my $j=1; $j<=$n_db_splits; $j++ ){	    
+	# GET DB VARS
+	my $suffix = "_${j}.fa";
+	if( $self->search_type eq "hmm" ){
+	    #$suffix = "_${j}.hmm.gz";
+	    $suffix = "_${j}.hmm";
+	}
+	my $db_file = $self->Shotmap::Run::get_db_filepath_prefix( $type ) . "${suffix}";
+	if( $compressed ){
+	    gzip_file( $db_file );    
+	}
     }
     return $self;
 }
@@ -2461,7 +2495,8 @@ sub parse_results {
     my $log_file_prefix = File::Spec->catfile( $self->project_dir(), "/logs/", "parse_results", "${type}_${sample_alt_id}"); #file stem that we add to below
     my $script_file     = File::Spec->catfile($self->local_scripts_dir(), "remote", "parse_results.pl"),
     my $orfbasename     = $self->Shotmap::Run::get_file_basename_from_dir(File::Spec->catdir(  $self->get_sample_path($sample_alt_id), "orfs")) . "split_"; 
-   
+    my $n_db_splits     = $self->search_db_n_splits( $self->search_type );
+
     my $pm = Parallel::ForkManager->new($nprocs);
     $pm->run_on_finish(
 	sub{ my ( $parent_id, $exit_code ) = @_;
@@ -2472,64 +2507,65 @@ sub parse_results {
 	);
     for( my $i=1; $i<=$nprocs; $i++ ){
         my $pid = $pm->start and next;
-        #do some work here                                                                                 
-	#set some loop specific variables
-	my $log_file = $log_file_prefix . "_${i}.log";	
-	my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_1.tab"; #it's always 1 for a local search since we only split metagenome
-	my $infile   = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
-	if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
-	    $infile = $infile . ".m8";
-	}
-	if( ! -e $infile && ! -e $infile . ".gz" ){
-	    $self->Shotmap::Notify::warn( 
-		"I could not find $infile for processing with parse_results. This is not "  .
-		"necessairly an error (we may have fewer input files that you expect), " .
-		"but I recommend verifying"
-		);
-	    $pm->finish;
-	}
-	my $incompressed = $infile . ".gz";
-	my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "orfs", $orfbasename . $i . ".fa" );
-	my $cmd  = "perl $script_file "
-	    . "--results-tab $incompressed "
-	    . "--orfs-file $query_orfs_file "
-	    . "--sample-alt-id $sample_alt_id "
-	    . "--algo $type "
-	    . "--parse-type best_hit "
-	    . "--trans-method $trans_meth "
-	    ;	
-	if( defined( $t_score ) ){
-	    $cmd .= " --score $t_score ";
-	} else {
-	    $cmd .= " --score NULL ";
-	}
-	if( defined( $t_evalue ) ){
-	    $cmd .= " --evalue $t_evalue ";
-	} else { 
-	    $cmd .= " --evalue NULL ";
-	}
-	if( defined( $t_coverage ) ){
-	    $cmd .= " --coverage $t_coverage ";
-	} else {
-	    $cmd .= " --coverage NULL ";
-	}
-	#if( $type eq "rapsearch" ){	
+	for( my $j=1; $j<=$n_db_splits; $j++ ){
+	    #do some work here                                                                                 
+	    #set some loop specific variables
+	    my $log_file = $log_file_prefix . "_${i}.log";	
+	    my $resbasename = "${orfbasename}${i}.fa-" . $self->search_db_name($type) . "_${j}.tab";
+	    my $infile   = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "search_results", $type, $orfbasename . $i . ".fa", $resbasename );
+	    if( $type eq "rapsearch" ){ #rapsearch has extra suffix auto appended to file
+		$infile = $infile . ".m8";
+	    }
+	    if( ! -e $infile && ! -e $infile . ".gz" ){
+		$self->Shotmap::Notify::warn( 
+		    "I could not find $infile for processing with parse_results. This is not "  .
+		    "necessairly an error (we may have fewer input files that you expect), " .
+		    "but I recommend verifying"
+		    );
+		$pm->finish;
+	    }
+	    my $incompressed = $infile . ".gz";
+	    my $query_orfs_file  = File::Spec->catfile( $self->get_sample_path($sample_alt_id), "orfs", $orfbasename . $i . ".fa" );
+	    my $cmd  = "perl $script_file "
+		. "--results-tab $incompressed "
+		. "--orfs-file $query_orfs_file "
+		. "--sample-alt-id $sample_alt_id "
+		. "--algo $type "
+		. "--parse-type best_hit "
+		. "--trans-method $trans_meth "
+		;	
+	    if( defined( $t_score ) ){
+		$cmd .= " --score $t_score ";
+	    } else {
+		$cmd .= " --score NULL ";
+	    }
+	    if( defined( $t_evalue ) ){
+		$cmd .= " --evalue $t_evalue ";
+	    } else { 
+		$cmd .= " --evalue NULL ";
+	    }
+	    if( defined( $t_coverage ) ){
+		$cmd .= " --coverage $t_coverage ";
+	    } else {
+		$cmd .= " --coverage NULL ";
+	    }
+	    #if( $type eq "rapsearch" ){	
 	    $cmd .= " &> $log_file"; 
 	    $self->Shotmap::Notify::print_verbose( "$cmd\n" );
-	#}
-
-	#execute
-        #system( $cmd );
-	my $results = IPC::System::Simple::capture("$cmd");
-        (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
-	if( ! -e $infile . ".mysqld" ){
-	    die( "parse_results.pl failed to produce an output file! This could mean that there are not hits that pass the parsing thresholds ".
-		 "or it could indicate an error."
-		);
+	    #}
+	    
+	    #execute
+	    #system( $cmd );
+	    my $results = IPC::System::Simple::capture("$cmd");
+	    (0 == $EXITVAL) or die("Error executing this command:\n${cmd}\nGot these results:\n${results}\n");
+	    if( ! -e $infile . ".mysqld" ){
+		die( "parse_results.pl failed to produce an output file! This could mean that there are not hits that pass the parsing thresholds ".
+		     "or it could indicate an error."
+		    );
+	    }
+	    gzip_file( $infile . ".mysqld" );
+	    unlink( $infile . ".mysqld" );
 	}
-	gzip_file( $infile . ".mysqld" );
-	unlink( $infile . ".mysqld" );
-       
         $pm->finish; 
     }
     $self->Shotmap::Notify::print( "\tWaiting for local jobs to finish..." );
@@ -2990,7 +3026,6 @@ sub calculate_abundances_flatfile{
 		       "ALN_LENGTH", "READ_COUNT", 
 		       "\n" );
     }
-
     $self->Shotmap::Notify::print( "\tCalculating abundances..."); 
     $self->Shotmap::Notify::print_verbose( "\t...processing $class_map" );
     open( MAP, $class_map ) || die "Can't open $class_map for read: $!\n";
@@ -3055,7 +3090,8 @@ sub calculate_abundances_flatfile{
 	    } elsif( $norm_type eq 'family_length' ){
 		$raw = 1 / $family_length;
 	    } else{
-		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). Must be either 'none', 'target_length', or 'family_length'\n" );
+		die( "You selected a normalization type that I am not familiar with (<${norm_type}>). " . 
+		     "Must be either 'none', 'target_length', or 'family_length'\n" );
 	    }			    
 	    $abundances->{$famid} += $raw;
 	    $abundances->{"total"}++; #we want RPKM like abundances here, so we don't carry the length of the gene/family in the total 			    

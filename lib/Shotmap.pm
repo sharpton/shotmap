@@ -86,6 +86,7 @@ sub new{
     $self->{"read_length_filter"}      = 0;
     $self->{"filter_hits"}             = 0;
     $self->{"mc_reads"}                = undef;
+    $self->{"search_db_n_splits"}      = 1;
     bless($self);
     return $self;
 }
@@ -282,11 +283,29 @@ sub build_search_db{
 
 sub search_db_split_size{
     my( $self, $type, $value ) = @_;
+    if( !defined( $type ) ){
+	die( "No type was provided in Shotmap::search_db_split_size" );
+    }
     my $string = "split_size_" . $type;
     if( defined( $value ) ){
 	$self->{$string} = $value;
+    } 
+    else{
+	if( ! defined( $self->{$string} ) ){
+	    # would like to have this on, but breaks !defined checks for Shotmap::Run::build_search_database
+            #die( "Couldn't determine search_db_split_size for type $type" );
+	}
     }
     return $self->{$string};
+}
+
+sub search_db_n_splits{
+    my( $self, $type, $value ) = @_;
+    my $string = "search_db_n_splits_" . $type;
+    if( defined( $value ) ){
+	$self->{$string} = $value;
+    }
+    return $self->{$string};   
 }
 
 sub nr{

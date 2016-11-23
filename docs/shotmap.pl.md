@@ -476,7 +476,8 @@ While you can use shotmap.pl to build your search database, we recommend you ins
 * **--searchdb-split-size=INTEGER** (OPTIONAL argument) NO DEFAULT VALUE
 
     Split the search database into subsets with INTEGER number of hmms/sequences in each subset. This can improve parallelization and optimization
-    of the remote compute cluster (i.e., smaller search database files are transferred to /scratch on slave nodes).
+    of the remote compute cluster (i.e., smaller search database files are transferred to /scratch on slave nodes) and reduces the overall memory footprint
+    of the search step of the workflow. Note that there is some added overhead for each split created that can impact processor time.
 
     Most users will not set this option, which results in a single, large search database, and will instead only change --seq-split-size.
 
@@ -502,3 +503,7 @@ While you can use shotmap.pl to build your search database, we recommend you ins
 
     Tell shotmap to build a search database for only a subset of the families found in --refdb. The value of this option
     must point to a file that contains family identifiers, one per line, to include in the search database.
+
+* **--version** (OPTIONAL argument) DEFAULT: DISABLED
+
+    Print the current version of shotMAP

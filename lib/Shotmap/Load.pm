@@ -20,7 +20,11 @@ use Data::Dumper;
 sub check_vars{
     my $self = shift;
     my $method_str = shift;
-     if( $self->opts->{"remote"} ){
+    if( defined( $self->opts->{"version"} ) ){
+	$self->Shotmap::Notify::print( "You are using ShotMAP version 1.1" );
+	die;
+    }
+    if( $self->opts->{"remote"} ){
 	 (defined($self->opts->{"rhost"}))      
 	     or $self->Shotmap::Notify::dieWithUsageError(
 		 "--rhost (remote computational cluster primary note) must be specified since you set --remote. Exbample --rhost='main.cluster.youruniversity.edu')!"
@@ -188,8 +192,7 @@ sub check_vars{
 	     "You must specify a database name suffix for indexing when running rapsearch!" 
 	     ); 
      }
-    
-    
+        
     #($coverage >= 0.0 && $coverage <= 1.0) or 
     #$self->Shotmap::Notify::dieWithUsageError(
     #"Coverage must be between 0.0 and 1.0 (inclusive). You specified: $coverage.");
@@ -309,13 +312,14 @@ sub check_vars{
 	    }
 	    #searchdb-dir was checked to be -d above
 	    #use the first database split to get the basename
-	    my @files = glob( $self->opts->{"searchdb-dir"} . "/*_1${stem}" ); 
+	    my @files = glob( $self->opts->{"searchdb-dir"} . "/*_1${stem}*" ); 
 	    if( $self->full_pipe && !( @files ) ){
 		die( "There does not appear to be a properly formatted search database in the directory " .
 		     "specified by --searchdb-dir" );
 	    }
 	    my $name  = basename( $files[0] );
 	    $name =~ s/\_1${stem}$//;
+	    $name =~ s/\_1${stem}\.gz$//; #in case db was compressed
 	    $self->opts->{"searchdb-name"} = $name;
 	} else {
 	    (defined($self->opts->{"searchdb-name"})) 
@@ -437,6 +441,7 @@ sub get_options{
 	$reload,
 	$filter_hits,
 	$mc_nreads, #number of reads to use in microbecensus
+	$version,
 	);
 
     my %options = (	
@@ -538,6 +543,7 @@ sub get_options{
 	,    "dryrun"      => \$dryRun
 	,    "reload"      => \$reload
 	,    "filter-hits" => \$filter_hits #should we use a hit-filtered classification map?
+	,    "version"     => \$version
 	);
     my @opt_type_array = ( "input|i=s"      
 			  , "metadata-file|m=s"
@@ -638,6 +644,7 @@ sub get_options{
 			  , "dryrun|dry!"
 			  , "reload!"   		
 			  , "filter-hits!"
+			  , "version!"
 	);
     #grab command line options
 
@@ -791,10 +798,13 @@ sub set_params{
     } else {
 	$self->build_search_db( $self->search_type, $self->opts->{"build-searchdb"} );
     }
-    $self->search_db_split_size( $self->search_type, $self->opts->{"searchdb-split-size"} );
+    if( defined( $self->opts->{"searchdb-split-size"} ) ){
+	$self->search_db_split_size( $self->search_type, $self->opts->{"searchdb-split-size"} );
+    }
+    #print "here: " . $self->search_db_split_size( $self->search_type ) . "\n";
     $self->nr( $self->opts->{"nr"} );     #should we build a non-redundant database
     $self->reps( $self->opts->{"reps"} ); #should we only use representative sequences? Probably defunct - just alter the input db
-    my $db_prefix_basename = $self->opts->{"searchdb-name"};    
+    my $db_prefix_basename = $self->opts->{"searchdb-name"};
     $self->search_db_name_suffix( $self->opts->{"db-suffix"} );
     if( defined( $self->family_subset ) ){
 	my $subset_name = basename( $self->opts->{"family-subset"} ); 
@@ -810,16 +820,18 @@ sub set_params{
 		    ($self->reps()?'_reps':'') . 
 		    ($self->nr()?'_nr':'')     . 
 		    (defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
-	    } else { #local job, so no search db splits
-		$db_name = $db_prefix_basename . 
-		    ($self->reps()?'_reps':'') . 
+	    }
+	    else { #local job, so no search db splits
+	    	$db_name = $db_prefix_basename . 
+	    	    ($self->reps()?'_reps':'') . 
 		    ($self->nr()?'_nr':'');
 	    }
 	} else {
 	    $db_name = $self->opts->{"searchdb-name"};
 	}
 	$self->search_db_name( $self->search_type, $db_name );
-	if( ( !$self->build_search_db( $self->search_type  ) ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
+	if( ( !$self->build_search_db( $self->search_type  ) ) && 
+	    ( ! -d $self->search_db_path( $self->search_type ) ) ){
 	    if( $self->auto() && !$self->is_conf_build){ 
 		unless( $self->is_iso_db ){ #build_search_db is implicit.
 		    $self->Shotmap::Notify::warn(
@@ -847,8 +859,9 @@ sub set_params{
 	if( $self->remote ){
 	    $db_name = "${db_prefix_basename}" . 
 		(defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
-	} else { #local job, so no search db splits
-	    $db_name = $db_prefix_basename;
+	} else {
+	    $db_name = "${db_prefix_basename}" . 
+		(defined( $self->search_db_split_size( $self->search_type ) ) ? "_" . $self->search_db_split_size( $self->search_type ) : '');
 	    $self->search_db_name( $self->search_type, $db_name );
 	    if ( !$self->build_search_db( $self->search_type ) && ( ! -d $self->search_db_path( $self->search_type ) ) ){
 		if( $self->auto() ){
@@ -1009,7 +1022,8 @@ sub load_defaults{
 	    # search methods 
 	    ,       "search-method" => 'rapsearch'
 	    # general options
-	    ,      "seq-split-size" => 100000
+	    ,    "seq-split-size"   => 100000
+
 	    ,    "rarefaction-type" => "read"
 	    ,    "auto"             => 1
 	    ,    "adapt"            => 0
