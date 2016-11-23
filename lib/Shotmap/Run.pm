@@ -1357,6 +1357,15 @@ sub find_tophit{ #for each orf to family mapping, find the top hit
 	    if( !defined($tophit->{$orf} ) ){
 		$tophit->{$orf} = $_;
 	    }
+	    elsif( $score == _get_score_from_mysqld_row( $tophit->{$orf} ) ){
+		my @a = ( 0, 1 );
+		my $pick = $a[ rand @a ];
+		if( $pick == 0 ){
+		    #do nothing - the old hit wins the tie
+		} else {
+		    $tophit->{$orf} = $_;
+		}
+	    }
 	    elsif( $score > _get_score_from_mysqld_row( $tophit->{$orf} ) ){
 		$tophit->{$orf} = $_;
 	    }
