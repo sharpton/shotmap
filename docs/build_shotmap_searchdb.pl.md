@@ -60,12 +60,9 @@ OPTIONS:
     The use of additional arguments (see below) may result in additional strings being concattenated to this prefix. For example,
     if --searchdb-name=KEGG and --nr is invoked, the search database name will be KEGG_nr
 
-* **--searchdb-split-size=INTEGER** (OPTIONAL argument, ONLY FOR REMOTE SEARCHES) NO DEFAULT VALUE
+* **--searchdb-split-size=INTEGER** (OPTIONAL argument) NO DEFAULT VALUE
 
-    Split the search database into subsets with INTEGER number of hmms/sequences in each subset. This can improve parallelization and optimization
-    of the remote compute cluster (i.e., smaller search database files are transferred to /scratch on slave nodes).
-
-    Most users will not set this option, which results in a single, large search database, and will instead only change --seq-split-size.
+    Split the search database into subsets with INTEGER number of hmms/sequences in each subset. This can improve parallelization and optimization, but might increase run time. Not setting this option results in a single, large search database.
 
 * **--nr** (Optional argument) DEFAULT: ENABLED
 
